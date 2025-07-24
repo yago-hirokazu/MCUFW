@@ -1,0 +1,552 @@
+Microsoft Windows [Version 10.0.19044.2728]
+(c) Microsoft Corporation. All rights reserved.
+
+C:\Users\yagouhir\usr\code\MCUFW\core\esh\test\par>setpath.bat
+Press any key to continue . . .
+
+C:\Users\yagouhir\usr\code\MCUFW\core\esh\test\par>make
+gcc -mno-ms-bitfields -g -O0 -I. -I../../include -I../../../elib -I../../target/windows -I../../../../target/windows/Adapt -c -MMD -MP test_par.c -o _output/test_par.o
+gcc -mno-ms-bitfields -g -O0 -I. -I../../include -I../../../elib -I../../target/windows -I../../../../target/windows/Adapt -c -MMD -MP ../../help.c -o _output/help.o
+gcc -mno-ms-bitfields -g -O0 -I. -I../../include -I../../../elib -I../../target/windows -I../../../../target/windows/Adapt -c -MMD -MP ../../par.c -o _output/par.o
+gcc -mno-ms-bitfields -g -O0 -I. -I../../include -I../../../elib -I../../target/windows -I../../../../target/windows/Adapt -c -MMD -MP ../../run.c -o _output/run.o
+gcc -mno-ms-bitfields -g -O0 -I. -I../../include -I../../../elib -I../../target/windows -I../../../../target/windows/Adapt -c -MMD -MP ../../slex.c -o _output/slex.o
+gcc -mno-ms-bitfields -g -O0 -I. -I../../include -I../../../elib -I../../target/windows -I../../../../target/windows/Adapt -c -MMD -MP ../../tty.c -o _output/tty.o
+gcc -mno-ms-bitfields -g -O0 -I. -I../../include -I../../../elib -I../../target/windows -I../../../../target/windows/Adapt -c -MMD -MP ../../target/windows/tty_adapt.c -o _output/tty_adapt.o
+gcc -mno-ms-bitfields -g -O0 -I. -I../../include -I../../../elib -I../../target/windows -I../../../../target/windows/Adapt -c -MMD -MP ../../../usr/cmd/sample.c -o _output/sample.o
+gcc -mno-ms-bitfields -g -O0 -I. -I../../include -I../../../elib -I../../target/windows -I../../../../target/windows/Adapt -c -MMD -MP ../../../elib/qbyte.c -o _output/qbyte.o
+g++ -o test_par.exe _output/test_par.o _output/code.o _output/echo.o _output/expr.o _output/help.o _output/par.o _output/run.o _output/slex.o _output/test.o _output/tok.o _output/tty.o _output/stdio_adapt.o _output/tty_adapt.o _output/sample.o _output/qbyte.o _output/symchar.o -lwinmm
+
+C:\Users\yagouhir\usr\code\MCUFW\core\esh\test\par>./test_par.exe test1.sh
+'.' is not recognized as an internal or external command,
+operable program or batch file.
+
+C:\Users\yagouhir\usr\code\MCUFW\core\esh\test\par>test_par.exe test1.sh
+Lexically analyzing characters to make tokens
+---------------------------------------------
+#scan(#, &aline)=0x0000
+!scan(!, &aline)=0x0000
+/scan(/, &aline)=0x0000
+bscan(b, &aline)=0x0000
+iscan(i, &aline)=0x0000
+nscan(n, &aline)=0x0000
+/scan(/, &aline)=0x0000
+sscan(s, &aline)=0x0000
+hscan(h, &aline)=0x0000
+[tty.c|scan_normal()|L328] LF=0x0A
+
+scan(
+, &aline)=0x0001
+aline.wp = 11
+Raw    : #!/bin/sh
+[tty.c|find_space()|L607] cp=0x0040C080 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=#
+[tty.c|find_space()|L607] cp=0x0040C081 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=!
+[tty.c|find_space()|L607] cp=0x0040C082 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=/
+[tty.c|find_space()|L607] cp=0x0040C083 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=b
+[tty.c|find_space()|L607] cp=0x0040C084 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=i
+[tty.c|find_space()|L607] cp=0x0040C085 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=n
+[tty.c|find_space()|L607] cp=0x0040C086 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=/
+[tty.c|find_space()|L607] cp=0x0040C087 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=s
+[tty.c|find_space()|L607] cp=0x0040C088 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=h
+[tty.c|find_space()|L618] done find_space()
+[tty.c|make_arg()|L263] argv[0]=#!/bin/sh
+ 1 = slex_make_token(#!/bin/sh, &token)
+token[00].t_type  =T_COMMENT
+token[00].t_symbol=
+[tty.c|scan_normal()|L328] LF=0x0A
+
+scan(
+, &aline)=0x0001
+aline.wp = 1
+Raw    :
+[tty.c|find_space()|L607] cp=0x0040C081 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C082 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C083 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C084 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C085 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C086 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C087 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C088 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C089 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C08A endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C08B endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C08C endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C08D endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C08E endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C08F endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C090 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C091 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C092 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C093 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C094 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C095 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C096 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C097 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C098 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C099 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C09A endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C09B endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C09C endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C09D endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C09E endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C09F endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C0A0 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C0A1 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C0A2 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C0A3 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C0A4 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C0A5 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C0A6 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C0A7 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C0A8 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C0A9 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C0AA endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C0AB endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C0AC endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C0AD endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C0AE endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C0AF endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C0B0 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C0B1 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C0B2 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C0B3 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C0B4 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C0B5 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C0B6 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C0B7 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C0B8 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C0B9 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C0BA endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C0BB endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C0BC endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C0BD endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C0BE endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|find_space()|L607] cp=0x0040C0BF endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=
+[tty.c|make_arg()|L263] argv[0]=
+-1 = slex_make_token(, &token)
+token[01].t_type  =T_UNKNOWN
+token[01].t_symbol=
+kscan(k, &aline)=0x0000
+=scan(=, &aline)=0x0000
+0scan(0, &aline)=0x0000
+[tty.c|scan_normal()|L328] LF=0x0A
+
+scan(
+, &aline)=0x0001
+aline.wp = 7
+Raw    : k = 0
+[tty.c|find_space()|L607] cp=0x0040C080 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=k
+[tty.c|find_space()|L618] done find_space()
+[tty.c|find_space()|L607] cp=0x0040C082 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp==
+[tty.c|find_space()|L618] done find_space()
+[tty.c|find_space()|L607] cp=0x0040C084 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=0
+[tty.c|find_space()|L618] done find_space()
+[tty.c|make_arg()|L263] argv[0]=k
+[tty.c|make_arg()|L263] argv[1]==
+[tty.c|make_arg()|L263] argv[2]=0
+ 1 = slex_make_token(k, &token)
+token[02].t_type  =T_SYMBOL
+token[02].t_symbol=k
+ 1 = slex_make_token(=, &token)
+token[03].t_type  =T_ASSIGN
+token[03].t_symbol==
+ 1 = slex_make_token(0, &token)
+token[04].t_type  =T_VALUE
+token[04].t_symbol=0
+wscan(w, &aline)=0x0000
+hscan(h, &aline)=0x0000
+iscan(i, &aline)=0x0000
+lscan(l, &aline)=0x0000
+escan(e, &aline)=0x0000
+ scan( , &aline)=0x0002
+[scan([, &aline)=0x0000
+ scan( , &aline)=0x0002
+$scan($, &aline)=0x0000
+kscan(k, &aline)=0x0000
+ scan( , &aline)=0x0002
+-scan(-, &aline)=0x0000
+nscan(n, &aline)=0x0000
+escan(e, &aline)=0x0000
+ scan( , &aline)=0x0002
+4scan(4, &aline)=0x0000
+ scan( , &aline)=0x0002
+]scan(], &aline)=0x0000
+ scan( , &aline)=0x0002
+;scan(;, &aline)=0x0000
+ scan( , &aline)=0x0002
+dscan(d, &aline)=0x0000
+oscan(o, &aline)=0x0000
+[tty.c|scan_normal()|L328] LF=0x0A
+
+scan(
+, &aline)=0x0001
+aline.wp = 25
+Raw    : while [ $k -ne 4 ] ; do
+[tty.c|find_space()|L607] cp=0x0040C080 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=w
+[tty.c|find_space()|L607] cp=0x0040C081 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=h
+[tty.c|find_space()|L607] cp=0x0040C082 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=i
+[tty.c|find_space()|L607] cp=0x0040C083 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=l
+[tty.c|find_space()|L607] cp=0x0040C084 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=e
+[tty.c|find_space()|L618] done find_space()
+[tty.c|find_space()|L607] cp=0x0040C086 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=[
+[tty.c|find_space()|L618] done find_space()
+[tty.c|find_space()|L607] cp=0x0040C088 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=$
+[tty.c|find_space()|L607] cp=0x0040C089 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=k
+[tty.c|find_space()|L618] done find_space()
+[tty.c|find_space()|L607] cp=0x0040C08B endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=-
+[tty.c|find_space()|L607] cp=0x0040C08C endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=n
+[tty.c|find_space()|L607] cp=0x0040C08D endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=e
+[tty.c|find_space()|L618] done find_space()
+[tty.c|find_space()|L607] cp=0x0040C08F endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=4
+[tty.c|find_space()|L618] done find_space()
+[tty.c|find_space()|L607] cp=0x0040C091 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=]
+[tty.c|find_space()|L618] done find_space()
+[tty.c|find_space()|L607] cp=0x0040C093 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=;
+[tty.c|find_space()|L618] done find_space()
+[tty.c|find_space()|L607] cp=0x0040C095 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=d
+[tty.c|find_space()|L607] cp=0x0040C096 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=o
+[tty.c|find_space()|L618] done find_space()
+[tty.c|make_arg()|L263] argv[0]=while
+[tty.c|make_arg()|L263] argv[1]=[
+[tty.c|make_arg()|L263] argv[2]=$k
+[tty.c|make_arg()|L263] argv[3]=-ne
+[tty.c|make_arg()|L263] argv[4]=4
+[tty.c|make_arg()|L263] argv[5]=]
+[tty.c|make_arg()|L263] argv[6]=;
+[tty.c|make_arg()|L263] argv[7]=do
+ 1 = slex_make_token(while, &token)
+token[05].t_type  =T_WHILE
+token[05].t_symbol=while
+ 0 = slex_make_token([, &token)
+token[06].t_type  =T_LBRACKET
+token[06].t_symbol=[
+ 0 = slex_make_token($k, &token)
+token[07].t_type  =T_CMD_VARG
+token[07].t_symbol=k
+ 0 = slex_make_token(-ne, &token)
+token[08].t_type  =T_CMD_ARG
+token[08].t_symbol=-ne
+ 0 = slex_make_token(4, &token)
+token[09].t_type  =T_CMD_ARG
+token[09].t_symbol=4
+ 0 = slex_make_token(], &token)
+token[10].t_type  =T_RBRACKET
+token[10].t_symbol=]
+ 1 = slex_make_token(;, &token)
+token[11].t_type  =T_SEMICOLON
+token[11].t_symbol=;
+ 1 = slex_make_token(do, &token)
+token[12].t_type  =T_DO
+token[12].t_symbol=do
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+escan(e, &aline)=0x0000
+cscan(c, &aline)=0x0000
+hscan(h, &aline)=0x0000
+oscan(o, &aline)=0x0000
+ scan( , &aline)=0x0002
+$scan($, &aline)=0x0000
+kscan(k, &aline)=0x0000
+[tty.c|scan_normal()|L328] LF=0x0A
+
+scan(
+, &aline)=0x0001
+aline.wp = 9
+Raw    : echo $k
+[tty.c|find_space()|L607] cp=0x0040C080 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=e
+[tty.c|find_space()|L607] cp=0x0040C081 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=c
+[tty.c|find_space()|L607] cp=0x0040C082 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=h
+[tty.c|find_space()|L607] cp=0x0040C083 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=o
+[tty.c|find_space()|L618] done find_space()
+[tty.c|find_space()|L607] cp=0x0040C085 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=$
+[tty.c|find_space()|L607] cp=0x0040C086 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=k
+[tty.c|find_space()|L618] done find_space()
+[tty.c|make_arg()|L263] argv[0]=echo
+[tty.c|make_arg()|L263] argv[1]=$k
+ 0 = slex_make_token(echo, &token)
+token[13].t_type  =T_BLTN_CMD
+token[13].t_symbol=echo
+ 0 = slex_make_token($k, &token)
+token[14].t_type  =T_CMD_VARG
+token[14].t_symbol=k
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+kscan(k, &aline)=0x0000
+=scan(=, &aline)=0x0000
+`scan(`, &aline)=0x0000
+escan(e, &aline)=0x0000
+xscan(x, &aline)=0x0000
+pscan(p, &aline)=0x0000
+rscan(r, &aline)=0x0000
+ scan( , &aline)=0x0002
+$scan($, &aline)=0x0000
+kscan(k, &aline)=0x0000
+ scan( , &aline)=0x0002
++scan(+, &aline)=0x0000
+ scan( , &aline)=0x0002
+1scan(1, &aline)=0x0000
+`scan(`, &aline)=0x0000
+[tty.c|scan_normal()|L328] LF=0x0A
+
+scan(
+, &aline)=0x0001
+aline.wp = 21
+Raw    : k = ` expr $k + 1 `
+[tty.c|find_space()|L607] cp=0x0040C080 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=k
+[tty.c|find_space()|L618] done find_space()
+[tty.c|find_space()|L607] cp=0x0040C082 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp==
+[tty.c|find_space()|L618] done find_space()
+[tty.c|find_space()|L607] cp=0x0040C084 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=`
+[tty.c|find_space()|L618] done find_space()
+[tty.c|find_space()|L607] cp=0x0040C086 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=e
+[tty.c|find_space()|L607] cp=0x0040C087 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=x
+[tty.c|find_space()|L607] cp=0x0040C088 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=p
+[tty.c|find_space()|L607] cp=0x0040C089 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=r
+[tty.c|find_space()|L618] done find_space()
+[tty.c|find_space()|L607] cp=0x0040C08B endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=$
+[tty.c|find_space()|L607] cp=0x0040C08C endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=k
+[tty.c|find_space()|L618] done find_space()
+[tty.c|find_space()|L607] cp=0x0040C08E endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=+
+[tty.c|find_space()|L618] done find_space()
+[tty.c|find_space()|L607] cp=0x0040C090 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=1
+[tty.c|find_space()|L618] done find_space()
+[tty.c|find_space()|L607] cp=0x0040C092 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=`
+[tty.c|find_space()|L618] done find_space()
+[tty.c|make_arg()|L263] argv[0]=k
+[tty.c|make_arg()|L263] argv[1]==
+[tty.c|make_arg()|L263] argv[2]=`
+[tty.c|make_arg()|L263] argv[3]=expr
+[tty.c|make_arg()|L263] argv[4]=$k
+[tty.c|make_arg()|L263] argv[5]=+
+[tty.c|make_arg()|L263] argv[6]=1
+[tty.c|make_arg()|L263] argv[7]=`
+ 1 = slex_make_token(k, &token)
+token[15].t_type  =T_SYMBOL
+token[15].t_symbol=k
+ 1 = slex_make_token(=, &token)
+token[16].t_type  =T_ASSIGN
+token[16].t_symbol==
+ 0 = slex_make_token(`, &token)
+token[17].t_type  =T_LBACKQUOTE
+token[17].t_symbol=`
+ 0 = slex_make_token(expr, &token)
+token[18].t_type  =T_BLTN_CMD
+token[18].t_symbol=expr
+ 0 = slex_make_token($k, &token)
+token[19].t_type  =T_CMD_VARG
+token[19].t_symbol=k
+ 0 = slex_make_token(+, &token)
+token[20].t_type  =T_CMD_ARG
+token[20].t_symbol=+
+ 0 = slex_make_token(1, &token)
+token[21].t_type  =T_CMD_ARG
+token[21].t_symbol=1
+ 0 = slex_make_token(`, &token)
+token[22].t_type  =T_RBACKQUOTE
+token[22].t_symbol=`
+dscan(d, &aline)=0x0000
+oscan(o, &aline)=0x0000
+nscan(n, &aline)=0x0000
+escan(e, &aline)=0x0000
+[tty.c|scan_normal()|L328] LF=0x0A
+
+scan(
+, &aline)=0x0001
+aline.wp = 6
+Raw    : done
+[tty.c|find_space()|L607] cp=0x0040C080 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=d
+[tty.c|find_space()|L607] cp=0x0040C081 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=o
+[tty.c|find_space()|L607] cp=0x0040C082 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=n
+[tty.c|find_space()|L607] cp=0x0040C083 endaddr=0x0040C0BF
+[tty.c|find_space()|L611] *cp=e
+[tty.c|find_space()|L618] done find_space()
+[tty.c|make_arg()|L263] argv[0]=done
+ 1 = slex_make_token(done, &token)
+token[23].t_type  =T_DONE
+token[23].t_symbol=done
+
+24 tokens were made from 76 characters
+
+Result of lexical analysis
+--------------------------
+token[00]: T_COMMENT,
+token[01]: T_UNKNOWN,
+token[02]: T_SYMBOL,    k
+token[03]: T_ASSIGN,    =
+token[04]: T_VALUE,     0
+token[05]: T_WHILE,     while
+token[06]: T_LBRACKET,  [
+token[07]: T_CMD_VARG,  k
+token[08]: T_CMD_ARG,   -ne
+token[09]: T_CMD_ARG,   4
+token[10]: T_RBRACKET,  ]
+token[11]: T_SEMICOLON, ;
+token[12]: T_DO,        do
+token[13]: T_BLTN_CMD,  echo
+token[14]: T_CMD_VARG,  k
+token[15]: T_SYMBOL,    k
+token[16]: T_ASSIGN,    =
+token[17]: T_LBACKQUOTE,        `
+token[18]: T_BLTN_CMD,  expr
+token[19]: T_CMD_VARG,  k
+token[20]: T_CMD_ARG,   +
+token[21]: T_CMD_ARG,   1
+token[22]: T_RBACKQUOTE,        `
+token[23]: T_DONE,      done
+
+Parsing tokens to make byte codes
+---------------------------------
+# of codes =  25
+code[  0]=OP_BLTN_CMD
+code[  1]=01
+code[  2]=OP_CMD_VARG
+code[  3]=00
+code[  4]=OP_CMD_ARG
+code[  5]=00
+code[  6]=OP_CMD_ARG
+code[  7]=01
+code[  8]=OP_CMD_EXE_THEN_STACK
+code[  9]=OP_JUMP_IF_FALSE
+code[ 10]=01
+code[ 11]=OP_BLTN_CMD
+code[ 12]=03
+code[ 13]=OP_CMD_VARG
+code[ 14]=00
+code[ 15]=OP_BLTN_CMD
+code[ 16]=02
+code[ 17]=OP_CMD_VARG
+code[ 18]=00
+code[ 19]=OP_CMD_ARG
+code[ 20]=02
+code[ 21]=OP_CMD_ARG
+code[ 22]=03
+code[ 23]=OP_JUMP
+code[ 24]=00
+code[ 25]=OP_NOP
+Variable:
+v_var[0]: k = 0
+Label:
+l_addr[0] =   0
+l_addr[1] =  25
+String:
+s_str[0] = -ne
+s_str[1] = 4
+s_str[2] = +
+s_str[3] = 1
+
+C:\Users\yagouhir\usr\code\MCUFW\core\esh\test\par>
