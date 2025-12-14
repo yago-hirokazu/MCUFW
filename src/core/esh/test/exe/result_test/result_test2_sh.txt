@@ -1,0 +1,625 @@
+Lexically analyzing characters to make tokens
+---------------------------------------------
+scan(#, &aline)=0x0000
+scan(!, &aline)=0x0000
+scan(/, &aline)=0x0000
+scan(b, &aline)=0x0000
+scan(i, &aline)=0x0000
+scan(n, &aline)=0x0000
+scan(/, &aline)=0x0000
+scan(s, &aline)=0x0000
+scan(h, &aline)=0x0000
+scan(
+, &aline)=0x0001
+aline.wp = 11
+Raw    : #!/bin/sh 
+ 1 = slex_make_token(#!/bin/sh, &token)
+token[00].t_type  =T_COMMENT
+token[00].t_symbol=
+ 1 = slex_make_token(
+, &token)
+token[01].t_type  =T_EOL
+token[01].t_symbol=
+scan(
+, &aline)=0x0001
+aline.wp = 1
+Raw    : 
+ 1 = slex_make_token(
+, &token)
+token[02].t_type  =T_EOL
+token[02].t_symbol=
+scan(k, &aline)=0x0000
+scan(=, &aline)=0x0000
+scan(0, &aline)=0x0000
+scan(
+, &aline)=0x0001
+aline.wp = 7
+Raw    : k = 0 
+ 1 = slex_make_token(k, &token)
+token[03].t_type  =T_VARIABLE
+token[03].t_symbol=k
+ 1 = slex_make_token(=, &token)
+token[04].t_type  =T_ASSIGN
+token[04].t_symbol==
+ 1 = slex_make_token(0, &token)
+token[05].t_type  =T_VALUE
+token[05].t_symbol=0
+ 1 = slex_make_token(
+, &token)
+token[06].t_type  =T_EOL
+token[06].t_symbol=
+scan(i, &aline)=0x0000
+scan(f, &aline)=0x0000
+scan( , &aline)=0x0002
+scan([, &aline)=0x0000
+scan( , &aline)=0x0002
+scan($, &aline)=0x0000
+scan(k, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(-, &aline)=0x0000
+scan(e, &aline)=0x0000
+scan(q, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(0, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(], &aline)=0x0000
+scan(;, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(t, &aline)=0x0000
+scan(h, &aline)=0x0000
+scan(e, &aline)=0x0000
+scan(n, &aline)=0x0000
+scan(
+, &aline)=0x0001
+aline.wp = 24
+Raw    : if [ $k -eq 0 ] ; then 
+ 1 = slex_make_token(if, &token)
+token[07].t_type  =T_IF
+token[07].t_symbol=if
+ 0 = slex_make_token([, &token)
+token[08].t_type  =T_LBRACKET
+token[08].t_symbol=[
+ 0 = slex_make_token($k, &token)
+token[09].t_type  =T_CMD_VARG
+token[09].t_symbol=k
+ 0 = slex_make_token(-eq, &token)
+token[10].t_type  =T_CMD_ARG
+token[10].t_symbol=-eq
+ 0 = slex_make_token(0, &token)
+token[11].t_type  =T_CMD_ARG
+token[11].t_symbol=0
+ 0 = slex_make_token(], &token)
+token[12].t_type  =T_RBRACKET
+token[12].t_symbol=]
+ 1 = slex_make_token(;, &token)
+token[13].t_type  =T_SEMICOLON
+token[13].t_symbol=;
+ 1 = slex_make_token(then, &token)
+token[14].t_type  =T_THEN
+token[14].t_symbol=then
+ 1 = slex_make_token(
+, &token)
+token[15].t_type  =T_EOL
+token[15].t_symbol=
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan(e, &aline)=0x0000
+scan(c, &aline)=0x0000
+scan(h, &aline)=0x0000
+scan(o, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(', &aline)=0x0000
+scan(c, &aline)=0x0000
+scan(a, &aline)=0x0000
+scan(t, &aline)=0x0000
+scan(c, &aline)=0x0000
+scan(h, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(a, &aline)=0x0000
+scan(t, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(i, &aline)=0x0000
+scan(f, &aline)=0x0000
+scan(', &aline)=0x0000
+scan(
+, &aline)=0x0001
+aline.wp = 22
+Raw    : echo ' catch at if ' 
+ 0 = slex_make_token(echo, &token)
+token[16].t_type  =T_BLTN_CMD
+token[16].t_symbol=echo
+ 2 = slex_make_token(', &token)
+token[17].t_type  =T_CMD_ARG
+token[17].t_symbol=
+ 2 = slex_make_token(catch, &token)
+token[17].t_type  =T_CMD_ARG
+token[17].t_symbol=catch
+ 2 = slex_make_token(at, &token)
+token[17].t_type  =T_CMD_ARG
+token[17].t_symbol=catch at
+ 2 = slex_make_token(if, &token)
+token[17].t_type  =T_CMD_ARG
+token[17].t_symbol=catch at if
+ 0 = slex_make_token(', &token)
+token[17].t_type  =T_CMD_ARG
+token[17].t_symbol=catch at if
+ 1 = slex_make_token(
+, &token)
+token[18].t_type  =T_EOL
+token[18].t_symbol=
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan(e, &aline)=0x0000
+scan(c, &aline)=0x0000
+scan(h, &aline)=0x0000
+scan(o, &aline)=0x0000
+scan( , &aline)=0x0002
+scan($, &aline)=0x0000
+scan(k, &aline)=0x0000
+scan(
+, &aline)=0x0001
+aline.wp = 9
+Raw    : echo $k 
+ 0 = slex_make_token(echo, &token)
+token[19].t_type  =T_BLTN_CMD
+token[19].t_symbol=echo
+ 0 = slex_make_token($k, &token)
+token[20].t_type  =T_CMD_VARG
+token[20].t_symbol=k
+ 1 = slex_make_token(
+, &token)
+token[21].t_type  =T_EOL
+token[21].t_symbol=
+scan(e, &aline)=0x0000
+scan(l, &aline)=0x0000
+scan(i, &aline)=0x0000
+scan(f, &aline)=0x0000
+scan( , &aline)=0x0002
+scan([, &aline)=0x0000
+scan( , &aline)=0x0002
+scan($, &aline)=0x0000
+scan(k, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(-, &aline)=0x0000
+scan(e, &aline)=0x0000
+scan(q, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(1, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(], &aline)=0x0000
+scan(;, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(t, &aline)=0x0000
+scan(h, &aline)=0x0000
+scan(e, &aline)=0x0000
+scan(n, &aline)=0x0000
+scan(
+, &aline)=0x0001
+aline.wp = 26
+Raw    : elif [ $k -eq 1 ] ; then 
+ 1 = slex_make_token(elif, &token)
+token[22].t_type  =T_ELIF
+token[22].t_symbol=elif
+ 0 = slex_make_token([, &token)
+token[23].t_type  =T_LBRACKET
+token[23].t_symbol=[
+ 0 = slex_make_token($k, &token)
+token[24].t_type  =T_CMD_VARG
+token[24].t_symbol=k
+ 0 = slex_make_token(-eq, &token)
+token[25].t_type  =T_CMD_ARG
+token[25].t_symbol=-eq
+ 0 = slex_make_token(1, &token)
+token[26].t_type  =T_CMD_ARG
+token[26].t_symbol=1
+ 0 = slex_make_token(], &token)
+token[27].t_type  =T_RBRACKET
+token[27].t_symbol=]
+ 1 = slex_make_token(;, &token)
+token[28].t_type  =T_SEMICOLON
+token[28].t_symbol=;
+ 1 = slex_make_token(then, &token)
+token[29].t_type  =T_THEN
+token[29].t_symbol=then
+ 1 = slex_make_token(
+, &token)
+token[30].t_type  =T_EOL
+token[30].t_symbol=
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan(e, &aline)=0x0000
+scan(c, &aline)=0x0000
+scan(h, &aline)=0x0000
+scan(o, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(', &aline)=0x0000
+scan(c, &aline)=0x0000
+scan(a, &aline)=0x0000
+scan(t, &aline)=0x0000
+scan(c, &aline)=0x0000
+scan(h, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(a, &aline)=0x0000
+scan(t, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(e, &aline)=0x0000
+scan(l, &aline)=0x0000
+scan(i, &aline)=0x0000
+scan(f, &aline)=0x0000
+scan(', &aline)=0x0000
+scan(
+, &aline)=0x0001
+aline.wp = 24
+Raw    : echo ' catch at elif ' 
+ 0 = slex_make_token(echo, &token)
+token[31].t_type  =T_BLTN_CMD
+token[31].t_symbol=echo
+ 2 = slex_make_token(', &token)
+token[32].t_type  =T_CMD_ARG
+token[32].t_symbol=
+ 2 = slex_make_token(catch, &token)
+token[32].t_type  =T_CMD_ARG
+token[32].t_symbol=catch
+ 2 = slex_make_token(at, &token)
+token[32].t_type  =T_CMD_ARG
+token[32].t_symbol=catch at
+ 2 = slex_make_token(elif, &token)
+token[32].t_type  =T_CMD_ARG
+token[32].t_symbol=catch at elif
+ 0 = slex_make_token(', &token)
+token[32].t_type  =T_CMD_ARG
+token[32].t_symbol=catch at elif
+ 1 = slex_make_token(
+, &token)
+token[33].t_type  =T_EOL
+token[33].t_symbol=
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan(e, &aline)=0x0000
+scan(c, &aline)=0x0000
+scan(h, &aline)=0x0000
+scan(o, &aline)=0x0000
+scan( , &aline)=0x0002
+scan($, &aline)=0x0000
+scan(k, &aline)=0x0000
+scan(
+, &aline)=0x0001
+aline.wp = 9
+Raw    : echo $k 
+ 0 = slex_make_token(echo, &token)
+token[34].t_type  =T_BLTN_CMD
+token[34].t_symbol=echo
+ 0 = slex_make_token($k, &token)
+token[35].t_type  =T_CMD_VARG
+token[35].t_symbol=k
+ 1 = slex_make_token(
+, &token)
+token[36].t_type  =T_EOL
+token[36].t_symbol=
+scan(e, &aline)=0x0000
+scan(l, &aline)=0x0000
+scan(s, &aline)=0x0000
+scan(e, &aline)=0x0000
+scan(
+, &aline)=0x0001
+aline.wp = 6
+Raw    : else 
+ 1 = slex_make_token(else, &token)
+token[37].t_type  =T_ELSE
+token[37].t_symbol=else
+ 1 = slex_make_token(
+, &token)
+token[38].t_type  =T_EOL
+token[38].t_symbol=
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan(e, &aline)=0x0000
+scan(c, &aline)=0x0000
+scan(h, &aline)=0x0000
+scan(o, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(', &aline)=0x0000
+scan(c, &aline)=0x0000
+scan(a, &aline)=0x0000
+scan(t, &aline)=0x0000
+scan(c, &aline)=0x0000
+scan(h, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(a, &aline)=0x0000
+scan(t, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(e, &aline)=0x0000
+scan(l, &aline)=0x0000
+scan(s, &aline)=0x0000
+scan(e, &aline)=0x0000
+scan(', &aline)=0x0000
+scan(
+, &aline)=0x0001
+aline.wp = 24
+Raw    : echo ' catch at else ' 
+ 0 = slex_make_token(echo, &token)
+token[39].t_type  =T_BLTN_CMD
+token[39].t_symbol=echo
+ 2 = slex_make_token(', &token)
+token[40].t_type  =T_CMD_ARG
+token[40].t_symbol=
+ 2 = slex_make_token(catch, &token)
+token[40].t_type  =T_CMD_ARG
+token[40].t_symbol=catch
+ 2 = slex_make_token(at, &token)
+token[40].t_type  =T_CMD_ARG
+token[40].t_symbol=catch at
+ 2 = slex_make_token(else, &token)
+token[40].t_type  =T_CMD_ARG
+token[40].t_symbol=catch at else
+ 0 = slex_make_token(', &token)
+token[40].t_type  =T_CMD_ARG
+token[40].t_symbol=catch at else
+ 1 = slex_make_token(
+, &token)
+token[41].t_type  =T_EOL
+token[41].t_symbol=
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan(e, &aline)=0x0000
+scan(c, &aline)=0x0000
+scan(h, &aline)=0x0000
+scan(o, &aline)=0x0000
+scan( , &aline)=0x0002
+scan($, &aline)=0x0000
+scan(k, &aline)=0x0000
+scan(
+, &aline)=0x0001
+aline.wp = 9
+Raw    : echo $k 
+ 0 = slex_make_token(echo, &token)
+token[42].t_type  =T_BLTN_CMD
+token[42].t_symbol=echo
+ 0 = slex_make_token($k, &token)
+token[43].t_type  =T_CMD_VARG
+token[43].t_symbol=k
+ 1 = slex_make_token(
+, &token)
+token[44].t_type  =T_EOL
+token[44].t_symbol=
+scan(f, &aline)=0x0000
+scan(i, &aline)=0x0000
+scan(
+, &aline)=0x0001
+aline.wp = 4
+Raw    : fi 
+ 1 = slex_make_token(fi, &token)
+token[45].t_type  =T_FI
+token[45].t_symbol=fi
+ 1 = slex_make_token(
+, &token)
+token[46].t_type  =T_EOL
+token[46].t_symbol=
+scan(
+, &aline)=0x0001
+aline.wp = 1
+Raw    : 
+ 1 = slex_make_token(
+, &token)
+token[47].t_type  =T_EOL
+token[47].t_symbol=
+
+48 tokens were made from -77 characters
+
+Result of lexical analysis
+--------------------------
+token[00]: T_COMMENT,	
+token[01]: T_EOL,	
+token[02]: T_EOL,	
+token[03]: T_VARIABLE,	k
+token[04]: T_ASSIGN,	=
+token[05]: T_VALUE,	0
+token[06]: T_EOL,	
+token[07]: T_IF,	if
+token[08]: T_LBRACKET,	[
+token[09]: T_CMD_VARG,	k
+token[10]: T_CMD_ARG,	-eq
+token[11]: T_CMD_ARG,	0
+token[12]: T_RBRACKET,	]
+token[13]: T_SEMICOLON,	;
+token[14]: T_THEN,	then
+token[15]: T_EOL,	
+token[16]: T_BLTN_CMD,	echo
+token[17]: T_CMD_ARG,	catch at if
+token[18]: T_EOL,	
+token[19]: T_BLTN_CMD,	echo
+token[20]: T_CMD_VARG,	k
+token[21]: T_EOL,	
+token[22]: T_ELIF,	elif
+token[23]: T_LBRACKET,	[
+token[24]: T_CMD_VARG,	k
+token[25]: T_CMD_ARG,	-eq
+token[26]: T_CMD_ARG,	1
+token[27]: T_RBRACKET,	]
+token[28]: T_SEMICOLON,	;
+token[29]: T_THEN,	then
+token[30]: T_EOL,	
+token[31]: T_BLTN_CMD,	echo
+token[32]: T_CMD_ARG,	catch at elif
+token[33]: T_EOL,	
+token[34]: T_BLTN_CMD,	echo
+token[35]: T_CMD_VARG,	k
+token[36]: T_EOL,	
+token[37]: T_ELSE,	else
+token[38]: T_EOL,	
+token[39]: T_BLTN_CMD,	echo
+token[40]: T_CMD_ARG,	catch at else
+token[41]: T_EOL,	
+token[42]: T_BLTN_CMD,	echo
+token[43]: T_CMD_VARG,	k
+token[44]: T_EOL,	
+token[45]: T_FI,	fi
+token[46]: T_EOL,	
+token[47]: T_EOL,	
+
+Parsing tokens to make byte codes
+---------------------------------
+# of codes =  60
+code[  0]=OP_PUSH_SYMBOL
+code[  1]=00
+code[  2]=OP_POP_SYMBOL_THEN_ASSIGN
+code[  3]=00
+code[  4]=OP_BLTN_CMD
+code[  5]=01
+code[  6]=OP_CMD_VARG
+code[  7]=00
+code[  8]=OP_CMD_ARG
+code[  9]=01
+code[ 10]=OP_CMD_ARG
+code[ 11]=00
+code[ 12]=OP_CMD_EXE_THEN_STACK
+code[ 13]=OP_JUMP_IF_FALSE
+code[ 14]=01
+code[ 15]=OP_BLTN_CMD
+code[ 16]=03
+code[ 17]=OP_CMD_ARG
+code[ 18]=02
+code[ 19]=OP_CMD_EXE
+code[ 20]=OP_BLTN_CMD
+code[ 21]=03
+code[ 22]=OP_CMD_VARG
+code[ 23]=00
+code[ 24]=OP_CMD_EXE
+code[ 25]=OP_JUMP
+code[ 26]=00
+code[ 27]=OP_BLTN_CMD
+code[ 28]=01
+code[ 29]=OP_CMD_VARG
+code[ 30]=00
+code[ 31]=OP_CMD_ARG
+code[ 32]=01
+code[ 33]=OP_CMD_ARG
+code[ 34]=03
+code[ 35]=OP_CMD_EXE_THEN_STACK
+code[ 36]=OP_JUMP_IF_FALSE
+code[ 37]=02
+code[ 38]=OP_BLTN_CMD
+code[ 39]=03
+code[ 40]=OP_CMD_ARG
+code[ 41]=04
+code[ 42]=OP_CMD_EXE
+code[ 43]=OP_BLTN_CMD
+code[ 44]=03
+code[ 45]=OP_CMD_VARG
+code[ 46]=00
+code[ 47]=OP_CMD_EXE
+code[ 48]=OP_JUMP
+code[ 49]=00
+code[ 50]=OP_BLTN_CMD
+code[ 51]=03
+code[ 52]=OP_CMD_ARG
+code[ 53]=05
+code[ 54]=OP_CMD_EXE
+code[ 55]=OP_BLTN_CMD
+code[ 56]=03
+code[ 57]=OP_CMD_VARG
+code[ 58]=00
+code[ 59]=OP_CMD_EXE
+code[ 60]=OP_NOP
+Variable:
+v_var[0]: k = 
+Label:
+l_addr[0] =  60
+l_addr[1] =  27
+l_addr[2] =  50
+String:
+s_str[0] = 0
+s_str[1] = -eq
+s_str[2] = catch at if
+s_str[3] = 1
+s_str[4] = catch at elif
+s_str[5] = catch at else
+
+Executing byte codes
+--------------------
+Execute code[  0]=OP_PUSH_SYMBOL
+exe.e_procs = 0
+stack[  0]=00
+variable[  0]: k = 
+Execute code[  2]=OP_POP_SYMBOL_THEN_ASSIGN
+exe.e_procs = 0
+variable[  0]: k = 0
+Execute code[  4]=OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0]=test
+variable[  0]: k = 0
+Execute code[  6]=OP_CMD_VARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0]=test
+argv[ 1]=0
+variable[  0]: k = 0
+Execute code[  8]=OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 3
+argv[ 0]=test
+argv[ 1]=0
+argv[ 2]=-eq
+variable[  0]: k = 0
+Execute code[ 10]=OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 4
+argv[ 0]=test
+argv[ 1]=0
+argv[ 2]=-eq
+argv[ 3]=0
+variable[  0]: k = 0
+Execute code[ 12]=OP_CMD_EXE_THEN_STACK
+exe.e_procs = 0
+stack[  0]=00
+variable[  0]: k = 0
+Execute code[ 13]=OP_JUMP_IF_FALSE
+exe.e_procs = 0
+variable[  0]: k = 0
+Execute code[ 15]=OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0]=echo
+variable[  0]: k = 0
+Execute code[ 17]=OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0]=echo
+argv[ 1]=catch at if
+variable[  0]: k = 0
+Execute code[ 19]=OP_CMD_EXE
+exe.e_procs = 0
+variable[  0]: k = 0
+Execute code[ 20]=OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0]=echo
+variable[  0]: k = 0
+Execute code[ 22]=OP_CMD_VARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0]=echo
+argv[ 1]=0
+variable[  0]: k = 0
+Execute code[ 24]=OP_CMD_EXE
+exe.e_procs = 0
+variable[  0]: k = 0
+Execute code[ 25]=OP_JUMP
+exe.e_procs = 0
+variable[  0]: k = 0
+Execute code[ 60]=OP_NOP
+exe.e_procs = 0
+variable[  0]: k = 0
