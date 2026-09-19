@@ -59,10 +59,10 @@ struct tty_context {
 /**************************************************************************
  * LOCAL VARIABLE DECLARATIONS
  **************************************************************************/
-char linebuf[TTY_NBUF];
-struct tty_arg arg;
-struct tty_history history;
-struct tty_context tty;
+static char linebuf[TTY_NBUF];
+static struct tty_arg arg;
+static struct tty_history history;
+static struct tty_context tty;
 
 
 /**************************************************************************

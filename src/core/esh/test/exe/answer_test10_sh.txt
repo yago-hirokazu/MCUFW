@@ -1,0 +1,1889 @@
+Lexically analyzing characters to make tokens
+---------------------------------------------
+scan(#, &aline)=0x0000
+scan(!, &aline)=0x0000
+scan(/, &aline)=0x0000
+scan(b, &aline)=0x0000
+scan(i, &aline)=0x0000
+scan(n, &aline)=0x0000
+scan(/, &aline)=0x0000
+scan(s, &aline)=0x0000
+scan(h, &aline)=0x0000
+scan(
+, &aline)=0x0001
+aline.wp = 11
+Raw    : #!/bin/sh 
+2 (LEXDONE) = lex_anlyze_token(#!/bin/sh, &token)
+token[00].t_type   = T_COMMENT
+token[00].t_symbol = 
+2 (LEXDONE) = lex_anlyze_token(
+, &token)
+token[01].t_type   = T_EOL
+token[01].t_symbol = 
+scan(
+, &aline)=0x0001
+aline.wp = 1
+Raw    : 
+2 (LEXDONE) = lex_anlyze_token(
+, &token)
+token[02].t_type   = T_EOL
+token[02].t_symbol = 
+scan(k, &aline)=0x0000
+scan(=, &aline)=0x0000
+scan(0, &aline)=0x0000
+scan(
+, &aline)=0x0001
+aline.wp = 7
+Raw    : k = 0 
+2 (LEXDONE) = lex_anlyze_token(k, &token)
+token[03].t_type   = T_VARIABLE
+token[03].t_symbol = k
+2 (LEXDONE) = lex_anlyze_token(=, &token)
+token[04].t_type   = T_ASSIGN
+token[04].t_symbol = =
+2 (LEXDONE) = lex_anlyze_token(0, &token)
+token[05].t_type   = T_VALUE
+token[05].t_symbol = 0
+2 (LEXDONE) = lex_anlyze_token(
+, &token)
+token[06].t_type   = T_EOL
+token[06].t_symbol = 
+scan(w, &aline)=0x0000
+scan(h, &aline)=0x0000
+scan(i, &aline)=0x0000
+scan(l, &aline)=0x0000
+scan(e, &aline)=0x0000
+scan( , &aline)=0x0002
+scan([, &aline)=0x0000
+scan( , &aline)=0x0002
+scan($, &aline)=0x0000
+scan(k, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(-, &aline)=0x0000
+scan(n, &aline)=0x0000
+scan(e, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(4, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(], &aline)=0x0000
+scan(;, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(d, &aline)=0x0000
+scan(o, &aline)=0x0000
+scan(
+, &aline)=0x0001
+aline.wp = 25
+Raw    : while [ $k -ne 4 ] ; do 
+2 (LEXDONE) = lex_anlyze_token(while, &token)
+token[07].t_type   = T_WHILE
+token[07].t_symbol = while
+1 (LEXONGO) = lex_anlyze_token([, &token)
+token[08].t_type   = T_LBRACKET
+token[08].t_symbol = [
+1 (LEXONGO) = lex_anlyze_token($k, &token)
+token[09].t_type   = T_CMD_VARG
+token[09].t_symbol = k
+1 (LEXONGO) = lex_anlyze_token(-ne, &token)
+token[10].t_type   = T_CMD_ARG
+token[10].t_symbol = -ne
+1 (LEXONGO) = lex_anlyze_token(4, &token)
+token[11].t_type   = T_CMD_ARG
+token[11].t_symbol = 4
+1 (LEXONGO) = lex_anlyze_token(], &token)
+token[12].t_type   = T_RBRACKET
+token[12].t_symbol = ]
+2 (LEXDONE) = lex_anlyze_token(;, &token)
+token[13].t_type   = T_SEMICOLON
+token[13].t_symbol = ;
+2 (LEXDONE) = lex_anlyze_token(do, &token)
+token[14].t_type   = T_DO
+token[14].t_symbol = do
+2 (LEXDONE) = lex_anlyze_token(
+, &token)
+token[15].t_type   = T_EOL
+token[15].t_symbol = 
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan(k, &aline)=0x0000
+scan(=, &aline)=0x0000
+scan(`, &aline)=0x0000
+scan(e, &aline)=0x0000
+scan(x, &aline)=0x0000
+scan(p, &aline)=0x0000
+scan(r, &aline)=0x0000
+scan( , &aline)=0x0002
+scan($, &aline)=0x0000
+scan(k, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(+, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(1, &aline)=0x0000
+scan(`, &aline)=0x0000
+scan(
+, &aline)=0x0001
+aline.wp = 21
+Raw    : k = ` expr $k + 1 ` 
+2 (LEXDONE) = lex_anlyze_token(k, &token)
+token[16].t_type   = T_VARIABLE
+token[16].t_symbol = k
+2 (LEXDONE) = lex_anlyze_token(=, &token)
+token[17].t_type   = T_ASSIGN
+token[17].t_symbol = =
+1 (LEXONGO) = lex_anlyze_token(`, &token)
+token[18].t_type   = T_LBACKQUOTE
+token[18].t_symbol = `
+1 (LEXONGO) = lex_anlyze_token(expr, &token)
+token[19].t_type   = T_BLTN_CMD
+token[19].t_symbol = expr
+1 (LEXONGO) = lex_anlyze_token($k, &token)
+token[20].t_type   = T_CMD_VARG
+token[20].t_symbol = k
+1 (LEXONGO) = lex_anlyze_token(+, &token)
+token[21].t_type   = T_CMD_ARG
+token[21].t_symbol = +
+1 (LEXONGO) = lex_anlyze_token(1, &token)
+token[22].t_type   = T_CMD_ARG
+token[22].t_symbol = 1
+1 (LEXONGO) = lex_anlyze_token(`, &token)
+token[23].t_type   = T_RBACKQUOTE
+token[23].t_symbol = `
+2 (LEXDONE) = lex_anlyze_token(
+, &token)
+token[24].t_type   = T_EOL
+token[24].t_symbol = 
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan(e, &aline)=0x0000
+scan(c, &aline)=0x0000
+scan(h, &aline)=0x0000
+scan(o, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(', &aline)=0x0000
+scan(k, &aline)=0x0000
+scan(=, &aline)=0x0000
+scan(', &aline)=0x0000
+scan(
+, &aline)=0x0001
+aline.wp = 14
+Raw    : echo ' k = ' 
+1 (LEXONGO) = lex_anlyze_token(echo, &token)
+token[25].t_type   = T_BLTN_CMD
+token[25].t_symbol = echo
+3 (LEXQUOTE) = lex_anlyze_token(', &token)
+token[26].t_type   = T_CMD_ARG
+token[26].t_symbol = 
+3 (LEXQUOTE) = lex_anlyze_token(k, &token)
+token[26].t_type   = T_CMD_ARG
+token[26].t_symbol = k
+3 (LEXQUOTE) = lex_anlyze_token(=, &token)
+token[26].t_type   = T_CMD_ARG
+token[26].t_symbol = k =
+1 (LEXONGO) = lex_anlyze_token(', &token)
+token[26].t_type   = T_CMD_ARG
+token[26].t_symbol = k =
+2 (LEXDONE) = lex_anlyze_token(
+, &token)
+token[27].t_type   = T_EOL
+token[27].t_symbol = 
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan(e, &aline)=0x0000
+scan(c, &aline)=0x0000
+scan(h, &aline)=0x0000
+scan(o, &aline)=0x0000
+scan( , &aline)=0x0002
+scan($, &aline)=0x0000
+scan(k, &aline)=0x0000
+scan(
+, &aline)=0x0001
+aline.wp = 9
+Raw    : echo $k 
+1 (LEXONGO) = lex_anlyze_token(echo, &token)
+token[28].t_type   = T_BLTN_CMD
+token[28].t_symbol = echo
+1 (LEXONGO) = lex_anlyze_token($k, &token)
+token[29].t_type   = T_CMD_VARG
+token[29].t_symbol = k
+2 (LEXDONE) = lex_anlyze_token(
+, &token)
+token[30].t_type   = T_EOL
+token[30].t_symbol = 
+scan(
+, &aline)=0x0001
+aline.wp = 1
+Raw    : 
+2 (LEXDONE) = lex_anlyze_token(
+, &token)
+token[31].t_type   = T_EOL
+token[31].t_symbol = 
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan(i, &aline)=0x0000
+scan(f, &aline)=0x0000
+scan( , &aline)=0x0002
+scan([, &aline)=0x0000
+scan( , &aline)=0x0002
+scan($, &aline)=0x0000
+scan(k, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(-, &aline)=0x0000
+scan(e, &aline)=0x0000
+scan(q, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(2, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(], &aline)=0x0000
+scan(;, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(t, &aline)=0x0000
+scan(h, &aline)=0x0000
+scan(e, &aline)=0x0000
+scan(n, &aline)=0x0000
+scan(
+, &aline)=0x0001
+aline.wp = 24
+Raw    : if [ $k -eq 2 ] ; then 
+2 (LEXDONE) = lex_anlyze_token(if, &token)
+token[32].t_type   = T_IF
+token[32].t_symbol = if
+1 (LEXONGO) = lex_anlyze_token([, &token)
+token[33].t_type   = T_LBRACKET
+token[33].t_symbol = [
+1 (LEXONGO) = lex_anlyze_token($k, &token)
+token[34].t_type   = T_CMD_VARG
+token[34].t_symbol = k
+1 (LEXONGO) = lex_anlyze_token(-eq, &token)
+token[35].t_type   = T_CMD_ARG
+token[35].t_symbol = -eq
+1 (LEXONGO) = lex_anlyze_token(2, &token)
+token[36].t_type   = T_CMD_ARG
+token[36].t_symbol = 2
+1 (LEXONGO) = lex_anlyze_token(], &token)
+token[37].t_type   = T_RBRACKET
+token[37].t_symbol = ]
+2 (LEXDONE) = lex_anlyze_token(;, &token)
+token[38].t_type   = T_SEMICOLON
+token[38].t_symbol = ;
+2 (LEXDONE) = lex_anlyze_token(then, &token)
+token[39].t_type   = T_THEN
+token[39].t_symbol = then
+2 (LEXDONE) = lex_anlyze_token(
+, &token)
+token[40].t_type   = T_EOL
+token[40].t_symbol = 
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan(l, &aline)=0x0000
+scan(=, &aline)=0x0000
+scan(0, &aline)=0x0000
+scan(
+, &aline)=0x0001
+aline.wp = 7
+Raw    : l = 0 
+2 (LEXDONE) = lex_anlyze_token(l, &token)
+token[41].t_type   = T_VARIABLE
+token[41].t_symbol = l
+2 (LEXDONE) = lex_anlyze_token(=, &token)
+token[42].t_type   = T_ASSIGN
+token[42].t_symbol = =
+2 (LEXDONE) = lex_anlyze_token(0, &token)
+token[43].t_type   = T_VALUE
+token[43].t_symbol = 0
+2 (LEXDONE) = lex_anlyze_token(
+, &token)
+token[44].t_type   = T_EOL
+token[44].t_symbol = 
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan(w, &aline)=0x0000
+scan(h, &aline)=0x0000
+scan(i, &aline)=0x0000
+scan(l, &aline)=0x0000
+scan(e, &aline)=0x0000
+scan( , &aline)=0x0002
+scan([, &aline)=0x0000
+scan( , &aline)=0x0002
+scan($, &aline)=0x0000
+scan(l, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(-, &aline)=0x0000
+scan(n, &aline)=0x0000
+scan(e, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(4, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(], &aline)=0x0000
+scan(;, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(d, &aline)=0x0000
+scan(o, &aline)=0x0000
+scan(
+, &aline)=0x0001
+aline.wp = 25
+Raw    : while [ $l -ne 4 ] ; do 
+2 (LEXDONE) = lex_anlyze_token(while, &token)
+token[45].t_type   = T_WHILE
+token[45].t_symbol = while
+1 (LEXONGO) = lex_anlyze_token([, &token)
+token[46].t_type   = T_LBRACKET
+token[46].t_symbol = [
+1 (LEXONGO) = lex_anlyze_token($l, &token)
+token[47].t_type   = T_CMD_VARG
+token[47].t_symbol = l
+1 (LEXONGO) = lex_anlyze_token(-ne, &token)
+token[48].t_type   = T_CMD_ARG
+token[48].t_symbol = -ne
+1 (LEXONGO) = lex_anlyze_token(4, &token)
+token[49].t_type   = T_CMD_ARG
+token[49].t_symbol = 4
+1 (LEXONGO) = lex_anlyze_token(], &token)
+token[50].t_type   = T_RBRACKET
+token[50].t_symbol = ]
+2 (LEXDONE) = lex_anlyze_token(;, &token)
+token[51].t_type   = T_SEMICOLON
+token[51].t_symbol = ;
+2 (LEXDONE) = lex_anlyze_token(do, &token)
+token[52].t_type   = T_DO
+token[52].t_symbol = do
+2 (LEXDONE) = lex_anlyze_token(
+, &token)
+token[53].t_type   = T_EOL
+token[53].t_symbol = 
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan(e, &aline)=0x0000
+scan(c, &aline)=0x0000
+scan(h, &aline)=0x0000
+scan(o, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(', &aline)=0x0000
+scan(l, &aline)=0x0000
+scan(=, &aline)=0x0000
+scan(', &aline)=0x0000
+scan(
+, &aline)=0x0001
+aline.wp = 14
+Raw    : echo ' l = ' 
+1 (LEXONGO) = lex_anlyze_token(echo, &token)
+token[54].t_type   = T_BLTN_CMD
+token[54].t_symbol = echo
+3 (LEXQUOTE) = lex_anlyze_token(', &token)
+token[55].t_type   = T_CMD_ARG
+token[55].t_symbol = 
+3 (LEXQUOTE) = lex_anlyze_token(l, &token)
+token[55].t_type   = T_CMD_ARG
+token[55].t_symbol = l
+3 (LEXQUOTE) = lex_anlyze_token(=, &token)
+token[55].t_type   = T_CMD_ARG
+token[55].t_symbol = l =
+1 (LEXONGO) = lex_anlyze_token(', &token)
+token[55].t_type   = T_CMD_ARG
+token[55].t_symbol = l =
+2 (LEXDONE) = lex_anlyze_token(
+, &token)
+token[56].t_type   = T_EOL
+token[56].t_symbol = 
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan(e, &aline)=0x0000
+scan(c, &aline)=0x0000
+scan(h, &aline)=0x0000
+scan(o, &aline)=0x0000
+scan( , &aline)=0x0002
+scan($, &aline)=0x0000
+scan(l, &aline)=0x0000
+scan(
+, &aline)=0x0001
+aline.wp = 9
+Raw    : echo $l 
+1 (LEXONGO) = lex_anlyze_token(echo, &token)
+token[57].t_type   = T_BLTN_CMD
+token[57].t_symbol = echo
+1 (LEXONGO) = lex_anlyze_token($l, &token)
+token[58].t_type   = T_CMD_VARG
+token[58].t_symbol = l
+2 (LEXDONE) = lex_anlyze_token(
+, &token)
+token[59].t_type   = T_EOL
+token[59].t_symbol = 
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan(l, &aline)=0x0000
+scan(=, &aline)=0x0000
+scan(`, &aline)=0x0000
+scan(e, &aline)=0x0000
+scan(x, &aline)=0x0000
+scan(p, &aline)=0x0000
+scan(r, &aline)=0x0000
+scan( , &aline)=0x0002
+scan($, &aline)=0x0000
+scan(l, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(+, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(1, &aline)=0x0000
+scan(`, &aline)=0x0000
+scan(
+, &aline)=0x0001
+aline.wp = 21
+Raw    : l = ` expr $l + 1 ` 
+2 (LEXDONE) = lex_anlyze_token(l, &token)
+token[60].t_type   = T_VARIABLE
+token[60].t_symbol = l
+2 (LEXDONE) = lex_anlyze_token(=, &token)
+token[61].t_type   = T_ASSIGN
+token[61].t_symbol = =
+1 (LEXONGO) = lex_anlyze_token(`, &token)
+token[62].t_type   = T_LBACKQUOTE
+token[62].t_symbol = `
+1 (LEXONGO) = lex_anlyze_token(expr, &token)
+token[63].t_type   = T_BLTN_CMD
+token[63].t_symbol = expr
+1 (LEXONGO) = lex_anlyze_token($l, &token)
+token[64].t_type   = T_CMD_VARG
+token[64].t_symbol = l
+1 (LEXONGO) = lex_anlyze_token(+, &token)
+token[65].t_type   = T_CMD_ARG
+token[65].t_symbol = +
+1 (LEXONGO) = lex_anlyze_token(1, &token)
+token[66].t_type   = T_CMD_ARG
+token[66].t_symbol = 1
+1 (LEXONGO) = lex_anlyze_token(`, &token)
+token[67].t_type   = T_RBACKQUOTE
+token[67].t_symbol = `
+2 (LEXDONE) = lex_anlyze_token(
+, &token)
+token[68].t_type   = T_EOL
+token[68].t_symbol = 
+scan(
+, &aline)=0x0001
+aline.wp = 1
+Raw    : 
+2 (LEXDONE) = lex_anlyze_token(
+, &token)
+token[69].t_type   = T_EOL
+token[69].t_symbol = 
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan(i, &aline)=0x0000
+scan(f, &aline)=0x0000
+scan( , &aline)=0x0002
+scan([, &aline)=0x0000
+scan( , &aline)=0x0002
+scan($, &aline)=0x0000
+scan(l, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(-, &aline)=0x0000
+scan(e, &aline)=0x0000
+scan(q, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(3, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(], &aline)=0x0000
+scan(;, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(t, &aline)=0x0000
+scan(h, &aline)=0x0000
+scan(e, &aline)=0x0000
+scan(n, &aline)=0x0000
+scan(
+, &aline)=0x0001
+aline.wp = 24
+Raw    : if [ $l -eq 3 ] ; then 
+2 (LEXDONE) = lex_anlyze_token(if, &token)
+token[70].t_type   = T_IF
+token[70].t_symbol = if
+1 (LEXONGO) = lex_anlyze_token([, &token)
+token[71].t_type   = T_LBRACKET
+token[71].t_symbol = [
+1 (LEXONGO) = lex_anlyze_token($l, &token)
+token[72].t_type   = T_CMD_VARG
+token[72].t_symbol = l
+1 (LEXONGO) = lex_anlyze_token(-eq, &token)
+token[73].t_type   = T_CMD_ARG
+token[73].t_symbol = -eq
+1 (LEXONGO) = lex_anlyze_token(3, &token)
+token[74].t_type   = T_CMD_ARG
+token[74].t_symbol = 3
+1 (LEXONGO) = lex_anlyze_token(], &token)
+token[75].t_type   = T_RBRACKET
+token[75].t_symbol = ]
+2 (LEXDONE) = lex_anlyze_token(;, &token)
+token[76].t_type   = T_SEMICOLON
+token[76].t_symbol = ;
+2 (LEXDONE) = lex_anlyze_token(then, &token)
+token[77].t_type   = T_THEN
+token[77].t_symbol = then
+2 (LEXDONE) = lex_anlyze_token(
+, &token)
+token[78].t_type   = T_EOL
+token[78].t_symbol = 
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan(e, &aline)=0x0000
+scan(c, &aline)=0x0000
+scan(h, &aline)=0x0000
+scan(o, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(', &aline)=0x0000
+scan(b, &aline)=0x0000
+scan(r, &aline)=0x0000
+scan(e, &aline)=0x0000
+scan(a, &aline)=0x0000
+scan(k, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(w, &aline)=0x0000
+scan(h, &aline)=0x0000
+scan(i, &aline)=0x0000
+scan(l, &aline)=0x0000
+scan(e, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(l, &aline)=0x0000
+scan(o, &aline)=0x0000
+scan(o, &aline)=0x0000
+scan(p, &aline)=0x0000
+scan( , &aline)=0x0002
+scan((, &aline)=0x0000
+scan(l, &aline)=0x0000
+scan(), &aline)=0x0000
+scan(', &aline)=0x0000
+scan(
+, &aline)=0x0001
+aline.wp = 29
+Raw    : echo ' break while loop l ' 
+1 (LEXONGO) = lex_anlyze_token(echo, &token)
+token[79].t_type   = T_BLTN_CMD
+token[79].t_symbol = echo
+3 (LEXQUOTE) = lex_anlyze_token(', &token)
+token[80].t_type   = T_CMD_ARG
+token[80].t_symbol = 
+3 (LEXQUOTE) = lex_anlyze_token(break, &token)
+token[80].t_type   = T_CMD_ARG
+token[80].t_symbol = break
+3 (LEXQUOTE) = lex_anlyze_token(while, &token)
+token[80].t_type   = T_CMD_ARG
+token[80].t_symbol = break while
+3 (LEXQUOTE) = lex_anlyze_token(loop, &token)
+token[80].t_type   = T_CMD_ARG
+token[80].t_symbol = break while loop
+3 (LEXQUOTE) = lex_anlyze_token(l, &token)
+token[80].t_type   = T_CMD_ARG
+token[80].t_symbol = break while loop l
+1 (LEXONGO) = lex_anlyze_token(', &token)
+token[80].t_type   = T_CMD_ARG
+token[80].t_symbol = break while loop l
+2 (LEXDONE) = lex_anlyze_token(
+, &token)
+token[81].t_type   = T_EOL
+token[81].t_symbol = 
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan(b, &aline)=0x0000
+scan(r, &aline)=0x0000
+scan(e, &aline)=0x0000
+scan(a, &aline)=0x0000
+scan(k, &aline)=0x0000
+scan(
+, &aline)=0x0001
+aline.wp = 7
+Raw    : break 
+1 (LEXONGO) = lex_anlyze_token(break, &token)
+token[82].t_type   = T_BLTN_CMD
+token[82].t_symbol = break
+2 (LEXDONE) = lex_anlyze_token(
+, &token)
+token[83].t_type   = T_EOL
+token[83].t_symbol = 
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan(f, &aline)=0x0000
+scan(i, &aline)=0x0000
+scan(
+, &aline)=0x0001
+aline.wp = 4
+Raw    : fi 
+2 (LEXDONE) = lex_anlyze_token(fi, &token)
+token[84].t_type   = T_FI
+token[84].t_symbol = fi
+2 (LEXDONE) = lex_anlyze_token(
+, &token)
+token[85].t_type   = T_EOL
+token[85].t_symbol = 
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan(d, &aline)=0x0000
+scan(o, &aline)=0x0000
+scan(n, &aline)=0x0000
+scan(e, &aline)=0x0000
+scan(
+, &aline)=0x0001
+aline.wp = 6
+Raw    : done 
+2 (LEXDONE) = lex_anlyze_token(done, &token)
+token[86].t_type   = T_DONE
+token[86].t_symbol = done
+2 (LEXDONE) = lex_anlyze_token(
+, &token)
+token[87].t_type   = T_EOL
+token[87].t_symbol = 
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan(e, &aline)=0x0000
+scan(l, &aline)=0x0000
+scan(s, &aline)=0x0000
+scan(e, &aline)=0x0000
+scan(
+, &aline)=0x0001
+aline.wp = 6
+Raw    : else 
+2 (LEXDONE) = lex_anlyze_token(else, &token)
+token[88].t_type   = T_ELSE
+token[88].t_symbol = else
+2 (LEXDONE) = lex_anlyze_token(
+, &token)
+token[89].t_type   = T_EOL
+token[89].t_symbol = 
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan(e, &aline)=0x0000
+scan(c, &aline)=0x0000
+scan(h, &aline)=0x0000
+scan(o, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(', &aline)=0x0000
+scan(k, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(>, &aline)=0x0000
+scan( , &aline)=0x0002
+scan(2, &aline)=0x0000
+scan(', &aline)=0x0000
+scan(
+, &aline)=0x0001
+aline.wp = 16
+Raw    : echo ' k > 2 ' 
+1 (LEXONGO) = lex_anlyze_token(echo, &token)
+token[90].t_type   = T_BLTN_CMD
+token[90].t_symbol = echo
+3 (LEXQUOTE) = lex_anlyze_token(', &token)
+token[91].t_type   = T_CMD_ARG
+token[91].t_symbol = 
+3 (LEXQUOTE) = lex_anlyze_token(k, &token)
+token[91].t_type   = T_CMD_ARG
+token[91].t_symbol = k
+3 (LEXQUOTE) = lex_anlyze_token(>, &token)
+token[91].t_type   = T_CMD_ARG
+token[91].t_symbol = k >
+3 (LEXQUOTE) = lex_anlyze_token(2, &token)
+token[91].t_type   = T_CMD_ARG
+token[91].t_symbol = k > 2
+1 (LEXONGO) = lex_anlyze_token(', &token)
+token[91].t_type   = T_CMD_ARG
+token[91].t_symbol = k > 2
+2 (LEXDONE) = lex_anlyze_token(
+, &token)
+token[92].t_type   = T_EOL
+token[92].t_symbol = 
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan( , &aline)=0x0000
+scan(f, &aline)=0x0000
+scan(i, &aline)=0x0000
+scan(
+, &aline)=0x0001
+aline.wp = 4
+Raw    : fi 
+2 (LEXDONE) = lex_anlyze_token(fi, &token)
+token[93].t_type   = T_FI
+token[93].t_symbol = fi
+2 (LEXDONE) = lex_anlyze_token(
+, &token)
+token[94].t_type   = T_EOL
+token[94].t_symbol = 
+scan(d, &aline)=0x0000
+scan(o, &aline)=0x0000
+scan(n, &aline)=0x0000
+scan(e, &aline)=0x0000
+scan(
+, &aline)=0x0001
+aline.wp = 6
+Raw    : done 
+2 (LEXDONE) = lex_anlyze_token(done, &token)
+token[95].t_type   = T_DONE
+token[95].t_symbol = done
+2 (LEXDONE) = lex_anlyze_token(
+, &token)
+token[96].t_type   = T_EOL
+token[96].t_symbol = 
+
+97 tokens were made from -117 characters
+
+Result of lexical analysis
+--------------------------
+token[00]: T_COMMENT,	
+token[01]: T_EOL,	
+token[02]: T_EOL,	
+token[03]: T_VARIABLE,	k
+token[04]: T_ASSIGN,	=
+token[05]: T_VALUE,	0
+token[06]: T_EOL,	
+token[07]: T_WHILE,	while
+token[08]: T_LBRACKET,	[
+token[09]: T_CMD_VARG,	k
+token[10]: T_CMD_ARG,	-ne
+token[11]: T_CMD_ARG,	4
+token[12]: T_RBRACKET,	]
+token[13]: T_SEMICOLON,	;
+token[14]: T_DO,	do
+token[15]: T_EOL,	
+token[16]: T_VARIABLE,	k
+token[17]: T_ASSIGN,	=
+token[18]: T_LBACKQUOTE,	`
+token[19]: T_BLTN_CMD,	expr
+token[20]: T_CMD_VARG,	k
+token[21]: T_CMD_ARG,	+
+token[22]: T_CMD_ARG,	1
+token[23]: T_RBACKQUOTE,	`
+token[24]: T_EOL,	
+token[25]: T_BLTN_CMD,	echo
+token[26]: T_CMD_ARG,	k =
+token[27]: T_EOL,	
+token[28]: T_BLTN_CMD,	echo
+token[29]: T_CMD_VARG,	k
+token[30]: T_EOL,	
+token[31]: T_EOL,	
+token[32]: T_IF,	if
+token[33]: T_LBRACKET,	[
+token[34]: T_CMD_VARG,	k
+token[35]: T_CMD_ARG,	-eq
+token[36]: T_CMD_ARG,	2
+token[37]: T_RBRACKET,	]
+token[38]: T_SEMICOLON,	;
+token[39]: T_THEN,	then
+token[40]: T_EOL,	
+token[41]: T_VARIABLE,	l
+token[42]: T_ASSIGN,	=
+token[43]: T_VALUE,	0
+token[44]: T_EOL,	
+token[45]: T_WHILE,	while
+token[46]: T_LBRACKET,	[
+token[47]: T_CMD_VARG,	l
+token[48]: T_CMD_ARG,	-ne
+token[49]: T_CMD_ARG,	4
+token[50]: T_RBRACKET,	]
+token[51]: T_SEMICOLON,	;
+token[52]: T_DO,	do
+token[53]: T_EOL,	
+token[54]: T_BLTN_CMD,	echo
+token[55]: T_CMD_ARG,	l =
+token[56]: T_EOL,	
+token[57]: T_BLTN_CMD,	echo
+token[58]: T_CMD_VARG,	l
+token[59]: T_EOL,	
+token[60]: T_VARIABLE,	l
+token[61]: T_ASSIGN,	=
+token[62]: T_LBACKQUOTE,	`
+token[63]: T_BLTN_CMD,	expr
+token[64]: T_CMD_VARG,	l
+token[65]: T_CMD_ARG,	+
+token[66]: T_CMD_ARG,	1
+token[67]: T_RBACKQUOTE,	`
+token[68]: T_EOL,	
+token[69]: T_EOL,	
+token[70]: T_IF,	if
+token[71]: T_LBRACKET,	[
+token[72]: T_CMD_VARG,	l
+token[73]: T_CMD_ARG,	-eq
+token[74]: T_CMD_ARG,	3
+token[75]: T_RBRACKET,	]
+token[76]: T_SEMICOLON,	;
+token[77]: T_THEN,	then
+token[78]: T_EOL,	
+token[79]: T_BLTN_CMD,	echo
+token[80]: T_CMD_ARG,	break while loop l
+token[81]: T_EOL,	
+token[82]: T_BLTN_CMD,	break
+token[83]: T_EOL,	
+token[84]: T_FI,	fi
+token[85]: T_EOL,	
+token[86]: T_DONE,	done
+token[87]: T_EOL,	
+token[88]: T_ELSE,	else
+token[89]: T_EOL,	
+token[90]: T_BLTN_CMD,	echo
+token[91]: T_CMD_ARG,	k > 2
+token[92]: T_EOL,	
+token[93]: T_FI,	fi
+token[94]: T_EOL,	
+token[95]: T_DONE,	done
+token[96]: T_EOL,	
+
+Parsing tokens to make byte codes
+---------------------------------
+# of codes = 113
+code[  0] = OP_PUSH_SYMBOL
+code[  1] = 00
+code[  2] = OP_POP_SYMBOL_THEN_ASSIGN
+code[  3] = 00
+code[  4] = OP_BLTN_CMD
+code[  5] = 01
+code[  6] = OP_CMD_VARG
+code[  7] = 00
+code[  8] = OP_CMD_ARG
+code[  9] = 01
+code[ 10] = OP_CMD_ARG
+code[ 11] = 02
+code[ 12] = OP_CMD_EXE_THEN_STACK
+code[ 13] = OP_JUMP_IF_FALSE
+code[ 14] = 01
+code[ 15] = OP_BLTN_CMD
+code[ 16] = 02
+code[ 17] = OP_CMD_VARG
+code[ 18] = 00
+code[ 19] = OP_CMD_ARG
+code[ 20] = 03
+code[ 21] = OP_CMD_ARG
+code[ 22] = 04
+code[ 23] = OP_CMD_EXE_THEN_ASSIGN
+code[ 24] = 00
+code[ 25] = OP_BLTN_CMD
+code[ 26] = 03
+code[ 27] = OP_CMD_ARG
+code[ 28] = 05
+code[ 29] = OP_CMD_EXE
+code[ 30] = OP_BLTN_CMD
+code[ 31] = 03
+code[ 32] = OP_CMD_VARG
+code[ 33] = 00
+code[ 34] = OP_CMD_EXE
+code[ 35] = OP_BLTN_CMD
+code[ 36] = 01
+code[ 37] = OP_CMD_VARG
+code[ 38] = 00
+code[ 39] = OP_CMD_ARG
+code[ 40] = 06
+code[ 41] = OP_CMD_ARG
+code[ 42] = 07
+code[ 43] = OP_CMD_EXE_THEN_STACK
+code[ 44] = OP_JUMP_IF_FALSE
+code[ 45] = 03
+code[ 46] = OP_PUSH_SYMBOL
+code[ 47] = 00
+code[ 48] = OP_POP_SYMBOL_THEN_ASSIGN
+code[ 49] = 01
+code[ 50] = OP_BLTN_CMD
+code[ 51] = 01
+code[ 52] = OP_CMD_VARG
+code[ 53] = 01
+code[ 54] = OP_CMD_ARG
+code[ 55] = 01
+code[ 56] = OP_CMD_ARG
+code[ 57] = 02
+code[ 58] = OP_CMD_EXE_THEN_STACK
+code[ 59] = OP_JUMP_IF_FALSE
+code[ 60] = 05
+code[ 61] = OP_BLTN_CMD
+code[ 62] = 03
+code[ 63] = OP_CMD_ARG
+code[ 64] = 08
+code[ 65] = OP_CMD_EXE
+code[ 66] = OP_BLTN_CMD
+code[ 67] = 03
+code[ 68] = OP_CMD_VARG
+code[ 69] = 01
+code[ 70] = OP_CMD_EXE
+code[ 71] = OP_BLTN_CMD
+code[ 72] = 02
+code[ 73] = OP_CMD_VARG
+code[ 74] = 01
+code[ 75] = OP_CMD_ARG
+code[ 76] = 03
+code[ 77] = OP_CMD_ARG
+code[ 78] = 04
+code[ 79] = OP_CMD_EXE_THEN_ASSIGN
+code[ 80] = 01
+code[ 81] = OP_BLTN_CMD
+code[ 82] = 01
+code[ 83] = OP_CMD_VARG
+code[ 84] = 01
+code[ 85] = OP_CMD_ARG
+code[ 86] = 06
+code[ 87] = OP_CMD_ARG
+code[ 88] = 09
+code[ 89] = OP_CMD_EXE_THEN_STACK
+code[ 90] = OP_JUMP_IF_FALSE
+code[ 91] = 07
+code[ 92] = OP_BLTN_CMD
+code[ 93] = 03
+code[ 94] = OP_CMD_ARG
+code[ 95] = 0A
+code[ 96] = OP_CMD_EXE
+code[ 97] = OP_BLTN_CMD
+code[ 98] = 04
+code[ 99] = OP_CMD_ARG
+code[100] = 01
+code[101] = OP_CMD_EXE
+code[102] = OP_JUMP
+code[103] = 04
+code[104] = OP_JUMP
+code[105] = 02
+code[106] = OP_BLTN_CMD
+code[107] = 03
+code[108] = OP_CMD_ARG
+code[109] = 0B
+code[110] = OP_CMD_EXE
+code[111] = OP_JUMP
+code[112] = 00
+code[113] = OP_NOP
+Variable:
+v_var[0]: k
+v_var[1]: l
+Label:
+l_addr[0] =   4
+l_addr[1] = 113
+l_addr[2] = 111
+l_addr[3] = 106
+l_addr[4] =  50
+l_addr[5] = 104
+l_addr[6] = 102
+l_addr[7] = 102
+String:
+s_str[0] = 0
+s_str[1] = -ne
+s_str[2] = 4
+s_str[3] = +
+s_str[4] = 1
+s_str[5] = k =
+s_str[6] = -eq
+s_str[7] = 2
+s_str[8] = l =
+s_str[9] = 3
+s_str[10] = break while loop l
+s_str[11] = k > 2
+
+Executing byte codes
+--------------------
+Execute code[  0] = OP_PUSH_SYMBOL
+exe.e_procs = 0
+stack[  0] = 00
+variable[  0]: k = \n
+variable[  1]: l = \n
+Execute code[  2] = OP_POP_SYMBOL_THEN_ASSIGN
+exe.e_procs = 0
+variable[  0]: k = 0
+variable[  1]: l = \n
+Execute code[  4] = OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0] = test
+variable[  0]: k = 0
+variable[  1]: l = \n
+Execute code[  6] = OP_CMD_VARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0] = test
+argv[ 1] = 0
+variable[  0]: k = 0
+variable[  1]: l = \n
+Execute code[  8] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 3
+argv[ 0] = test
+argv[ 1] = 0
+argv[ 2] = -ne
+variable[  0]: k = 0
+variable[  1]: l = \n
+Execute code[ 10] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 4
+argv[ 0] = test
+argv[ 1] = 0
+argv[ 2] = -ne
+argv[ 3] = 4
+variable[  0]: k = 0
+variable[  1]: l = \n
+Execute code[ 12] = OP_CMD_EXE_THEN_STACK
+exe.e_procs = 0
+stack[  0] = 00
+variable[  0]: k = 0
+variable[  1]: l = \n
+Execute code[ 13] = OP_JUMP_IF_FALSE
+exe.e_procs = 0
+variable[  0]: k = 0
+variable[  1]: l = \n
+Execute code[ 15] = OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0] = expr
+variable[  0]: k = 0
+variable[  1]: l = \n
+Execute code[ 17] = OP_CMD_VARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0] = expr
+argv[ 1] = 0
+variable[  0]: k = 0
+variable[  1]: l = \n
+Execute code[ 19] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 3
+argv[ 0] = expr
+argv[ 1] = 0
+argv[ 2] = +
+variable[  0]: k = 0
+variable[  1]: l = \n
+Execute code[ 21] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 4
+argv[ 0] = expr
+argv[ 1] = 0
+argv[ 2] = +
+argv[ 3] = 1
+variable[  0]: k = 0
+variable[  1]: l = \n
+Execute code[ 23] = OP_CMD_EXE_THEN_ASSIGN
+exe.e_procs = 0
+variable[  0]: k = 1
+variable[  1]: l = \n
+Execute code[ 25] = OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0] = echo
+variable[  0]: k = 1
+variable[  1]: l = \n
+Execute code[ 27] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0] = echo
+argv[ 1] = k =
+variable[  0]: k = 1
+variable[  1]: l = \n
+Execute code[ 29] = OP_CMD_EXE
+exe.e_procs = 0
+variable[  0]: k = 1
+variable[  1]: l = \n
+Execute code[ 30] = OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0] = echo
+variable[  0]: k = 1
+variable[  1]: l = \n
+Execute code[ 32] = OP_CMD_VARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0] = echo
+argv[ 1] = 1
+variable[  0]: k = 1
+variable[  1]: l = \n
+Execute code[ 34] = OP_CMD_EXE
+exe.e_procs = 0
+variable[  0]: k = 1
+variable[  1]: l = \n
+Execute code[ 35] = OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0] = test
+variable[  0]: k = 1
+variable[  1]: l = \n
+Execute code[ 37] = OP_CMD_VARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0] = test
+argv[ 1] = 1
+variable[  0]: k = 1
+variable[  1]: l = \n
+Execute code[ 39] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 3
+argv[ 0] = test
+argv[ 1] = 1
+argv[ 2] = -eq
+variable[  0]: k = 1
+variable[  1]: l = \n
+Execute code[ 41] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 4
+argv[ 0] = test
+argv[ 1] = 1
+argv[ 2] = -eq
+argv[ 3] = 2
+variable[  0]: k = 1
+variable[  1]: l = \n
+Execute code[ 43] = OP_CMD_EXE_THEN_STACK
+exe.e_procs = 0
+stack[  0] = 01
+variable[  0]: k = 1
+variable[  1]: l = \n
+Execute code[ 44] = OP_JUMP_IF_FALSE
+exe.e_procs = 0
+variable[  0]: k = 1
+variable[  1]: l = \n
+Execute code[106] = OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0] = echo
+variable[  0]: k = 1
+variable[  1]: l = \n
+Execute code[108] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0] = echo
+argv[ 1] = k > 2
+variable[  0]: k = 1
+variable[  1]: l = \n
+Execute code[110] = OP_CMD_EXE
+exe.e_procs = 0
+variable[  0]: k = 1
+variable[  1]: l = \n
+Execute code[111] = OP_JUMP
+exe.e_procs = 0
+variable[  0]: k = 1
+variable[  1]: l = \n
+Execute code[  4] = OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0] = test
+variable[  0]: k = 1
+variable[  1]: l = \n
+Execute code[  6] = OP_CMD_VARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0] = test
+argv[ 1] = 1
+variable[  0]: k = 1
+variable[  1]: l = \n
+Execute code[  8] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 3
+argv[ 0] = test
+argv[ 1] = 1
+argv[ 2] = -ne
+variable[  0]: k = 1
+variable[  1]: l = \n
+Execute code[ 10] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 4
+argv[ 0] = test
+argv[ 1] = 1
+argv[ 2] = -ne
+argv[ 3] = 4
+variable[  0]: k = 1
+variable[  1]: l = \n
+Execute code[ 12] = OP_CMD_EXE_THEN_STACK
+exe.e_procs = 0
+stack[  0] = 00
+variable[  0]: k = 1
+variable[  1]: l = \n
+Execute code[ 13] = OP_JUMP_IF_FALSE
+exe.e_procs = 0
+variable[  0]: k = 1
+variable[  1]: l = \n
+Execute code[ 15] = OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0] = expr
+variable[  0]: k = 1
+variable[  1]: l = \n
+Execute code[ 17] = OP_CMD_VARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0] = expr
+argv[ 1] = 1
+variable[  0]: k = 1
+variable[  1]: l = \n
+Execute code[ 19] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 3
+argv[ 0] = expr
+argv[ 1] = 1
+argv[ 2] = +
+variable[  0]: k = 1
+variable[  1]: l = \n
+Execute code[ 21] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 4
+argv[ 0] = expr
+argv[ 1] = 1
+argv[ 2] = +
+argv[ 3] = 1
+variable[  0]: k = 1
+variable[  1]: l = \n
+Execute code[ 23] = OP_CMD_EXE_THEN_ASSIGN
+exe.e_procs = 0
+variable[  0]: k = 2
+variable[  1]: l = \n
+Execute code[ 25] = OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0] = echo
+variable[  0]: k = 2
+variable[  1]: l = \n
+Execute code[ 27] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0] = echo
+argv[ 1] = k =
+variable[  0]: k = 2
+variable[  1]: l = \n
+Execute code[ 29] = OP_CMD_EXE
+exe.e_procs = 0
+variable[  0]: k = 2
+variable[  1]: l = \n
+Execute code[ 30] = OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0] = echo
+variable[  0]: k = 2
+variable[  1]: l = \n
+Execute code[ 32] = OP_CMD_VARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0] = echo
+argv[ 1] = 2
+variable[  0]: k = 2
+variable[  1]: l = \n
+Execute code[ 34] = OP_CMD_EXE
+exe.e_procs = 0
+variable[  0]: k = 2
+variable[  1]: l = \n
+Execute code[ 35] = OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0] = test
+variable[  0]: k = 2
+variable[  1]: l = \n
+Execute code[ 37] = OP_CMD_VARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0] = test
+argv[ 1] = 2
+variable[  0]: k = 2
+variable[  1]: l = \n
+Execute code[ 39] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 3
+argv[ 0] = test
+argv[ 1] = 2
+argv[ 2] = -eq
+variable[  0]: k = 2
+variable[  1]: l = \n
+Execute code[ 41] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 4
+argv[ 0] = test
+argv[ 1] = 2
+argv[ 2] = -eq
+argv[ 3] = 2
+variable[  0]: k = 2
+variable[  1]: l = \n
+Execute code[ 43] = OP_CMD_EXE_THEN_STACK
+exe.e_procs = 0
+stack[  0] = 00
+variable[  0]: k = 2
+variable[  1]: l = \n
+Execute code[ 44] = OP_JUMP_IF_FALSE
+exe.e_procs = 0
+variable[  0]: k = 2
+variable[  1]: l = \n
+Execute code[ 46] = OP_PUSH_SYMBOL
+exe.e_procs = 0
+stack[  0] = 00
+variable[  0]: k = 2
+variable[  1]: l = \n
+Execute code[ 48] = OP_POP_SYMBOL_THEN_ASSIGN
+exe.e_procs = 0
+variable[  0]: k = 2
+variable[  1]: l = 0
+Execute code[ 50] = OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0] = test
+variable[  0]: k = 2
+variable[  1]: l = 0
+Execute code[ 52] = OP_CMD_VARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0] = test
+argv[ 1] = 0
+variable[  0]: k = 2
+variable[  1]: l = 0
+Execute code[ 54] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 3
+argv[ 0] = test
+argv[ 1] = 0
+argv[ 2] = -ne
+variable[  0]: k = 2
+variable[  1]: l = 0
+Execute code[ 56] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 4
+argv[ 0] = test
+argv[ 1] = 0
+argv[ 2] = -ne
+argv[ 3] = 4
+variable[  0]: k = 2
+variable[  1]: l = 0
+Execute code[ 58] = OP_CMD_EXE_THEN_STACK
+exe.e_procs = 0
+stack[  0] = 00
+variable[  0]: k = 2
+variable[  1]: l = 0
+Execute code[ 59] = OP_JUMP_IF_FALSE
+exe.e_procs = 0
+variable[  0]: k = 2
+variable[  1]: l = 0
+Execute code[ 61] = OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0] = echo
+variable[  0]: k = 2
+variable[  1]: l = 0
+Execute code[ 63] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0] = echo
+argv[ 1] = l =
+variable[  0]: k = 2
+variable[  1]: l = 0
+Execute code[ 65] = OP_CMD_EXE
+exe.e_procs = 0
+variable[  0]: k = 2
+variable[  1]: l = 0
+Execute code[ 66] = OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0] = echo
+variable[  0]: k = 2
+variable[  1]: l = 0
+Execute code[ 68] = OP_CMD_VARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0] = echo
+argv[ 1] = 0
+variable[  0]: k = 2
+variable[  1]: l = 0
+Execute code[ 70] = OP_CMD_EXE
+exe.e_procs = 0
+variable[  0]: k = 2
+variable[  1]: l = 0
+Execute code[ 71] = OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0] = expr
+variable[  0]: k = 2
+variable[  1]: l = 0
+Execute code[ 73] = OP_CMD_VARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0] = expr
+argv[ 1] = 0
+variable[  0]: k = 2
+variable[  1]: l = 0
+Execute code[ 75] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 3
+argv[ 0] = expr
+argv[ 1] = 0
+argv[ 2] = +
+variable[  0]: k = 2
+variable[  1]: l = 0
+Execute code[ 77] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 4
+argv[ 0] = expr
+argv[ 1] = 0
+argv[ 2] = +
+argv[ 3] = 1
+variable[  0]: k = 2
+variable[  1]: l = 0
+Execute code[ 79] = OP_CMD_EXE_THEN_ASSIGN
+exe.e_procs = 0
+variable[  0]: k = 2
+variable[  1]: l = 1
+Execute code[ 81] = OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0] = test
+variable[  0]: k = 2
+variable[  1]: l = 1
+Execute code[ 83] = OP_CMD_VARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0] = test
+argv[ 1] = 1
+variable[  0]: k = 2
+variable[  1]: l = 1
+Execute code[ 85] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 3
+argv[ 0] = test
+argv[ 1] = 1
+argv[ 2] = -eq
+variable[  0]: k = 2
+variable[  1]: l = 1
+Execute code[ 87] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 4
+argv[ 0] = test
+argv[ 1] = 1
+argv[ 2] = -eq
+argv[ 3] = 3
+variable[  0]: k = 2
+variable[  1]: l = 1
+Execute code[ 89] = OP_CMD_EXE_THEN_STACK
+exe.e_procs = 0
+stack[  0] = 01
+variable[  0]: k = 2
+variable[  1]: l = 1
+Execute code[ 90] = OP_JUMP_IF_FALSE
+exe.e_procs = 0
+variable[  0]: k = 2
+variable[  1]: l = 1
+Execute code[102] = OP_JUMP
+exe.e_procs = 0
+variable[  0]: k = 2
+variable[  1]: l = 1
+Execute code[ 50] = OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0] = test
+variable[  0]: k = 2
+variable[  1]: l = 1
+Execute code[ 52] = OP_CMD_VARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0] = test
+argv[ 1] = 1
+variable[  0]: k = 2
+variable[  1]: l = 1
+Execute code[ 54] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 3
+argv[ 0] = test
+argv[ 1] = 1
+argv[ 2] = -ne
+variable[  0]: k = 2
+variable[  1]: l = 1
+Execute code[ 56] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 4
+argv[ 0] = test
+argv[ 1] = 1
+argv[ 2] = -ne
+argv[ 3] = 4
+variable[  0]: k = 2
+variable[  1]: l = 1
+Execute code[ 58] = OP_CMD_EXE_THEN_STACK
+exe.e_procs = 0
+stack[  0] = 00
+variable[  0]: k = 2
+variable[  1]: l = 1
+Execute code[ 59] = OP_JUMP_IF_FALSE
+exe.e_procs = 0
+variable[  0]: k = 2
+variable[  1]: l = 1
+Execute code[ 61] = OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0] = echo
+variable[  0]: k = 2
+variable[  1]: l = 1
+Execute code[ 63] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0] = echo
+argv[ 1] = l =
+variable[  0]: k = 2
+variable[  1]: l = 1
+Execute code[ 65] = OP_CMD_EXE
+exe.e_procs = 0
+variable[  0]: k = 2
+variable[  1]: l = 1
+Execute code[ 66] = OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0] = echo
+variable[  0]: k = 2
+variable[  1]: l = 1
+Execute code[ 68] = OP_CMD_VARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0] = echo
+argv[ 1] = 1
+variable[  0]: k = 2
+variable[  1]: l = 1
+Execute code[ 70] = OP_CMD_EXE
+exe.e_procs = 0
+variable[  0]: k = 2
+variable[  1]: l = 1
+Execute code[ 71] = OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0] = expr
+variable[  0]: k = 2
+variable[  1]: l = 1
+Execute code[ 73] = OP_CMD_VARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0] = expr
+argv[ 1] = 1
+variable[  0]: k = 2
+variable[  1]: l = 1
+Execute code[ 75] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 3
+argv[ 0] = expr
+argv[ 1] = 1
+argv[ 2] = +
+variable[  0]: k = 2
+variable[  1]: l = 1
+Execute code[ 77] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 4
+argv[ 0] = expr
+argv[ 1] = 1
+argv[ 2] = +
+argv[ 3] = 1
+variable[  0]: k = 2
+variable[  1]: l = 1
+Execute code[ 79] = OP_CMD_EXE_THEN_ASSIGN
+exe.e_procs = 0
+variable[  0]: k = 2
+variable[  1]: l = 2
+Execute code[ 81] = OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0] = test
+variable[  0]: k = 2
+variable[  1]: l = 2
+Execute code[ 83] = OP_CMD_VARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0] = test
+argv[ 1] = 2
+variable[  0]: k = 2
+variable[  1]: l = 2
+Execute code[ 85] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 3
+argv[ 0] = test
+argv[ 1] = 2
+argv[ 2] = -eq
+variable[  0]: k = 2
+variable[  1]: l = 2
+Execute code[ 87] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 4
+argv[ 0] = test
+argv[ 1] = 2
+argv[ 2] = -eq
+argv[ 3] = 3
+variable[  0]: k = 2
+variable[  1]: l = 2
+Execute code[ 89] = OP_CMD_EXE_THEN_STACK
+exe.e_procs = 0
+stack[  0] = 01
+variable[  0]: k = 2
+variable[  1]: l = 2
+Execute code[ 90] = OP_JUMP_IF_FALSE
+exe.e_procs = 0
+variable[  0]: k = 2
+variable[  1]: l = 2
+Execute code[102] = OP_JUMP
+exe.e_procs = 0
+variable[  0]: k = 2
+variable[  1]: l = 2
+Execute code[ 50] = OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0] = test
+variable[  0]: k = 2
+variable[  1]: l = 2
+Execute code[ 52] = OP_CMD_VARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0] = test
+argv[ 1] = 2
+variable[  0]: k = 2
+variable[  1]: l = 2
+Execute code[ 54] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 3
+argv[ 0] = test
+argv[ 1] = 2
+argv[ 2] = -ne
+variable[  0]: k = 2
+variable[  1]: l = 2
+Execute code[ 56] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 4
+argv[ 0] = test
+argv[ 1] = 2
+argv[ 2] = -ne
+argv[ 3] = 4
+variable[  0]: k = 2
+variable[  1]: l = 2
+Execute code[ 58] = OP_CMD_EXE_THEN_STACK
+exe.e_procs = 0
+stack[  0] = 00
+variable[  0]: k = 2
+variable[  1]: l = 2
+Execute code[ 59] = OP_JUMP_IF_FALSE
+exe.e_procs = 0
+variable[  0]: k = 2
+variable[  1]: l = 2
+Execute code[ 61] = OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0] = echo
+variable[  0]: k = 2
+variable[  1]: l = 2
+Execute code[ 63] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0] = echo
+argv[ 1] = l =
+variable[  0]: k = 2
+variable[  1]: l = 2
+Execute code[ 65] = OP_CMD_EXE
+exe.e_procs = 0
+variable[  0]: k = 2
+variable[  1]: l = 2
+Execute code[ 66] = OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0] = echo
+variable[  0]: k = 2
+variable[  1]: l = 2
+Execute code[ 68] = OP_CMD_VARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0] = echo
+argv[ 1] = 2
+variable[  0]: k = 2
+variable[  1]: l = 2
+Execute code[ 70] = OP_CMD_EXE
+exe.e_procs = 0
+variable[  0]: k = 2
+variable[  1]: l = 2
+Execute code[ 71] = OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0] = expr
+variable[  0]: k = 2
+variable[  1]: l = 2
+Execute code[ 73] = OP_CMD_VARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0] = expr
+argv[ 1] = 2
+variable[  0]: k = 2
+variable[  1]: l = 2
+Execute code[ 75] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 3
+argv[ 0] = expr
+argv[ 1] = 2
+argv[ 2] = +
+variable[  0]: k = 2
+variable[  1]: l = 2
+Execute code[ 77] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 4
+argv[ 0] = expr
+argv[ 1] = 2
+argv[ 2] = +
+argv[ 3] = 1
+variable[  0]: k = 2
+variable[  1]: l = 2
+Execute code[ 79] = OP_CMD_EXE_THEN_ASSIGN
+exe.e_procs = 0
+variable[  0]: k = 2
+variable[  1]: l = 3
+Execute code[ 81] = OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0] = test
+variable[  0]: k = 2
+variable[  1]: l = 3
+Execute code[ 83] = OP_CMD_VARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0] = test
+argv[ 1] = 3
+variable[  0]: k = 2
+variable[  1]: l = 3
+Execute code[ 85] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 3
+argv[ 0] = test
+argv[ 1] = 3
+argv[ 2] = -eq
+variable[  0]: k = 2
+variable[  1]: l = 3
+Execute code[ 87] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 4
+argv[ 0] = test
+argv[ 1] = 3
+argv[ 2] = -eq
+argv[ 3] = 3
+variable[  0]: k = 2
+variable[  1]: l = 3
+Execute code[ 89] = OP_CMD_EXE_THEN_STACK
+exe.e_procs = 0
+stack[  0] = 00
+variable[  0]: k = 2
+variable[  1]: l = 3
+Execute code[ 90] = OP_JUMP_IF_FALSE
+exe.e_procs = 0
+variable[  0]: k = 2
+variable[  1]: l = 3
+Execute code[ 92] = OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0] = echo
+variable[  0]: k = 2
+variable[  1]: l = 3
+Execute code[ 94] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0] = echo
+argv[ 1] = break while loop l
+variable[  0]: k = 2
+variable[  1]: l = 3
+Execute code[ 96] = OP_CMD_EXE
+exe.e_procs = 0
+variable[  0]: k = 2
+variable[  1]: l = 3
+Execute code[ 97] = OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0] = break
+variable[  0]: k = 2
+variable[  1]: l = 3
+Execute code[ 99] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0] = break
+argv[ 1] = -ne
+variable[  0]: k = 2
+variable[  1]: l = 3
+Execute code[101] = OP_CMD_EXE
+exe.e_procs = 0
+variable[  0]: k = 2
+variable[  1]: l = 3
+All codes were successfully executed.

@@ -4,7 +4,12 @@ TARGET = test_exe.exe
 
 # Commands
 CC = gcc
-ifeq ($(OS),Windows_NT)
+ifeq ($(MSYSTEM),MINGW64)
+DEL = rm -f
+COPY = cp
+MKDIR = mkdir -p
+RMDIR = rm -rf
+else ifeq ($(OS),Windows_NT)
 DEL = del /q
 COPY = copy
 REN = ren

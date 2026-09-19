@@ -42,12 +42,12 @@ const struct applet builtins[] = {
 	BLTN(test)
 	BLTN(expr)
 	BLTN(echo)
+#endif
+
+#if !defined(PROTOTYPES)
 #if TODO_BREAK_WITH_ARGUMENT
 	{"break", break_command},
 #endif // #if TODO_BREAK_WITH_ARGUMENT
-#endif // #if USE_STACKMACH
-
-#if !defined(PROTOTYPES)
 	{NULL, NULL}
 };
 #endif

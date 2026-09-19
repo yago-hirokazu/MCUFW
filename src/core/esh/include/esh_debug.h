@@ -14,7 +14,7 @@ extern "C" {
 #define	DEBUG_STDIO	0	/* Enable debug print on stdio_adapt.c */
 #define	DEBUG_SHELL	0	/* Enable debug print on run.c */
 #define DEBUG_LEX	0	/* Enable debug print on slex.c */
-#define DEBUG_PAR	1	/* Enable debug print on par.c */
+#define DEBUG_PAR	0	/* Enable debug print on par.c */
 #define DEBUG_EXE	0	/* Enable debug print on exe.c */
 #define DEBUG_TEST	0	/* Enable debug print on test.c */
 #define DEBUG_EXPR	0	/* Enable debug pinrt on expr.c */
