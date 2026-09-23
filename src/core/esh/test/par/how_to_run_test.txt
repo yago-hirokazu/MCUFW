@@ -1,0 +1,2 @@
+bash ./run_test1.sh
+bash ./run_test2.sh
