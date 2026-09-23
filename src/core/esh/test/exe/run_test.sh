@@ -4,8 +4,6 @@ set -u
 
 cd "$(dirname "$0")" || exit 1
 
-TDMGCC=../../../../target/windows/TDM-GCC
-PATH="$TDMGCC/tdm/bin:$TDMGCC/make-3.81-bin/bin:$TDMGCC/make-3.81-dep/bin:$PATH"
 MSYSTEM=${MSYSTEM:-MINGW64}
 export PATH MSYSTEM
 
