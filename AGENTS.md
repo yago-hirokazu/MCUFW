@@ -66,11 +66,12 @@ target/						ハードウェア依存レイヤ
 
 下記の設計で UNIX パイプを使えるようにしたい。
 
-1. パイプ処理をするときは、RTOS が使えない環境でも動かせるように、一時的に coroutiine を用いて異なるコマンド処理を時分割で実行する。RTOS が使える環境では coroutine ではなくスレッドを使って UNIX パイプを使えるようにしたいので、移植レイヤを用意して開発を進める。
+1. パイプ処理をするときは、RTOS が使えない環境でも動かせるように、一時的に coroutine を用いて異なるコマンド処理を時分割で実行する。RTOS が使える環境では coroutine ではなくスレッドを使って UNIX パイプを使えるようにしたいので、移植レイヤを用意して開発を進める。
 
-2. UNIX V7 相当のファイルシステムを使えるようにして、UNIX V7 と同じようにしくみでパイプを使えるようにする。ただし、MMU (Memory Management Unit) がない環境でも動かしたいため、下記の制約を守った設計にする。
+2. UNIX V7 相当のファイルシステムを使えるようにして、UNIX V7 と同じような仕組みでパイプを使えるようにする。ただし、MMU (Memory Management Unit) がない環境でも動かしたいため、下記の制約を守った設計にする。
    - 最下層はバッファキャッシュまでとする。物理ストレージへのアクセスはしない。
    - ファイルシステムは UNIX V7 ファイルシステムを完全再現はせず、パイプを使えるだけの最小限の構成とする。
+   - UNIX V6, V7 のように trap 命令を利用したシステムコールは使わない。
 
 
 ## target
@@ -79,7 +80,7 @@ target/						ハードウェア依存レイヤ
 
 1. まず Windows で動くソフトウェアを開発する。
 
-2. 1 ができたら、移植可能な部分を  NUCLEO-U575ZI-Q に移植する。
+2. 1 ができたら、移植可能な部分を NUCLEO-U575ZI-Q に移植する。
 
 
 ## 開発環境
@@ -97,10 +98,11 @@ C:\Keil_v543a\ARM\ARMCLANG\bin
 
 ## ビルドとテスト
 
-### /src/target/windows
+### src/target/windows
 
-1. mingw64シェルで下記を実行
+1. mingw64 シェルで下記を実行
 
+- cd src/target/windows
 - make
 - ./main.exe
 
@@ -111,17 +113,17 @@ C:\Keil_v543a\ARM\ARMCLANG\bin
 - sam3 -a -b string
 
 
-### /src/core/esh/test/par
+### src/core/esh/test/par
 
-ming64シェルで下記を実行して`test pass`になる確認
+mingw64 シェルで `src/core/esh/test/par` に移動し、下記を実行して `test pass` になることを確認
 
 - bash ./run_test1.sh
 - bash ./run_test2.sh
 
 
-### /src/core/esh/test/exe
+### src/core/esh/test/exe
 
-ming64シェルで下記を実行して`all tests passed`になる確認
+mingw64 シェルで `src/core/esh/test/exe` に移動し、下記を実行して `all tests passed` になることを確認
 
 - bash ./run_test.sh
 
@@ -172,4 +174,3 @@ docs/coding_style_summary_stm32cubefw.md
 9. プリプロセッサ処理
 10. データ構造
 11. 戻り値
-
