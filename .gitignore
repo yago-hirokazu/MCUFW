@@ -1,3 +1,13 @@
 /src/target/windows/TDM-GCC/tdm
 /src/target/windows/TDM-GCC/make-3.81-bin
 /src/target/windows/TDM-GCC/make-3.81-dep
+
+# ESH test build and result files
+/src/core/esh/test/exe/_output/
+/src/core/esh/test/exe/*.exe
+/src/core/esh/test/exe/*.dll
+/src/core/esh/test/exe/result_test*_sh.txt
+/src/core/esh/test/par/_output/
+/src/core/esh/test/par/*.exe
+/src/core/esh/test/par/*.dll
+/src/core/esh/test/par/result_test*_sh.txt

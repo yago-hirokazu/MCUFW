@@ -1,0 +1,6 @@
+.github/workflows/*.yml text eol=lf
+.github/workflows/*.yaml text eol=lf
+
+src/core/esh/test/**/Makefile text eol=lf
+src/core/esh/test/**/*.sh text eol=lf
+src/core/esh/test/**/answer_test*_sh.txt text eol=crlf
