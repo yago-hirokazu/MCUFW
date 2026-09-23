@@ -8,7 +8,7 @@ make
 
 for /l %%k in (1,1,10) do (
     test_exe.exe test%%k.sh
-    fc .\result_test%%k_sh.txt .\result_test\result_test%%k_sh.txt > NUL
+    fc .\result_test%%k_sh.txt .\answer_test%%k_sh.txt > NUL
 
     if not %ERRORLEVEL%==0 (
        echo error @ test%%k
