@@ -1,0 +1,36 @@
+name: ESH tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Windows (MinGW64)
+    runs-on: windows-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-gcc
+            make
+            diffutils
+
+      - name: Test parser
+        shell: msys2 {0}
+        run: bash ./src/core/esh/test/par/run_test.sh
+
+      - name: Test executor
+        shell: msys2 {0}
+        run: bash ./src/core/esh/test/exe/run_test.sh
