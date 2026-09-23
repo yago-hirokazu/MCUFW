@@ -158,7 +158,7 @@ parse:
 	DP("Result of lexical analysis\n");
 	DP("--------------------------\n");
 	for (k=0; k<tokens; k++) {
-		DP("token[%02d]: %s,\t%s\n",
+		DP("token[%3d]: %s,\t%s\n",
 		   k, token_type_str[token[k].t_type],
 		   symlf(token[k].t_symbol));
 	}
