@@ -8,3 +8,7 @@ done
 
 for f in result_test*_sh.txt; do cp -- "$f" "answer_${f#result_}"; done
 
+for f in answer_test*_sh.txt; do
+    awk '{ sub(/\r$/, ""); printf "%s\r\n", $0 }' "$f" > "${f}.tmp" &&
+        mv -- "${f}.tmp" "$f"
+done
