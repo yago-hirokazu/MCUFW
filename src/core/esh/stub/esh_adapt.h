@@ -11,7 +11,7 @@ extern "C" {
 
 #include "machdep.h"
 
-#define	USE_STACKMACH	1	/* Switch to use stack machine */
+#define	USE_STACKMACH	0	/* Switch to use stack machine */
 
 #define	SYMCHARS	16	/* Max # of characters of a symbol */
 #define	SYMBOLS		16	/* Max # of symbols */

@@ -20,7 +20,9 @@ extern const char C_ECHO;
 #endif
 
 #define BLTN(name) extern int name(int argc, char *argv[]);
+#if USE_STACKMACH
 extern int break_command(int argc, char *argv[]);
+#endif
 
 #else
 
@@ -45,9 +47,11 @@ const struct applet builtins[] = {
 #endif
 
 #if !defined(PROTOTYPES)
+#if USE_STACKMACH
 #if TODO_BREAK_WITH_ARGUMENT
 	{"break", break_command},
 #endif // #if TODO_BREAK_WITH_ARGUMENT
+#endif // #if USE_STACKMACH
 	{NULL, NULL}
 };
 #endif

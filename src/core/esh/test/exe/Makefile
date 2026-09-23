@@ -90,6 +90,7 @@ INCLUDES += -I../../target/windows
 INCLUDES += -I../../../../target/windows/Adapt
 
 CFLAGS += $(INCLUDES)
+CFLAGS += -DUSE_STACKMACH
 
 # CXXFLAGS
 CXXFLAGS := $(CFLAGS)
