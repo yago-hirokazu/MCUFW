@@ -50,6 +50,7 @@ struct parse {
 	enum par_state2 p_state2;
 	char p_varid;
 	char p_elses;
+	char p_break;
 	struct label
 	{
 		int l_loop;

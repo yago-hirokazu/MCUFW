@@ -1,8 +1,8 @@
 #!/bin/sh
 
 k=1
-while [ "$k" -le 10 ]; do
-    ./test_exe.exe "test${k}.sh";
+while [ "$k" -le 2 ]; do
+    ./test_par.exe "test${k}.sh";
     k=$((k + 1))
 done
 

@@ -14,7 +14,7 @@ do {\
 	fflush(stdout);\
 } while (0)
 
-#if DEBUG_TEST
+#if DEBUG_BREAK
 #define DP(fmt, ...)\
 do {\
 	fprintf(stdout,"debug [%s|%s()|L%d] " fmt "\n",\
@@ -30,13 +30,14 @@ do {\
 
 extern struct parse parse[MAXNESTS];
 extern int loop_at[MAXNESTS];
-extern int loops;
 
 static int break_label(struct parse *par, int *loop_at, int loop_p);
 
 int break_command(int argc, char *argv[])
 {
-	int loop_p=0, label=0;
+	char *end;
+	long depth = 1;
+	long loop_p;
 
 	DP("break");
 	DP("argc = %d",argc);
@@ -45,26 +46,55 @@ int break_command(int argc, char *argv[])
 		DP("argv[%d] = %s",k,argv[k]);
 #endif
 
-	// Use 1st argument
-	loop_p = strtol(argv[1], NULL, 0);
-	label = break_label(parse, loop_at, loop_p);
+	/*
+	  argc    = 4 => invalid
 
-	DP("loop_p = %d\n", loop_p);
-	DP("label  = %d\n", label);
+	  argc    = 3
+	  argv[0] = "break"
+	  argv[1] = user input = loop depth to break
+	  argv[2] = current loop pointer (loop depth - 1)
 
-	return label;
+	  argc    = 2
+	  argv[0] = "break"
+	  argv[1] = current loop pointer (loop depth - 1)
+
+	  argc    = 1 => invalid
+	*/
+
+	if (argc < 2 || argc > 3)
+		goto invalid_argument;
+
+	loop_p = strtol(argv[argc - 1], &end, 10);
+	if (*argv[argc - 1] == '\0' || *end != '\0' || loop_p < 0)
+		goto invalid_argument;
+
+	if (argc == 3) {
+		depth = strtol(argv[1], &end, 10);
+		if (*argv[1] == '\0' || *end != '\0' || depth <= 0)
+			goto invalid_argument;
+	}
+
+	if (depth > loop_p + 1)
+		loop_p = 0;
+	else
+		loop_p -= depth - 1;
+
+	return break_label(parse, loop_at, loop_p);
+
+invalid_argument:
+	EP("break: numeric argument required");
+	return -1;
 }
 
 static int break_label(struct parse *par, int *loop_at, int loop_p)
 {
-	int label=0, loopat=0;
+	int loopat;
+	int label;
 
-	if (loop_p >= loops)
-		loop_p = loops - 1;
 	loopat = loop_at[loop_p];
 	label = par[loopat].p_label.l_end;
 	DP("label = parse[loop_at[loop_p=%d]=%d].p_label.l_end = %d",
-	   loop_p,loop_at[loop_p],label);
+	   loop_p, loop_at[loop_p], label);
 
 	return label;
 }

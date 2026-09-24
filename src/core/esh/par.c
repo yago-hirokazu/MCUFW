@@ -53,7 +53,9 @@ extern char *get_string(char id, struct code *code);
 static int find_cmd(struct token *tok, const struct applet *cmd);
 
 static char parse_cmdarg(struct token *token, struct code *code);
-static char parse_cmdline(struct token *token, struct code *code);
+static char parse_break_loop_arg(struct code *code);
+static char parse_cmdline(struct parse *par, struct token *token,
+			  struct code *code);
 
 static char _par_make_code(struct parse *par, struct token *tok, struct code *code);
 static char parse_idle(struct parse *par, struct token *tok, struct code *code);
@@ -219,8 +221,19 @@ parse_cmdarg(struct token *tok, struct code *code)
 	return PARINVLD;
 }
 
+static char parse_break_loop_arg(struct code *code)
+{
+	struct token tok;
+
+	memset(&tok, 0, sizeof(tok));
+	tok.t_type = T_CMD_ARG;
+	snprintf(tok.t_symbol, sizeof(tok.t_symbol), "%d", loops - 1);
+
+	return parse_cmdarg(&tok, code);
+}
+
 static char
-parse_cmdline(struct token *tok, struct code *code)
+parse_cmdline(struct parse *par, struct token *tok, struct code *code)
 {
 	DUMPCX(__func__, tok);
 
@@ -231,6 +244,7 @@ parse_cmdline(struct token *tok, struct code *code)
 		DP("%d = find_cmd(...)", ret);
 		if (ret < 0)
 			goto error;
+		par->p_break = 0;
 		add_code(OP_USER_CMD, code);
 		add_code(ret, code);
 		return PARONGO;
@@ -239,18 +253,24 @@ parse_cmdline(struct token *tok, struct code *code)
 		DP("%d = find_cmd(...)", ret);
 		if (ret < 0)
 			goto error;
+		if (0 == strcmp(tok->t_symbol, "break"))
+			par->p_break = 1;
+		else
+			par->p_break = 0;
 		add_code(OP_BLTN_CMD, code);
 		add_code(ret, code);
-		if (0 == strcmp(tok->t_symbol, "break")) {
-			add_code(OP_CMD_ARG, code);
-			add_code(loops-1, code);
-		}
 		return PARONGO;
 	} else if (tok->t_type == T_CMD_ARG || tok->t_type == T_CMD_VARG) {
 		ret = parse_cmdarg(tok, code);
 		DP("%d = parse_cmdarg(...)", ret);
 		return ret;
 	} else if (tok->t_type == T_EOL) {
+		if (par->p_break == 1) {
+			ret = parse_break_loop_arg(code);
+			if (ret == PARINVLD)
+				goto error;
+		}
+		par->p_break = 0;
 		add_code(OP_CMD_EXE, code);
 		return PARDONE;
 	}
@@ -280,7 +300,7 @@ _par_make_code(struct parse *par, struct token *tok, struct code *code)
 		DP("%d = parse_idle(...)", ret);
 		break;
 	case PAR_CMDLINE:
-		ret = parse_cmdline(tok, code);
+		ret = parse_cmdline(par, tok, code);
 		DP("%d = parse_cmdline(...)", ret);
 		if (ret == PARDONE) {
 			par->p_state1 = PAR_HALT;
@@ -315,7 +335,7 @@ parse_idle(struct parse *par, struct token *tok, struct code *code)
 	switch (tok->t_type) {
 	case T_USER_CMD:
 	case T_BLTN_CMD:
-		ret = parse_cmdline(tok, code);
+		ret = parse_cmdline(par, tok, code);
 		DP("%d = parse_cmdline(...)",ret);
 		if (ret == PARINVLD)
 			return PARINVLD;
@@ -418,7 +438,7 @@ parse_assign(struct parse *par, struct token *tok, struct code *code)
 			return PARDONE;
 		}
 
-		int ret = parse_cmdline(tok, code);
+		int ret = parse_cmdline(par, tok, code);
 		DP("%d = parse_cmdline(tok, code)", ret);
 		if (ret != PARINVLD)
 			return PARONGO;

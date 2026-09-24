@@ -199,36 +199,36 @@ token[29].t_symbol =
 
 Result of lexical analysis
 --------------------------
-token[00]: T_COMMENT,	
-token[01]: T_EOL,	
-token[02]: T_EOL,	
-token[03]: T_VARIABLE,	k
-token[04]: T_ASSIGN,	=
-token[05]: T_VALUE,	0
-token[06]: T_EOL,	
-token[07]: T_WHILE,	while
-token[08]: T_LBRACKET,	[
-token[09]: T_CMD_VARG,	k
-token[10]: T_CMD_ARG,	-ne
-token[11]: T_CMD_ARG,	4
-token[12]: T_RBRACKET,	]
-token[13]: T_SEMICOLON,	;
-token[14]: T_DO,	do
-token[15]: T_EOL,	
-token[16]: T_BLTN_CMD,	echo
-token[17]: T_CMD_VARG,	k
-token[18]: T_EOL,	
-token[19]: T_VARIABLE,	k
-token[20]: T_ASSIGN,	=
-token[21]: T_LBACKQUOTE,	`
-token[22]: T_BLTN_CMD,	expr
-token[23]: T_CMD_VARG,	k
-token[24]: T_CMD_ARG,	+
-token[25]: T_CMD_ARG,	1
-token[26]: T_RBACKQUOTE,	`
-token[27]: T_EOL,	
-token[28]: T_DONE,	done
-token[29]: T_EOL,	
+token[  0]: T_COMMENT,	
+token[  1]: T_EOL,	
+token[  2]: T_EOL,	
+token[  3]: T_VARIABLE,	k
+token[  4]: T_ASSIGN,	=
+token[  5]: T_VALUE,	0
+token[  6]: T_EOL,	
+token[  7]: T_WHILE,	while
+token[  8]: T_LBRACKET,	[
+token[  9]: T_CMD_VARG,	k
+token[ 10]: T_CMD_ARG,	-ne
+token[ 11]: T_CMD_ARG,	4
+token[ 12]: T_RBRACKET,	]
+token[ 13]: T_SEMICOLON,	;
+token[ 14]: T_DO,	do
+token[ 15]: T_EOL,	
+token[ 16]: T_BLTN_CMD,	echo
+token[ 17]: T_CMD_VARG,	k
+token[ 18]: T_EOL,	
+token[ 19]: T_VARIABLE,	k
+token[ 20]: T_ASSIGN,	=
+token[ 21]: T_LBACKQUOTE,	`
+token[ 22]: T_BLTN_CMD,	expr
+token[ 23]: T_CMD_VARG,	k
+token[ 24]: T_CMD_ARG,	+
+token[ 25]: T_CMD_ARG,	1
+token[ 26]: T_RBACKQUOTE,	`
+token[ 27]: T_EOL,	
+token[ 28]: T_DONE,	done
+token[ 29]: T_EOL,	
 
 Parsing tokens to make byte codes
 ---------------------------------
