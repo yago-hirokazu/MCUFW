@@ -217,6 +217,15 @@ parse_cmdarg(struct token *tok, struct code *code)
 		add_code(OP_CMD_VARG, code);
 		add_code(varid, code);
 		return PARONGO;
+	} else if (tok->t_type == T_CMD_QARG) {
+		char strid = find_symbol(tok->t_symbol, code->c_stab.s_str);
+
+		if (strid == NO_SYMBOL)
+			strid = make_symbol(tok->t_symbol, code->c_stab.s_str,
+					    &code->c_stab.s_num);
+		add_code(OP_CMD_QARG, code);
+		add_code(strid, code);
+		return PARONGO;
 	}
 	return PARINVLD;
 }
@@ -260,7 +269,9 @@ parse_cmdline(struct parse *par, struct token *tok, struct code *code)
 		add_code(OP_BLTN_CMD, code);
 		add_code(ret, code);
 		return PARONGO;
-	} else if (tok->t_type == T_CMD_ARG || tok->t_type == T_CMD_VARG) {
+	} else if (tok->t_type == T_CMD_ARG ||
+		   tok->t_type == T_CMD_VARG ||
+		   tok->t_type == T_CMD_QARG) {
 		ret = parse_cmdarg(tok, code);
 		DP("%d = parse_cmdarg(...)", ret);
 		return ret;

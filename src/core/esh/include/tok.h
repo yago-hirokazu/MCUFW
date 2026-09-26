@@ -18,6 +18,7 @@ enum	token_type {
 	T_BLTN_CMD,	/* Builtin command */
 	T_CMD_ARG,	/* Command argument */
 	T_CMD_VARG,	/* Command variable argument */
+	T_CMD_QARG,	/* Quoted command argument */
 	T_VALUE,	/* Ineger value */
 	T_STRING,	/* String */
 	T_VARIABLE,	/* Variable */

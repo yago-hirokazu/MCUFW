@@ -197,32 +197,32 @@ scan(k, &aline)=0x0000
 scan(", &aline)=0x0000
 scan(
 , &aline)=0x0001
-aline.wp = 13
-Raw    : echo k = $k 
+aline.wp = 15
+Raw    : echo " k=$k " 
 1 (LEXONGO) = lex_anlyze_token(echo, &token)
 token[28].t_type   = T_BLTN_CMD
 token[28].t_symbol = echo
-1 (LEXONGO) = lex_anlyze_token(k, &token)
-token[29].t_type   = T_CMD_ARG
-token[29].t_symbol = k
-1 (LEXONGO) = lex_anlyze_token(=, &token)
-token[30].t_type   = T_CMD_ARG
-token[30].t_symbol = =
-1 (LEXONGO) = lex_anlyze_token($k, &token)
-token[31].t_type   = T_CMD_VARG
-token[31].t_symbol = k
+3 (LEXQUOTE) = lex_anlyze_token(", &token)
+token[29].t_type   = T_CMD_QARG
+token[29].t_symbol = 
+3 (LEXQUOTE) = lex_anlyze_token(k=$k, &token)
+token[29].t_type   = T_CMD_QARG
+token[29].t_symbol = k=$k
+1 (LEXONGO) = lex_anlyze_token(", &token)
+token[29].t_type   = T_CMD_QARG
+token[29].t_symbol = k=$k
 2 (LEXDONE) = lex_anlyze_token(
 , &token)
-token[32].t_type   = T_EOL
-token[32].t_symbol = 
+token[30].t_type   = T_EOL
+token[30].t_symbol = 
 scan(
 , &aline)=0x0001
 aline.wp = 1
 Raw    : 
 2 (LEXDONE) = lex_anlyze_token(
 , &token)
-token[33].t_type   = T_EOL
-token[33].t_symbol = 
+token[31].t_type   = T_EOL
+token[31].t_symbol = 
 scan(	, &aline)=0x0000
 scan(l, &aline)=0x0000
 scan(=, &aline)=0x0000
@@ -232,18 +232,18 @@ scan(
 aline.wp = 7
 Raw    : l = 0 
 2 (LEXDONE) = lex_anlyze_token(l, &token)
-token[34].t_type   = T_VARIABLE
-token[34].t_symbol = l
+token[32].t_type   = T_VARIABLE
+token[32].t_symbol = l
 2 (LEXDONE) = lex_anlyze_token(=, &token)
-token[35].t_type   = T_ASSIGN
-token[35].t_symbol = =
+token[33].t_type   = T_ASSIGN
+token[33].t_symbol = =
 2 (LEXDONE) = lex_anlyze_token(0, &token)
-token[36].t_type   = T_VALUE
-token[36].t_symbol = 0
+token[34].t_type   = T_VALUE
+token[34].t_symbol = 0
 2 (LEXDONE) = lex_anlyze_token(
 , &token)
-token[37].t_type   = T_EOL
-token[37].t_symbol = 
+token[35].t_type   = T_EOL
+token[35].t_symbol = 
 scan(	, &aline)=0x0000
 scan(w, &aline)=0x0000
 scan(h, &aline)=0x0000
@@ -272,33 +272,33 @@ scan(
 aline.wp = 25
 Raw    : while [ $l -ne 3 ] ; do 
 2 (LEXDONE) = lex_anlyze_token(while, &token)
-token[38].t_type   = T_WHILE
-token[38].t_symbol = while
+token[36].t_type   = T_WHILE
+token[36].t_symbol = while
 1 (LEXONGO) = lex_anlyze_token([, &token)
-token[39].t_type   = T_LBRACKET
-token[39].t_symbol = [
+token[37].t_type   = T_LBRACKET
+token[37].t_symbol = [
 1 (LEXONGO) = lex_anlyze_token($l, &token)
-token[40].t_type   = T_CMD_VARG
-token[40].t_symbol = l
+token[38].t_type   = T_CMD_VARG
+token[38].t_symbol = l
 1 (LEXONGO) = lex_anlyze_token(-ne, &token)
-token[41].t_type   = T_CMD_ARG
-token[41].t_symbol = -ne
+token[39].t_type   = T_CMD_ARG
+token[39].t_symbol = -ne
 1 (LEXONGO) = lex_anlyze_token(3, &token)
-token[42].t_type   = T_CMD_ARG
-token[42].t_symbol = 3
+token[40].t_type   = T_CMD_ARG
+token[40].t_symbol = 3
 1 (LEXONGO) = lex_anlyze_token(], &token)
-token[43].t_type   = T_RBRACKET
-token[43].t_symbol = ]
+token[41].t_type   = T_RBRACKET
+token[41].t_symbol = ]
 2 (LEXDONE) = lex_anlyze_token(;, &token)
-token[44].t_type   = T_SEMICOLON
-token[44].t_symbol = ;
+token[42].t_type   = T_SEMICOLON
+token[42].t_symbol = ;
 2 (LEXDONE) = lex_anlyze_token(do, &token)
-token[45].t_type   = T_DO
-token[45].t_symbol = do
+token[43].t_type   = T_DO
+token[43].t_symbol = do
 2 (LEXDONE) = lex_anlyze_token(
 , &token)
-token[46].t_type   = T_EOL
-token[46].t_symbol = 
+token[44].t_type   = T_EOL
+token[44].t_symbol = 
 scan(	, &aline)=0x0000
 scan(	, &aline)=0x0000
 scan(l, &aline)=0x0000
@@ -321,33 +321,33 @@ scan(
 aline.wp = 21
 Raw    : l = ` expr $l + 1 ` 
 2 (LEXDONE) = lex_anlyze_token(l, &token)
-token[47].t_type   = T_VARIABLE
-token[47].t_symbol = l
+token[45].t_type   = T_VARIABLE
+token[45].t_symbol = l
 2 (LEXDONE) = lex_anlyze_token(=, &token)
-token[48].t_type   = T_ASSIGN
-token[48].t_symbol = =
+token[46].t_type   = T_ASSIGN
+token[46].t_symbol = =
 1 (LEXONGO) = lex_anlyze_token(`, &token)
-token[49].t_type   = T_LBACKQUOTE
-token[49].t_symbol = `
+token[47].t_type   = T_LBACKQUOTE
+token[47].t_symbol = `
 1 (LEXONGO) = lex_anlyze_token(expr, &token)
-token[50].t_type   = T_BLTN_CMD
-token[50].t_symbol = expr
+token[48].t_type   = T_BLTN_CMD
+token[48].t_symbol = expr
 1 (LEXONGO) = lex_anlyze_token($l, &token)
-token[51].t_type   = T_CMD_VARG
-token[51].t_symbol = l
+token[49].t_type   = T_CMD_VARG
+token[49].t_symbol = l
 1 (LEXONGO) = lex_anlyze_token(+, &token)
-token[52].t_type   = T_CMD_ARG
-token[52].t_symbol = +
+token[50].t_type   = T_CMD_ARG
+token[50].t_symbol = +
 1 (LEXONGO) = lex_anlyze_token(1, &token)
-token[53].t_type   = T_CMD_ARG
-token[53].t_symbol = 1
+token[51].t_type   = T_CMD_ARG
+token[51].t_symbol = 1
 1 (LEXONGO) = lex_anlyze_token(`, &token)
-token[54].t_type   = T_RBACKQUOTE
-token[54].t_symbol = `
+token[52].t_type   = T_RBACKQUOTE
+token[52].t_symbol = `
 2 (LEXDONE) = lex_anlyze_token(
 , &token)
-token[55].t_type   = T_EOL
-token[55].t_symbol = 
+token[53].t_type   = T_EOL
+token[53].t_symbol = 
 scan(	, &aline)=0x0000
 scan(	, &aline)=0x0000
 scan(e, &aline)=0x0000
@@ -367,21 +367,21 @@ scan(
 aline.wp = 16
 Raw    : echo ' inner ' 
 1 (LEXONGO) = lex_anlyze_token(echo, &token)
-token[56].t_type   = T_BLTN_CMD
-token[56].t_symbol = echo
+token[54].t_type   = T_BLTN_CMD
+token[54].t_symbol = echo
 3 (LEXQUOTE) = lex_anlyze_token(', &token)
-token[57].t_type   = T_CMD_ARG
-token[57].t_symbol = 
+token[55].t_type   = T_CMD_ARG
+token[55].t_symbol = 
 3 (LEXQUOTE) = lex_anlyze_token(inner, &token)
-token[57].t_type   = T_CMD_ARG
-token[57].t_symbol = inner
+token[55].t_type   = T_CMD_ARG
+token[55].t_symbol = inner
 1 (LEXONGO) = lex_anlyze_token(', &token)
-token[57].t_type   = T_CMD_ARG
-token[57].t_symbol = inner
+token[55].t_type   = T_CMD_ARG
+token[55].t_symbol = inner
 2 (LEXDONE) = lex_anlyze_token(
 , &token)
-token[58].t_type   = T_EOL
-token[58].t_symbol = 
+token[56].t_type   = T_EOL
+token[56].t_symbol = 
 scan(	, &aline)=0x0000
 scan(	, &aline)=0x0000
 scan(e, &aline)=0x0000
@@ -397,32 +397,32 @@ scan(l, &aline)=0x0000
 scan(", &aline)=0x0000
 scan(
 , &aline)=0x0001
-aline.wp = 13
-Raw    : echo l = $l 
+aline.wp = 15
+Raw    : echo " l=$l " 
 1 (LEXONGO) = lex_anlyze_token(echo, &token)
-token[59].t_type   = T_BLTN_CMD
-token[59].t_symbol = echo
-1 (LEXONGO) = lex_anlyze_token(l, &token)
-token[60].t_type   = T_CMD_ARG
-token[60].t_symbol = l
-1 (LEXONGO) = lex_anlyze_token(=, &token)
-token[61].t_type   = T_CMD_ARG
-token[61].t_symbol = =
-1 (LEXONGO) = lex_anlyze_token($l, &token)
-token[62].t_type   = T_CMD_VARG
-token[62].t_symbol = l
+token[57].t_type   = T_BLTN_CMD
+token[57].t_symbol = echo
+3 (LEXQUOTE) = lex_anlyze_token(", &token)
+token[58].t_type   = T_CMD_QARG
+token[58].t_symbol = 
+3 (LEXQUOTE) = lex_anlyze_token(l=$l, &token)
+token[58].t_type   = T_CMD_QARG
+token[58].t_symbol = l=$l
+1 (LEXONGO) = lex_anlyze_token(", &token)
+token[58].t_type   = T_CMD_QARG
+token[58].t_symbol = l=$l
 2 (LEXDONE) = lex_anlyze_token(
 , &token)
-token[63].t_type   = T_EOL
-token[63].t_symbol = 
+token[59].t_type   = T_EOL
+token[59].t_symbol = 
 scan(
 , &aline)=0x0001
 aline.wp = 1
 Raw    : 
 2 (LEXDONE) = lex_anlyze_token(
 , &token)
-token[64].t_type   = T_EOL
-token[64].t_symbol = 
+token[60].t_type   = T_EOL
+token[60].t_symbol = 
 scan(	, &aline)=0x0000
 scan(	, &aline)=0x0000
 scan(i, &aline)=0x0000
@@ -451,33 +451,33 @@ scan(
 aline.wp = 24
 Raw    : if [ $l -eq 2 ] ; then 
 2 (LEXDONE) = lex_anlyze_token(if, &token)
-token[65].t_type   = T_IF
-token[65].t_symbol = if
+token[61].t_type   = T_IF
+token[61].t_symbol = if
 1 (LEXONGO) = lex_anlyze_token([, &token)
-token[66].t_type   = T_LBRACKET
-token[66].t_symbol = [
+token[62].t_type   = T_LBRACKET
+token[62].t_symbol = [
 1 (LEXONGO) = lex_anlyze_token($l, &token)
-token[67].t_type   = T_CMD_VARG
-token[67].t_symbol = l
+token[63].t_type   = T_CMD_VARG
+token[63].t_symbol = l
 1 (LEXONGO) = lex_anlyze_token(-eq, &token)
-token[68].t_type   = T_CMD_ARG
-token[68].t_symbol = -eq
+token[64].t_type   = T_CMD_ARG
+token[64].t_symbol = -eq
 1 (LEXONGO) = lex_anlyze_token(2, &token)
-token[69].t_type   = T_CMD_ARG
-token[69].t_symbol = 2
+token[65].t_type   = T_CMD_ARG
+token[65].t_symbol = 2
 1 (LEXONGO) = lex_anlyze_token(], &token)
-token[70].t_type   = T_RBRACKET
-token[70].t_symbol = ]
+token[66].t_type   = T_RBRACKET
+token[66].t_symbol = ]
 2 (LEXDONE) = lex_anlyze_token(;, &token)
-token[71].t_type   = T_SEMICOLON
-token[71].t_symbol = ;
+token[67].t_type   = T_SEMICOLON
+token[67].t_symbol = ;
 2 (LEXDONE) = lex_anlyze_token(then, &token)
-token[72].t_type   = T_THEN
-token[72].t_symbol = then
+token[68].t_type   = T_THEN
+token[68].t_symbol = then
 2 (LEXDONE) = lex_anlyze_token(
 , &token)
-token[73].t_type   = T_EOL
-token[73].t_symbol = 
+token[69].t_type   = T_EOL
+token[69].t_symbol = 
 scan(	, &aline)=0x0000
 scan(	, &aline)=0x0000
 scan(	, &aline)=0x0000
@@ -500,24 +500,24 @@ scan(
 aline.wp = 18
 Raw    : echo ' break 2 ' 
 1 (LEXONGO) = lex_anlyze_token(echo, &token)
-token[74].t_type   = T_BLTN_CMD
-token[74].t_symbol = echo
+token[70].t_type   = T_BLTN_CMD
+token[70].t_symbol = echo
 3 (LEXQUOTE) = lex_anlyze_token(', &token)
-token[75].t_type   = T_CMD_ARG
-token[75].t_symbol = 
+token[71].t_type   = T_CMD_ARG
+token[71].t_symbol = 
 3 (LEXQUOTE) = lex_anlyze_token(break, &token)
-token[75].t_type   = T_CMD_ARG
-token[75].t_symbol = break
+token[71].t_type   = T_CMD_ARG
+token[71].t_symbol = break
 3 (LEXQUOTE) = lex_anlyze_token(2, &token)
-token[75].t_type   = T_CMD_ARG
-token[75].t_symbol = break 2
+token[71].t_type   = T_CMD_ARG
+token[71].t_symbol = break 2
 1 (LEXONGO) = lex_anlyze_token(', &token)
-token[75].t_type   = T_CMD_ARG
-token[75].t_symbol = break 2
+token[71].t_type   = T_CMD_ARG
+token[71].t_symbol = break 2
 2 (LEXDONE) = lex_anlyze_token(
 , &token)
-token[76].t_type   = T_EOL
-token[76].t_symbol = 
+token[72].t_type   = T_EOL
+token[72].t_symbol = 
 scan(	, &aline)=0x0000
 scan(	, &aline)=0x0000
 scan(	, &aline)=0x0000
@@ -534,15 +534,15 @@ scan(
 aline.wp = 10
 Raw    : break $l 
 1 (LEXONGO) = lex_anlyze_token(break, &token)
-token[77].t_type   = T_BLTN_CMD
-token[77].t_symbol = break
+token[73].t_type   = T_BLTN_CMD
+token[73].t_symbol = break
 1 (LEXONGO) = lex_anlyze_token($l, &token)
-token[78].t_type   = T_CMD_VARG
-token[78].t_symbol = l
+token[74].t_type   = T_CMD_VARG
+token[74].t_symbol = l
 2 (LEXDONE) = lex_anlyze_token(
 , &token)
-token[79].t_type   = T_EOL
-token[79].t_symbol = 
+token[75].t_type   = T_EOL
+token[75].t_symbol = 
 scan(	, &aline)=0x0000
 scan(	, &aline)=0x0000
 scan(f, &aline)=0x0000
@@ -552,12 +552,12 @@ scan(
 aline.wp = 4
 Raw    : fi 
 2 (LEXDONE) = lex_anlyze_token(fi, &token)
-token[80].t_type   = T_FI
-token[80].t_symbol = fi
+token[76].t_type   = T_FI
+token[76].t_symbol = fi
 2 (LEXDONE) = lex_anlyze_token(
 , &token)
-token[81].t_type   = T_EOL
-token[81].t_symbol = 
+token[77].t_type   = T_EOL
+token[77].t_symbol = 
 scan(	, &aline)=0x0000
 scan(d, &aline)=0x0000
 scan(o, &aline)=0x0000
@@ -568,20 +568,20 @@ scan(
 aline.wp = 6
 Raw    : done 
 2 (LEXDONE) = lex_anlyze_token(done, &token)
-token[82].t_type   = T_DONE
-token[82].t_symbol = done
+token[78].t_type   = T_DONE
+token[78].t_symbol = done
 2 (LEXDONE) = lex_anlyze_token(
 , &token)
-token[83].t_type   = T_EOL
-token[83].t_symbol = 
+token[79].t_type   = T_EOL
+token[79].t_symbol = 
 scan(
 , &aline)=0x0001
 aline.wp = 1
 Raw    : 
 2 (LEXDONE) = lex_anlyze_token(
 , &token)
-token[84].t_type   = T_EOL
-token[84].t_symbol = 
+token[80].t_type   = T_EOL
+token[80].t_symbol = 
 scan(	, &aline)=0x0000
 scan(e, &aline)=0x0000
 scan(c, &aline)=0x0000
@@ -606,24 +606,24 @@ scan(
 aline.wp = 22
 Raw    : echo ' not reached ' 
 1 (LEXONGO) = lex_anlyze_token(echo, &token)
-token[85].t_type   = T_BLTN_CMD
-token[85].t_symbol = echo
+token[81].t_type   = T_BLTN_CMD
+token[81].t_symbol = echo
 3 (LEXQUOTE) = lex_anlyze_token(', &token)
-token[86].t_type   = T_CMD_ARG
-token[86].t_symbol = 
+token[82].t_type   = T_CMD_ARG
+token[82].t_symbol = 
 3 (LEXQUOTE) = lex_anlyze_token(not, &token)
-token[86].t_type   = T_CMD_ARG
-token[86].t_symbol = not
+token[82].t_type   = T_CMD_ARG
+token[82].t_symbol = not
 3 (LEXQUOTE) = lex_anlyze_token(reached, &token)
-token[86].t_type   = T_CMD_ARG
-token[86].t_symbol = not reached
+token[82].t_type   = T_CMD_ARG
+token[82].t_symbol = not reached
 1 (LEXONGO) = lex_anlyze_token(', &token)
-token[86].t_type   = T_CMD_ARG
-token[86].t_symbol = not reached
+token[82].t_type   = T_CMD_ARG
+token[82].t_symbol = not reached
 2 (LEXDONE) = lex_anlyze_token(
 , &token)
-token[87].t_type   = T_EOL
-token[87].t_symbol = 
+token[83].t_type   = T_EOL
+token[83].t_symbol = 
 scan(d, &aline)=0x0000
 scan(o, &aline)=0x0000
 scan(n, &aline)=0x0000
@@ -633,20 +633,20 @@ scan(
 aline.wp = 6
 Raw    : done 
 2 (LEXDONE) = lex_anlyze_token(done, &token)
-token[88].t_type   = T_DONE
-token[88].t_symbol = done
+token[84].t_type   = T_DONE
+token[84].t_symbol = done
 2 (LEXDONE) = lex_anlyze_token(
 , &token)
-token[89].t_type   = T_EOL
-token[89].t_symbol = 
+token[85].t_type   = T_EOL
+token[85].t_symbol = 
 scan(
 , &aline)=0x0001
 aline.wp = 1
 Raw    : 
 2 (LEXDONE) = lex_anlyze_token(
 , &token)
-token[90].t_type   = T_EOL
-token[90].t_symbol = 
+token[86].t_type   = T_EOL
+token[86].t_symbol = 
 scan(e, &aline)=0x0000
 scan(c, &aline)=0x0000
 scan(h, &aline)=0x0000
@@ -670,26 +670,26 @@ scan(
 aline.wp = 22
 Raw    : echo ' after loops ' 
 1 (LEXONGO) = lex_anlyze_token(echo, &token)
-token[91].t_type   = T_BLTN_CMD
-token[91].t_symbol = echo
+token[87].t_type   = T_BLTN_CMD
+token[87].t_symbol = echo
 3 (LEXQUOTE) = lex_anlyze_token(', &token)
-token[92].t_type   = T_CMD_ARG
-token[92].t_symbol = 
+token[88].t_type   = T_CMD_ARG
+token[88].t_symbol = 
 3 (LEXQUOTE) = lex_anlyze_token(after, &token)
-token[92].t_type   = T_CMD_ARG
-token[92].t_symbol = after
+token[88].t_type   = T_CMD_ARG
+token[88].t_symbol = after
 3 (LEXQUOTE) = lex_anlyze_token(loops, &token)
-token[92].t_type   = T_CMD_ARG
-token[92].t_symbol = after loops
+token[88].t_type   = T_CMD_ARG
+token[88].t_symbol = after loops
 1 (LEXONGO) = lex_anlyze_token(', &token)
-token[92].t_type   = T_CMD_ARG
-token[92].t_symbol = after loops
+token[88].t_type   = T_CMD_ARG
+token[88].t_symbol = after loops
 2 (LEXDONE) = lex_anlyze_token(
 , &token)
-token[93].t_type   = T_EOL
-token[93].t_symbol = 
+token[89].t_type   = T_EOL
+token[89].t_symbol = 
 
-94 tokens were made from 15 characters
+90 tokens were made from 15 characters
 
 Result of lexical analysis
 --------------------------
@@ -722,75 +722,71 @@ token[ 25]: T_BLTN_CMD,	echo
 token[ 26]: T_CMD_ARG,	outer
 token[ 27]: T_EOL,	
 token[ 28]: T_BLTN_CMD,	echo
-token[ 29]: T_CMD_ARG,	k
-token[ 30]: T_CMD_ARG,	=
-token[ 31]: T_CMD_VARG,	k
-token[ 32]: T_EOL,	
-token[ 33]: T_EOL,	
-token[ 34]: T_VARIABLE,	l
-token[ 35]: T_ASSIGN,	=
-token[ 36]: T_VALUE,	0
-token[ 37]: T_EOL,	
-token[ 38]: T_WHILE,	while
-token[ 39]: T_LBRACKET,	[
-token[ 40]: T_CMD_VARG,	l
-token[ 41]: T_CMD_ARG,	-ne
-token[ 42]: T_CMD_ARG,	3
-token[ 43]: T_RBRACKET,	]
-token[ 44]: T_SEMICOLON,	;
-token[ 45]: T_DO,	do
-token[ 46]: T_EOL,	
-token[ 47]: T_VARIABLE,	l
-token[ 48]: T_ASSIGN,	=
-token[ 49]: T_LBACKQUOTE,	`
-token[ 50]: T_BLTN_CMD,	expr
-token[ 51]: T_CMD_VARG,	l
-token[ 52]: T_CMD_ARG,	+
-token[ 53]: T_CMD_ARG,	1
-token[ 54]: T_RBACKQUOTE,	`
-token[ 55]: T_EOL,	
-token[ 56]: T_BLTN_CMD,	echo
-token[ 57]: T_CMD_ARG,	inner
-token[ 58]: T_EOL,	
-token[ 59]: T_BLTN_CMD,	echo
-token[ 60]: T_CMD_ARG,	l
-token[ 61]: T_CMD_ARG,	=
-token[ 62]: T_CMD_VARG,	l
-token[ 63]: T_EOL,	
-token[ 64]: T_EOL,	
-token[ 65]: T_IF,	if
-token[ 66]: T_LBRACKET,	[
-token[ 67]: T_CMD_VARG,	l
-token[ 68]: T_CMD_ARG,	-eq
-token[ 69]: T_CMD_ARG,	2
-token[ 70]: T_RBRACKET,	]
-token[ 71]: T_SEMICOLON,	;
-token[ 72]: T_THEN,	then
-token[ 73]: T_EOL,	
-token[ 74]: T_BLTN_CMD,	echo
-token[ 75]: T_CMD_ARG,	break 2
-token[ 76]: T_EOL,	
-token[ 77]: T_BLTN_CMD,	break
-token[ 78]: T_CMD_VARG,	l
+token[ 29]: T_CMD_QARG,	k=$k
+token[ 30]: T_EOL,	
+token[ 31]: T_EOL,	
+token[ 32]: T_VARIABLE,	l
+token[ 33]: T_ASSIGN,	=
+token[ 34]: T_VALUE,	0
+token[ 35]: T_EOL,	
+token[ 36]: T_WHILE,	while
+token[ 37]: T_LBRACKET,	[
+token[ 38]: T_CMD_VARG,	l
+token[ 39]: T_CMD_ARG,	-ne
+token[ 40]: T_CMD_ARG,	3
+token[ 41]: T_RBRACKET,	]
+token[ 42]: T_SEMICOLON,	;
+token[ 43]: T_DO,	do
+token[ 44]: T_EOL,	
+token[ 45]: T_VARIABLE,	l
+token[ 46]: T_ASSIGN,	=
+token[ 47]: T_LBACKQUOTE,	`
+token[ 48]: T_BLTN_CMD,	expr
+token[ 49]: T_CMD_VARG,	l
+token[ 50]: T_CMD_ARG,	+
+token[ 51]: T_CMD_ARG,	1
+token[ 52]: T_RBACKQUOTE,	`
+token[ 53]: T_EOL,	
+token[ 54]: T_BLTN_CMD,	echo
+token[ 55]: T_CMD_ARG,	inner
+token[ 56]: T_EOL,	
+token[ 57]: T_BLTN_CMD,	echo
+token[ 58]: T_CMD_QARG,	l=$l
+token[ 59]: T_EOL,	
+token[ 60]: T_EOL,	
+token[ 61]: T_IF,	if
+token[ 62]: T_LBRACKET,	[
+token[ 63]: T_CMD_VARG,	l
+token[ 64]: T_CMD_ARG,	-eq
+token[ 65]: T_CMD_ARG,	2
+token[ 66]: T_RBRACKET,	]
+token[ 67]: T_SEMICOLON,	;
+token[ 68]: T_THEN,	then
+token[ 69]: T_EOL,	
+token[ 70]: T_BLTN_CMD,	echo
+token[ 71]: T_CMD_ARG,	break 2
+token[ 72]: T_EOL,	
+token[ 73]: T_BLTN_CMD,	break
+token[ 74]: T_CMD_VARG,	l
+token[ 75]: T_EOL,	
+token[ 76]: T_FI,	fi
+token[ 77]: T_EOL,	
+token[ 78]: T_DONE,	done
 token[ 79]: T_EOL,	
-token[ 80]: T_FI,	fi
-token[ 81]: T_EOL,	
-token[ 82]: T_DONE,	done
+token[ 80]: T_EOL,	
+token[ 81]: T_BLTN_CMD,	echo
+token[ 82]: T_CMD_ARG,	not reached
 token[ 83]: T_EOL,	
-token[ 84]: T_EOL,	
-token[ 85]: T_BLTN_CMD,	echo
-token[ 86]: T_CMD_ARG,	not reached
-token[ 87]: T_EOL,	
-token[ 88]: T_DONE,	done
+token[ 84]: T_DONE,	done
+token[ 85]: T_EOL,	
+token[ 86]: T_EOL,	
+token[ 87]: T_BLTN_CMD,	echo
+token[ 88]: T_CMD_ARG,	after loops
 token[ 89]: T_EOL,	
-token[ 90]: T_EOL,	
-token[ 91]: T_BLTN_CMD,	echo
-token[ 92]: T_CMD_ARG,	after loops
-token[ 93]: T_EOL,	
 
 Parsing tokens to make byte codes
 ---------------------------------
-# of codes = 115
+# of codes = 107
 code[  0] = OP_PUSH_SYMBOL
 code[  1] = 00
 code[  2] = OP_POP_SYMBOL_THEN_ASSIGN
@@ -823,100 +819,92 @@ code[ 28] = 05
 code[ 29] = OP_CMD_EXE
 code[ 30] = OP_BLTN_CMD
 code[ 31] = 03
-code[ 32] = OP_CMD_ARG
+code[ 32] = OP_CMD_QARG
 code[ 33] = 06
-code[ 34] = OP_CMD_ARG
-code[ 35] = 07
-code[ 36] = OP_CMD_VARG
-code[ 37] = 00
-code[ 38] = OP_CMD_EXE
-code[ 39] = OP_PUSH_SYMBOL
-code[ 40] = 00
-code[ 41] = OP_POP_SYMBOL_THEN_ASSIGN
+code[ 34] = OP_CMD_EXE
+code[ 35] = OP_PUSH_SYMBOL
+code[ 36] = 00
+code[ 37] = OP_POP_SYMBOL_THEN_ASSIGN
+code[ 38] = 01
+code[ 39] = OP_BLTN_CMD
+code[ 40] = 01
+code[ 41] = OP_CMD_VARG
 code[ 42] = 01
-code[ 43] = OP_BLTN_CMD
+code[ 43] = OP_CMD_ARG
 code[ 44] = 01
-code[ 45] = OP_CMD_VARG
-code[ 46] = 01
-code[ 47] = OP_CMD_ARG
-code[ 48] = 01
-code[ 49] = OP_CMD_ARG
-code[ 50] = 02
-code[ 51] = OP_CMD_EXE_THEN_STACK
-code[ 52] = OP_JUMP_IF_FALSE
-code[ 53] = 03
-code[ 54] = OP_BLTN_CMD
-code[ 55] = 02
-code[ 56] = OP_CMD_VARG
-code[ 57] = 01
-code[ 58] = OP_CMD_ARG
-code[ 59] = 03
-code[ 60] = OP_CMD_ARG
-code[ 61] = 04
-code[ 62] = OP_CMD_EXE_THEN_ASSIGN
-code[ 63] = 01
-code[ 64] = OP_BLTN_CMD
-code[ 65] = 03
-code[ 66] = OP_CMD_ARG
-code[ 67] = 08
-code[ 68] = OP_CMD_EXE
-code[ 69] = OP_BLTN_CMD
-code[ 70] = 03
-code[ 71] = OP_CMD_ARG
-code[ 72] = 09
-code[ 73] = OP_CMD_ARG
-code[ 74] = 07
-code[ 75] = OP_CMD_VARG
-code[ 76] = 01
-code[ 77] = OP_CMD_EXE
-code[ 78] = OP_BLTN_CMD
-code[ 79] = 01
-code[ 80] = OP_CMD_VARG
-code[ 81] = 01
-code[ 82] = OP_CMD_ARG
-code[ 83] = 0A
-code[ 84] = OP_CMD_ARG
-code[ 85] = 0B
-code[ 86] = OP_CMD_EXE_THEN_STACK
-code[ 87] = OP_JUMP_IF_FALSE
-code[ 88] = 05
-code[ 89] = OP_BLTN_CMD
-code[ 90] = 03
-code[ 91] = OP_CMD_ARG
-code[ 92] = 0C
-code[ 93] = OP_CMD_EXE
-code[ 94] = OP_BLTN_CMD
-code[ 95] = 04
-code[ 96] = OP_CMD_VARG
-code[ 97] = 01
-code[ 98] = OP_CMD_ARG
-code[ 99] = 04
-code[100] = OP_CMD_EXE
-code[101] = OP_JUMP
-code[102] = 02
-code[103] = OP_BLTN_CMD
-code[104] = 03
-code[105] = OP_CMD_ARG
-code[106] = 0D
-code[107] = OP_CMD_EXE
-code[108] = OP_JUMP
-code[109] = 00
-code[110] = OP_BLTN_CMD
-code[111] = 03
-code[112] = OP_CMD_ARG
-code[113] = 0E
-code[114] = OP_CMD_EXE
-code[115] = OP_NOP
+code[ 45] = OP_CMD_ARG
+code[ 46] = 02
+code[ 47] = OP_CMD_EXE_THEN_STACK
+code[ 48] = OP_JUMP_IF_FALSE
+code[ 49] = 03
+code[ 50] = OP_BLTN_CMD
+code[ 51] = 02
+code[ 52] = OP_CMD_VARG
+code[ 53] = 01
+code[ 54] = OP_CMD_ARG
+code[ 55] = 03
+code[ 56] = OP_CMD_ARG
+code[ 57] = 04
+code[ 58] = OP_CMD_EXE_THEN_ASSIGN
+code[ 59] = 01
+code[ 60] = OP_BLTN_CMD
+code[ 61] = 03
+code[ 62] = OP_CMD_ARG
+code[ 63] = 07
+code[ 64] = OP_CMD_EXE
+code[ 65] = OP_BLTN_CMD
+code[ 66] = 03
+code[ 67] = OP_CMD_QARG
+code[ 68] = 08
+code[ 69] = OP_CMD_EXE
+code[ 70] = OP_BLTN_CMD
+code[ 71] = 01
+code[ 72] = OP_CMD_VARG
+code[ 73] = 01
+code[ 74] = OP_CMD_ARG
+code[ 75] = 09
+code[ 76] = OP_CMD_ARG
+code[ 77] = 0A
+code[ 78] = OP_CMD_EXE_THEN_STACK
+code[ 79] = OP_JUMP_IF_FALSE
+code[ 80] = 05
+code[ 81] = OP_BLTN_CMD
+code[ 82] = 03
+code[ 83] = OP_CMD_ARG
+code[ 84] = 0B
+code[ 85] = OP_CMD_EXE
+code[ 86] = OP_BLTN_CMD
+code[ 87] = 04
+code[ 88] = OP_CMD_VARG
+code[ 89] = 01
+code[ 90] = OP_CMD_ARG
+code[ 91] = 04
+code[ 92] = OP_CMD_EXE
+code[ 93] = OP_JUMP
+code[ 94] = 02
+code[ 95] = OP_BLTN_CMD
+code[ 96] = 03
+code[ 97] = OP_CMD_ARG
+code[ 98] = 0C
+code[ 99] = OP_CMD_EXE
+code[100] = OP_JUMP
+code[101] = 00
+code[102] = OP_BLTN_CMD
+code[103] = 03
+code[104] = OP_CMD_ARG
+code[105] = 0D
+code[106] = OP_CMD_EXE
+code[107] = OP_NOP
 Variable:
 v_var[0]: k
 v_var[1]: l
 Label:
 l_addr[0] =   4
-l_addr[1] = 110
-l_addr[2] =  43
-l_addr[3] = 103
-l_addr[4] = 101
-l_addr[5] = 101
+l_addr[1] = 102
+l_addr[2] =  39
+l_addr[3] =  95
+l_addr[4] =  93
+l_addr[5] =  93
 String:
 s_str[0] = 0
 s_str[1] = -ne
@@ -924,15 +912,14 @@ s_str[2] = 3
 s_str[3] = +
 s_str[4] = 1
 s_str[5] = outer
-s_str[6] = k
-s_str[7] = =
-s_str[8] = inner
-s_str[9] = l
-s_str[10] = -eq
-s_str[11] = 2
-s_str[12] = break 2
-s_str[13] = not reached
-s_str[14] = after loops
+s_str[6] = k=$k
+s_str[7] = inner
+s_str[8] = l=$l
+s_str[9] = -eq
+s_str[10] = 2
+s_str[11] = break 2
+s_str[12] = not reached
+s_str[13] = after loops
 
 Executing byte codes
 --------------------
@@ -1041,57 +1028,40 @@ exe.e_proc[0].p_argc = 1
 argv[ 0] = echo
 variable[  0]: k = 1
 variable[  1]: l = \n
-Execute code[ 32] = OP_CMD_ARG
+Execute code[ 32] = OP_CMD_QARG
 exe.e_procs = 1
 exe.e_proc[0].p_argc = 2
 argv[ 0] = echo
-argv[ 1] = k
+argv[ 1] = k=1
 variable[  0]: k = 1
 variable[  1]: l = \n
-Execute code[ 34] = OP_CMD_ARG
-exe.e_procs = 1
-exe.e_proc[0].p_argc = 3
-argv[ 0] = echo
-argv[ 1] = k
-argv[ 2] = =
-variable[  0]: k = 1
-variable[  1]: l = \n
-Execute code[ 36] = OP_CMD_VARG
-exe.e_procs = 1
-exe.e_proc[0].p_argc = 4
-argv[ 0] = echo
-argv[ 1] = k
-argv[ 2] = =
-argv[ 3] = 1
-variable[  0]: k = 1
-variable[  1]: l = \n
-Execute code[ 38] = OP_CMD_EXE
+Execute code[ 34] = OP_CMD_EXE
 exe.e_procs = 0
 variable[  0]: k = 1
 variable[  1]: l = \n
-Execute code[ 39] = OP_PUSH_SYMBOL
+Execute code[ 35] = OP_PUSH_SYMBOL
 exe.e_procs = 0
 stack[  0] = 00
 variable[  0]: k = 1
 variable[  1]: l = \n
-Execute code[ 41] = OP_POP_SYMBOL_THEN_ASSIGN
+Execute code[ 37] = OP_POP_SYMBOL_THEN_ASSIGN
 exe.e_procs = 0
 variable[  0]: k = 1
 variable[  1]: l = 0
-Execute code[ 43] = OP_BLTN_CMD
+Execute code[ 39] = OP_BLTN_CMD
 exe.e_procs = 1
 exe.e_proc[0].p_argc = 1
 argv[ 0] = test
 variable[  0]: k = 1
 variable[  1]: l = 0
-Execute code[ 45] = OP_CMD_VARG
+Execute code[ 41] = OP_CMD_VARG
 exe.e_procs = 1
 exe.e_proc[0].p_argc = 2
 argv[ 0] = test
 argv[ 1] = 0
 variable[  0]: k = 1
 variable[  1]: l = 0
-Execute code[ 47] = OP_CMD_ARG
+Execute code[ 43] = OP_CMD_ARG
 exe.e_procs = 1
 exe.e_proc[0].p_argc = 3
 argv[ 0] = test
@@ -1099,7 +1069,7 @@ argv[ 1] = 0
 argv[ 2] = -ne
 variable[  0]: k = 1
 variable[  1]: l = 0
-Execute code[ 49] = OP_CMD_ARG
+Execute code[ 45] = OP_CMD_ARG
 exe.e_procs = 1
 exe.e_proc[0].p_argc = 4
 argv[ 0] = test
@@ -1108,29 +1078,29 @@ argv[ 2] = -ne
 argv[ 3] = 3
 variable[  0]: k = 1
 variable[  1]: l = 0
-Execute code[ 51] = OP_CMD_EXE_THEN_STACK
+Execute code[ 47] = OP_CMD_EXE_THEN_STACK
 exe.e_procs = 0
 stack[  0] = 00
 variable[  0]: k = 1
 variable[  1]: l = 0
-Execute code[ 52] = OP_JUMP_IF_FALSE
+Execute code[ 48] = OP_JUMP_IF_FALSE
 exe.e_procs = 0
 variable[  0]: k = 1
 variable[  1]: l = 0
-Execute code[ 54] = OP_BLTN_CMD
+Execute code[ 50] = OP_BLTN_CMD
 exe.e_procs = 1
 exe.e_proc[0].p_argc = 1
 argv[ 0] = expr
 variable[  0]: k = 1
 variable[  1]: l = 0
-Execute code[ 56] = OP_CMD_VARG
+Execute code[ 52] = OP_CMD_VARG
 exe.e_procs = 1
 exe.e_proc[0].p_argc = 2
 argv[ 0] = expr
 argv[ 1] = 0
 variable[  0]: k = 1
 variable[  1]: l = 0
-Execute code[ 58] = OP_CMD_ARG
+Execute code[ 54] = OP_CMD_ARG
 exe.e_procs = 1
 exe.e_proc[0].p_argc = 3
 argv[ 0] = expr
@@ -1138,7 +1108,7 @@ argv[ 1] = 0
 argv[ 2] = +
 variable[  0]: k = 1
 variable[  1]: l = 0
-Execute code[ 60] = OP_CMD_ARG
+Execute code[ 56] = OP_CMD_ARG
 exe.e_procs = 1
 exe.e_proc[0].p_argc = 4
 argv[ 0] = expr
@@ -1147,75 +1117,58 @@ argv[ 2] = +
 argv[ 3] = 1
 variable[  0]: k = 1
 variable[  1]: l = 0
-Execute code[ 62] = OP_CMD_EXE_THEN_ASSIGN
+Execute code[ 58] = OP_CMD_EXE_THEN_ASSIGN
 exe.e_procs = 0
 variable[  0]: k = 1
 variable[  1]: l = 1
-Execute code[ 64] = OP_BLTN_CMD
+Execute code[ 60] = OP_BLTN_CMD
 exe.e_procs = 1
 exe.e_proc[0].p_argc = 1
 argv[ 0] = echo
 variable[  0]: k = 1
 variable[  1]: l = 1
-Execute code[ 66] = OP_CMD_ARG
+Execute code[ 62] = OP_CMD_ARG
 exe.e_procs = 1
 exe.e_proc[0].p_argc = 2
 argv[ 0] = echo
 argv[ 1] = inner
 variable[  0]: k = 1
 variable[  1]: l = 1
-Execute code[ 68] = OP_CMD_EXE
+Execute code[ 64] = OP_CMD_EXE
 exe.e_procs = 0
 variable[  0]: k = 1
 variable[  1]: l = 1
-Execute code[ 69] = OP_BLTN_CMD
+Execute code[ 65] = OP_BLTN_CMD
 exe.e_procs = 1
 exe.e_proc[0].p_argc = 1
 argv[ 0] = echo
 variable[  0]: k = 1
 variable[  1]: l = 1
-Execute code[ 71] = OP_CMD_ARG
+Execute code[ 67] = OP_CMD_QARG
 exe.e_procs = 1
 exe.e_proc[0].p_argc = 2
 argv[ 0] = echo
-argv[ 1] = l
+argv[ 1] = l=1
 variable[  0]: k = 1
 variable[  1]: l = 1
-Execute code[ 73] = OP_CMD_ARG
-exe.e_procs = 1
-exe.e_proc[0].p_argc = 3
-argv[ 0] = echo
-argv[ 1] = l
-argv[ 2] = =
-variable[  0]: k = 1
-variable[  1]: l = 1
-Execute code[ 75] = OP_CMD_VARG
-exe.e_procs = 1
-exe.e_proc[0].p_argc = 4
-argv[ 0] = echo
-argv[ 1] = l
-argv[ 2] = =
-argv[ 3] = 1
-variable[  0]: k = 1
-variable[  1]: l = 1
-Execute code[ 77] = OP_CMD_EXE
+Execute code[ 69] = OP_CMD_EXE
 exe.e_procs = 0
 variable[  0]: k = 1
 variable[  1]: l = 1
-Execute code[ 78] = OP_BLTN_CMD
+Execute code[ 70] = OP_BLTN_CMD
 exe.e_procs = 1
 exe.e_proc[0].p_argc = 1
 argv[ 0] = test
 variable[  0]: k = 1
 variable[  1]: l = 1
-Execute code[ 80] = OP_CMD_VARG
+Execute code[ 72] = OP_CMD_VARG
 exe.e_procs = 1
 exe.e_proc[0].p_argc = 2
 argv[ 0] = test
 argv[ 1] = 1
 variable[  0]: k = 1
 variable[  1]: l = 1
-Execute code[ 82] = OP_CMD_ARG
+Execute code[ 74] = OP_CMD_ARG
 exe.e_procs = 1
 exe.e_proc[0].p_argc = 3
 argv[ 0] = test
@@ -1223,7 +1176,7 @@ argv[ 1] = 1
 argv[ 2] = -eq
 variable[  0]: k = 1
 variable[  1]: l = 1
-Execute code[ 84] = OP_CMD_ARG
+Execute code[ 76] = OP_CMD_ARG
 exe.e_procs = 1
 exe.e_proc[0].p_argc = 4
 argv[ 0] = test
@@ -1232,33 +1185,33 @@ argv[ 2] = -eq
 argv[ 3] = 2
 variable[  0]: k = 1
 variable[  1]: l = 1
-Execute code[ 86] = OP_CMD_EXE_THEN_STACK
+Execute code[ 78] = OP_CMD_EXE_THEN_STACK
 exe.e_procs = 0
 stack[  0] = 01
 variable[  0]: k = 1
 variable[  1]: l = 1
-Execute code[ 87] = OP_JUMP_IF_FALSE
+Execute code[ 79] = OP_JUMP_IF_FALSE
 exe.e_procs = 0
 variable[  0]: k = 1
 variable[  1]: l = 1
-Execute code[101] = OP_JUMP
+Execute code[ 93] = OP_JUMP
 exe.e_procs = 0
 variable[  0]: k = 1
 variable[  1]: l = 1
-Execute code[ 43] = OP_BLTN_CMD
+Execute code[ 39] = OP_BLTN_CMD
 exe.e_procs = 1
 exe.e_proc[0].p_argc = 1
 argv[ 0] = test
 variable[  0]: k = 1
 variable[  1]: l = 1
-Execute code[ 45] = OP_CMD_VARG
+Execute code[ 41] = OP_CMD_VARG
 exe.e_procs = 1
 exe.e_proc[0].p_argc = 2
 argv[ 0] = test
 argv[ 1] = 1
 variable[  0]: k = 1
 variable[  1]: l = 1
-Execute code[ 47] = OP_CMD_ARG
+Execute code[ 43] = OP_CMD_ARG
 exe.e_procs = 1
 exe.e_proc[0].p_argc = 3
 argv[ 0] = test
@@ -1266,7 +1219,7 @@ argv[ 1] = 1
 argv[ 2] = -ne
 variable[  0]: k = 1
 variable[  1]: l = 1
-Execute code[ 49] = OP_CMD_ARG
+Execute code[ 45] = OP_CMD_ARG
 exe.e_procs = 1
 exe.e_proc[0].p_argc = 4
 argv[ 0] = test
@@ -1275,29 +1228,29 @@ argv[ 2] = -ne
 argv[ 3] = 3
 variable[  0]: k = 1
 variable[  1]: l = 1
-Execute code[ 51] = OP_CMD_EXE_THEN_STACK
+Execute code[ 47] = OP_CMD_EXE_THEN_STACK
 exe.e_procs = 0
 stack[  0] = 00
 variable[  0]: k = 1
 variable[  1]: l = 1
-Execute code[ 52] = OP_JUMP_IF_FALSE
+Execute code[ 48] = OP_JUMP_IF_FALSE
 exe.e_procs = 0
 variable[  0]: k = 1
 variable[  1]: l = 1
-Execute code[ 54] = OP_BLTN_CMD
+Execute code[ 50] = OP_BLTN_CMD
 exe.e_procs = 1
 exe.e_proc[0].p_argc = 1
 argv[ 0] = expr
 variable[  0]: k = 1
 variable[  1]: l = 1
-Execute code[ 56] = OP_CMD_VARG
+Execute code[ 52] = OP_CMD_VARG
 exe.e_procs = 1
 exe.e_proc[0].p_argc = 2
 argv[ 0] = expr
 argv[ 1] = 1
 variable[  0]: k = 1
 variable[  1]: l = 1
-Execute code[ 58] = OP_CMD_ARG
+Execute code[ 54] = OP_CMD_ARG
 exe.e_procs = 1
 exe.e_proc[0].p_argc = 3
 argv[ 0] = expr
@@ -1305,7 +1258,7 @@ argv[ 1] = 1
 argv[ 2] = +
 variable[  0]: k = 1
 variable[  1]: l = 1
-Execute code[ 60] = OP_CMD_ARG
+Execute code[ 56] = OP_CMD_ARG
 exe.e_procs = 1
 exe.e_proc[0].p_argc = 4
 argv[ 0] = expr
@@ -1314,75 +1267,58 @@ argv[ 2] = +
 argv[ 3] = 1
 variable[  0]: k = 1
 variable[  1]: l = 1
-Execute code[ 62] = OP_CMD_EXE_THEN_ASSIGN
+Execute code[ 58] = OP_CMD_EXE_THEN_ASSIGN
 exe.e_procs = 0
 variable[  0]: k = 1
 variable[  1]: l = 2
-Execute code[ 64] = OP_BLTN_CMD
+Execute code[ 60] = OP_BLTN_CMD
 exe.e_procs = 1
 exe.e_proc[0].p_argc = 1
 argv[ 0] = echo
 variable[  0]: k = 1
 variable[  1]: l = 2
-Execute code[ 66] = OP_CMD_ARG
+Execute code[ 62] = OP_CMD_ARG
 exe.e_procs = 1
 exe.e_proc[0].p_argc = 2
 argv[ 0] = echo
 argv[ 1] = inner
 variable[  0]: k = 1
 variable[  1]: l = 2
-Execute code[ 68] = OP_CMD_EXE
+Execute code[ 64] = OP_CMD_EXE
 exe.e_procs = 0
 variable[  0]: k = 1
 variable[  1]: l = 2
-Execute code[ 69] = OP_BLTN_CMD
+Execute code[ 65] = OP_BLTN_CMD
 exe.e_procs = 1
 exe.e_proc[0].p_argc = 1
 argv[ 0] = echo
 variable[  0]: k = 1
 variable[  1]: l = 2
-Execute code[ 71] = OP_CMD_ARG
+Execute code[ 67] = OP_CMD_QARG
 exe.e_procs = 1
 exe.e_proc[0].p_argc = 2
 argv[ 0] = echo
-argv[ 1] = l
+argv[ 1] = l=2
 variable[  0]: k = 1
 variable[  1]: l = 2
-Execute code[ 73] = OP_CMD_ARG
-exe.e_procs = 1
-exe.e_proc[0].p_argc = 3
-argv[ 0] = echo
-argv[ 1] = l
-argv[ 2] = =
-variable[  0]: k = 1
-variable[  1]: l = 2
-Execute code[ 75] = OP_CMD_VARG
-exe.e_procs = 1
-exe.e_proc[0].p_argc = 4
-argv[ 0] = echo
-argv[ 1] = l
-argv[ 2] = =
-argv[ 3] = 2
-variable[  0]: k = 1
-variable[  1]: l = 2
-Execute code[ 77] = OP_CMD_EXE
+Execute code[ 69] = OP_CMD_EXE
 exe.e_procs = 0
 variable[  0]: k = 1
 variable[  1]: l = 2
-Execute code[ 78] = OP_BLTN_CMD
+Execute code[ 70] = OP_BLTN_CMD
 exe.e_procs = 1
 exe.e_proc[0].p_argc = 1
 argv[ 0] = test
 variable[  0]: k = 1
 variable[  1]: l = 2
-Execute code[ 80] = OP_CMD_VARG
+Execute code[ 72] = OP_CMD_VARG
 exe.e_procs = 1
 exe.e_proc[0].p_argc = 2
 argv[ 0] = test
 argv[ 1] = 2
 variable[  0]: k = 1
 variable[  1]: l = 2
-Execute code[ 82] = OP_CMD_ARG
+Execute code[ 74] = OP_CMD_ARG
 exe.e_procs = 1
 exe.e_proc[0].p_argc = 3
 argv[ 0] = test
@@ -1390,7 +1326,7 @@ argv[ 1] = 2
 argv[ 2] = -eq
 variable[  0]: k = 1
 variable[  1]: l = 2
-Execute code[ 84] = OP_CMD_ARG
+Execute code[ 76] = OP_CMD_ARG
 exe.e_procs = 1
 exe.e_proc[0].p_argc = 4
 argv[ 0] = test
@@ -1399,46 +1335,46 @@ argv[ 2] = -eq
 argv[ 3] = 2
 variable[  0]: k = 1
 variable[  1]: l = 2
-Execute code[ 86] = OP_CMD_EXE_THEN_STACK
+Execute code[ 78] = OP_CMD_EXE_THEN_STACK
 exe.e_procs = 0
 stack[  0] = 00
 variable[  0]: k = 1
 variable[  1]: l = 2
-Execute code[ 87] = OP_JUMP_IF_FALSE
+Execute code[ 79] = OP_JUMP_IF_FALSE
 exe.e_procs = 0
 variable[  0]: k = 1
 variable[  1]: l = 2
-Execute code[ 89] = OP_BLTN_CMD
+Execute code[ 81] = OP_BLTN_CMD
 exe.e_procs = 1
 exe.e_proc[0].p_argc = 1
 argv[ 0] = echo
 variable[  0]: k = 1
 variable[  1]: l = 2
-Execute code[ 91] = OP_CMD_ARG
+Execute code[ 83] = OP_CMD_ARG
 exe.e_procs = 1
 exe.e_proc[0].p_argc = 2
 argv[ 0] = echo
 argv[ 1] = break 2
 variable[  0]: k = 1
 variable[  1]: l = 2
-Execute code[ 93] = OP_CMD_EXE
+Execute code[ 85] = OP_CMD_EXE
 exe.e_procs = 0
 variable[  0]: k = 1
 variable[  1]: l = 2
-Execute code[ 94] = OP_BLTN_CMD
+Execute code[ 86] = OP_BLTN_CMD
 exe.e_procs = 1
 exe.e_proc[0].p_argc = 1
 argv[ 0] = break
 variable[  0]: k = 1
 variable[  1]: l = 2
-Execute code[ 96] = OP_CMD_VARG
+Execute code[ 88] = OP_CMD_VARG
 exe.e_procs = 1
 exe.e_proc[0].p_argc = 2
 argv[ 0] = break
 argv[ 1] = 2
 variable[  0]: k = 1
 variable[  1]: l = 2
-Execute code[ 98] = OP_CMD_ARG
+Execute code[ 90] = OP_CMD_ARG
 exe.e_procs = 1
 exe.e_proc[0].p_argc = 3
 argv[ 0] = break
@@ -1446,24 +1382,24 @@ argv[ 1] = 2
 argv[ 2] = 1
 variable[  0]: k = 1
 variable[  1]: l = 2
-Execute code[100] = OP_CMD_EXE
+Execute code[ 92] = OP_CMD_EXE
 exe.e_procs = 0
 variable[  0]: k = 1
 variable[  1]: l = 2
-Execute code[110] = OP_BLTN_CMD
+Execute code[102] = OP_BLTN_CMD
 exe.e_procs = 1
 exe.e_proc[0].p_argc = 1
 argv[ 0] = echo
 variable[  0]: k = 1
 variable[  1]: l = 2
-Execute code[112] = OP_CMD_ARG
+Execute code[104] = OP_CMD_ARG
 exe.e_procs = 1
 exe.e_proc[0].p_argc = 2
 argv[ 0] = echo
 argv[ 1] = after loops
 variable[  0]: k = 1
 variable[  1]: l = 2
-Execute code[114] = OP_CMD_EXE
+Execute code[106] = OP_CMD_EXE
 exe.e_procs = 0
 variable[  0]: k = 1
 variable[  1]: l = 2
