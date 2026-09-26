@@ -530,64 +530,64 @@ token[57].t_symbol =
 
 Result of lexical analysis
 --------------------------
-token[00]: T_COMMENT,	
-token[01]: T_EOL,	
-token[02]: T_EOL,	
-token[03]: T_VARIABLE,	k
-token[04]: T_ASSIGN,	=
-token[05]: T_STRING,	close quote 1
-token[06]: T_EOL,	
-token[07]: T_BLTN_CMD,	echo
-token[08]: T_CMD_VARG,	k
-token[09]: T_EOL,	
-token[10]: T_EOL,	
-token[11]: T_VARIABLE,	k
-token[12]: T_ASSIGN,	=
-token[13]: T_STRING,	close quote 2
-token[14]: T_EOL,	
-token[15]: T_BLTN_CMD,	echo
-token[16]: T_CMD_VARG,	k
-token[17]: T_EOL,	
-token[18]: T_EOL,	
-token[19]: T_VARIABLE,	k
-token[20]: T_ASSIGN,	=
-token[21]: T_STRING,	close quote 3
-token[22]: T_EOL,	
-token[23]: T_IF,	if
-token[24]: T_LBRACKET,	[
-token[25]: T_CMD_VARG,	k
-token[26]: T_CMD_ARG,	=
-token[27]: T_CMD_ARG,	close quote 3
-token[28]: T_RBRACKET,	]
-token[29]: T_SEMICOLON,	;
-token[30]: T_THEN,	then
-token[31]: T_EOL,	
-token[32]: T_BLTN_CMD,	echo
-token[33]: T_CMD_VARG,	k
-token[34]: T_EOL,	
-token[35]: T_FI,	fi
-token[36]: T_EOL,	
-token[37]: T_EOL,	
-token[38]: T_VARIABLE,	k
-token[39]: T_ASSIGN,	=
-token[40]: T_STRING,	close quote 4
-token[41]: T_EOL,	
-token[42]: T_IF,	if
-token[43]: T_LBRACKET,	[
-token[44]: T_CMD_VARG,	k
-token[45]: T_CMD_ARG,	=
-token[46]: T_CMD_ARG,	close quote 4
-token[47]: T_RBRACKET,	]
-token[48]: T_EOL,	
-token[49]: T_THEN,	then
-token[50]: T_EOL,	
-token[51]: T_BLTN_CMD,	echo
-token[52]: T_CMD_VARG,	k
-token[53]: T_EOL,	
-token[54]: T_FI,	fi
-token[55]: T_EOL,	
-token[56]: T_EOL,	
-token[57]: T_EOL,	
+token[  0]: T_COMMENT,	
+token[  1]: T_EOL,	
+token[  2]: T_EOL,	
+token[  3]: T_VARIABLE,	k
+token[  4]: T_ASSIGN,	=
+token[  5]: T_STRING,	close quote 1
+token[  6]: T_EOL,	
+token[  7]: T_BLTN_CMD,	echo
+token[  8]: T_CMD_VARG,	k
+token[  9]: T_EOL,	
+token[ 10]: T_EOL,	
+token[ 11]: T_VARIABLE,	k
+token[ 12]: T_ASSIGN,	=
+token[ 13]: T_STRING,	close quote 2
+token[ 14]: T_EOL,	
+token[ 15]: T_BLTN_CMD,	echo
+token[ 16]: T_CMD_VARG,	k
+token[ 17]: T_EOL,	
+token[ 18]: T_EOL,	
+token[ 19]: T_VARIABLE,	k
+token[ 20]: T_ASSIGN,	=
+token[ 21]: T_STRING,	close quote 3
+token[ 22]: T_EOL,	
+token[ 23]: T_IF,	if
+token[ 24]: T_LBRACKET,	[
+token[ 25]: T_CMD_VARG,	k
+token[ 26]: T_CMD_ARG,	=
+token[ 27]: T_CMD_ARG,	close quote 3
+token[ 28]: T_RBRACKET,	]
+token[ 29]: T_SEMICOLON,	;
+token[ 30]: T_THEN,	then
+token[ 31]: T_EOL,	
+token[ 32]: T_BLTN_CMD,	echo
+token[ 33]: T_CMD_VARG,	k
+token[ 34]: T_EOL,	
+token[ 35]: T_FI,	fi
+token[ 36]: T_EOL,	
+token[ 37]: T_EOL,	
+token[ 38]: T_VARIABLE,	k
+token[ 39]: T_ASSIGN,	=
+token[ 40]: T_STRING,	close quote 4
+token[ 41]: T_EOL,	
+token[ 42]: T_IF,	if
+token[ 43]: T_LBRACKET,	[
+token[ 44]: T_CMD_VARG,	k
+token[ 45]: T_CMD_ARG,	=
+token[ 46]: T_CMD_ARG,	close quote 4
+token[ 47]: T_RBRACKET,	]
+token[ 48]: T_EOL,	
+token[ 49]: T_THEN,	then
+token[ 50]: T_EOL,	
+token[ 51]: T_BLTN_CMD,	echo
+token[ 52]: T_CMD_VARG,	k
+token[ 53]: T_EOL,	
+token[ 54]: T_FI,	fi
+token[ 55]: T_EOL,	
+token[ 56]: T_EOL,	
+token[ 57]: T_EOL,	
 
 Parsing tokens to make byte codes
 ---------------------------------

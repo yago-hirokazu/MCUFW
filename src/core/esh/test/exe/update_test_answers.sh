@@ -1,7 +1,13 @@
 #!/bin/sh
 
+if [ "$#" -eq 0 ]; then
+    echo "usage: bash ./update_test_answers.sh <# of tests>"
+    exit 1
+fi
+
+echo "# of test = $1"
 k=1
-while [ "$k" -le 10 ]; do
+while [ "$k" -le $1 ]; do
     ./test_exe.exe "test${k}.sh";
     k=$((k + 1))
 done

@@ -412,53 +412,53 @@ token[46].t_symbol =
 
 Result of lexical analysis
 --------------------------
-token[00]: T_COMMENT,	
-token[01]: T_EOL,	
-token[02]: T_EOL,	
-token[03]: T_VARIABLE,	k
-token[04]: T_ASSIGN,	=
-token[05]: T_VALUE,	1
-token[06]: T_EOL,	
-token[07]: T_IF,	if
-token[08]: T_LBRACKET,	[
-token[09]: T_CMD_VARG,	k
-token[10]: T_CMD_ARG,	-eq
-token[11]: T_CMD_ARG,	0
-token[12]: T_RBRACKET,	]
-token[13]: T_SEMICOLON,	;
-token[14]: T_THEN,	then
-token[15]: T_EOL,	
-token[16]: T_BLTN_CMD,	echo
-token[17]: T_CMD_ARG,	catch at if
-token[18]: T_EOL,	
-token[19]: T_BLTN_CMD,	echo
-token[20]: T_CMD_VARG,	k
-token[21]: T_EOL,	
-token[22]: T_ELIF,	elif
-token[23]: T_LBRACKET,	[
-token[24]: T_CMD_VARG,	k
-token[25]: T_CMD_ARG,	-eq
-token[26]: T_CMD_ARG,	1
-token[27]: T_RBRACKET,	]
-token[28]: T_SEMICOLON,	;
-token[29]: T_THEN,	then
-token[30]: T_EOL,	
-token[31]: T_BLTN_CMD,	echo
-token[32]: T_CMD_ARG,	catch at elif
-token[33]: T_EOL,	
-token[34]: T_BLTN_CMD,	echo
-token[35]: T_CMD_VARG,	k
-token[36]: T_EOL,	
-token[37]: T_ELSE,	else
-token[38]: T_EOL,	
-token[39]: T_BLTN_CMD,	echo
-token[40]: T_CMD_ARG,	catch at else
-token[41]: T_EOL,	
-token[42]: T_BLTN_CMD,	echo
-token[43]: T_CMD_VARG,	k
-token[44]: T_EOL,	
-token[45]: T_FI,	fi
-token[46]: T_EOL,	
+token[  0]: T_COMMENT,	
+token[  1]: T_EOL,	
+token[  2]: T_EOL,	
+token[  3]: T_VARIABLE,	k
+token[  4]: T_ASSIGN,	=
+token[  5]: T_VALUE,	1
+token[  6]: T_EOL,	
+token[  7]: T_IF,	if
+token[  8]: T_LBRACKET,	[
+token[  9]: T_CMD_VARG,	k
+token[ 10]: T_CMD_ARG,	-eq
+token[ 11]: T_CMD_ARG,	0
+token[ 12]: T_RBRACKET,	]
+token[ 13]: T_SEMICOLON,	;
+token[ 14]: T_THEN,	then
+token[ 15]: T_EOL,	
+token[ 16]: T_BLTN_CMD,	echo
+token[ 17]: T_CMD_ARG,	catch at if
+token[ 18]: T_EOL,	
+token[ 19]: T_BLTN_CMD,	echo
+token[ 20]: T_CMD_VARG,	k
+token[ 21]: T_EOL,	
+token[ 22]: T_ELIF,	elif
+token[ 23]: T_LBRACKET,	[
+token[ 24]: T_CMD_VARG,	k
+token[ 25]: T_CMD_ARG,	-eq
+token[ 26]: T_CMD_ARG,	1
+token[ 27]: T_RBRACKET,	]
+token[ 28]: T_SEMICOLON,	;
+token[ 29]: T_THEN,	then
+token[ 30]: T_EOL,	
+token[ 31]: T_BLTN_CMD,	echo
+token[ 32]: T_CMD_ARG,	catch at elif
+token[ 33]: T_EOL,	
+token[ 34]: T_BLTN_CMD,	echo
+token[ 35]: T_CMD_VARG,	k
+token[ 36]: T_EOL,	
+token[ 37]: T_ELSE,	else
+token[ 38]: T_EOL,	
+token[ 39]: T_BLTN_CMD,	echo
+token[ 40]: T_CMD_ARG,	catch at else
+token[ 41]: T_EOL,	
+token[ 42]: T_BLTN_CMD,	echo
+token[ 43]: T_CMD_VARG,	k
+token[ 44]: T_EOL,	
+token[ 45]: T_FI,	fi
+token[ 46]: T_EOL,	
 
 Parsing tokens to make byte codes
 ---------------------------------

@@ -832,103 +832,103 @@ token[96].t_symbol =
 
 Result of lexical analysis
 --------------------------
-token[00]: T_COMMENT,	
-token[01]: T_EOL,	
-token[02]: T_EOL,	
-token[03]: T_VARIABLE,	k
-token[04]: T_ASSIGN,	=
-token[05]: T_VALUE,	0
-token[06]: T_EOL,	
-token[07]: T_WHILE,	while
-token[08]: T_LBRACKET,	[
-token[09]: T_CMD_VARG,	k
-token[10]: T_CMD_ARG,	-ne
-token[11]: T_CMD_ARG,	4
-token[12]: T_RBRACKET,	]
-token[13]: T_SEMICOLON,	;
-token[14]: T_DO,	do
-token[15]: T_EOL,	
-token[16]: T_VARIABLE,	k
-token[17]: T_ASSIGN,	=
-token[18]: T_LBACKQUOTE,	`
-token[19]: T_BLTN_CMD,	expr
-token[20]: T_CMD_VARG,	k
-token[21]: T_CMD_ARG,	+
-token[22]: T_CMD_ARG,	1
-token[23]: T_RBACKQUOTE,	`
-token[24]: T_EOL,	
-token[25]: T_BLTN_CMD,	echo
-token[26]: T_CMD_ARG,	k =
-token[27]: T_EOL,	
-token[28]: T_BLTN_CMD,	echo
-token[29]: T_CMD_VARG,	k
-token[30]: T_EOL,	
-token[31]: T_EOL,	
-token[32]: T_IF,	if
-token[33]: T_LBRACKET,	[
-token[34]: T_CMD_VARG,	k
-token[35]: T_CMD_ARG,	-eq
-token[36]: T_CMD_ARG,	2
-token[37]: T_RBRACKET,	]
-token[38]: T_SEMICOLON,	;
-token[39]: T_THEN,	then
-token[40]: T_EOL,	
-token[41]: T_VARIABLE,	l
-token[42]: T_ASSIGN,	=
-token[43]: T_VALUE,	0
-token[44]: T_EOL,	
-token[45]: T_WHILE,	while
-token[46]: T_LBRACKET,	[
-token[47]: T_CMD_VARG,	l
-token[48]: T_CMD_ARG,	-ne
-token[49]: T_CMD_ARG,	4
-token[50]: T_RBRACKET,	]
-token[51]: T_SEMICOLON,	;
-token[52]: T_DO,	do
-token[53]: T_EOL,	
-token[54]: T_BLTN_CMD,	echo
-token[55]: T_CMD_ARG,	l =
-token[56]: T_EOL,	
-token[57]: T_BLTN_CMD,	echo
-token[58]: T_CMD_VARG,	l
-token[59]: T_EOL,	
-token[60]: T_VARIABLE,	l
-token[61]: T_ASSIGN,	=
-token[62]: T_LBACKQUOTE,	`
-token[63]: T_BLTN_CMD,	expr
-token[64]: T_CMD_VARG,	l
-token[65]: T_CMD_ARG,	+
-token[66]: T_CMD_ARG,	1
-token[67]: T_RBACKQUOTE,	`
-token[68]: T_EOL,	
-token[69]: T_EOL,	
-token[70]: T_IF,	if
-token[71]: T_LBRACKET,	[
-token[72]: T_CMD_VARG,	l
-token[73]: T_CMD_ARG,	-eq
-token[74]: T_CMD_ARG,	3
-token[75]: T_RBRACKET,	]
-token[76]: T_SEMICOLON,	;
-token[77]: T_THEN,	then
-token[78]: T_EOL,	
-token[79]: T_BLTN_CMD,	echo
-token[80]: T_CMD_ARG,	break while loop l
-token[81]: T_EOL,	
-token[82]: T_BLTN_CMD,	break
-token[83]: T_EOL,	
-token[84]: T_FI,	fi
-token[85]: T_EOL,	
-token[86]: T_DONE,	done
-token[87]: T_EOL,	
-token[88]: T_ELSE,	else
-token[89]: T_EOL,	
-token[90]: T_BLTN_CMD,	echo
-token[91]: T_CMD_ARG,	k > 2
-token[92]: T_EOL,	
-token[93]: T_FI,	fi
-token[94]: T_EOL,	
-token[95]: T_DONE,	done
-token[96]: T_EOL,	
+token[  0]: T_COMMENT,	
+token[  1]: T_EOL,	
+token[  2]: T_EOL,	
+token[  3]: T_VARIABLE,	k
+token[  4]: T_ASSIGN,	=
+token[  5]: T_VALUE,	0
+token[  6]: T_EOL,	
+token[  7]: T_WHILE,	while
+token[  8]: T_LBRACKET,	[
+token[  9]: T_CMD_VARG,	k
+token[ 10]: T_CMD_ARG,	-ne
+token[ 11]: T_CMD_ARG,	4
+token[ 12]: T_RBRACKET,	]
+token[ 13]: T_SEMICOLON,	;
+token[ 14]: T_DO,	do
+token[ 15]: T_EOL,	
+token[ 16]: T_VARIABLE,	k
+token[ 17]: T_ASSIGN,	=
+token[ 18]: T_LBACKQUOTE,	`
+token[ 19]: T_BLTN_CMD,	expr
+token[ 20]: T_CMD_VARG,	k
+token[ 21]: T_CMD_ARG,	+
+token[ 22]: T_CMD_ARG,	1
+token[ 23]: T_RBACKQUOTE,	`
+token[ 24]: T_EOL,	
+token[ 25]: T_BLTN_CMD,	echo
+token[ 26]: T_CMD_ARG,	k =
+token[ 27]: T_EOL,	
+token[ 28]: T_BLTN_CMD,	echo
+token[ 29]: T_CMD_VARG,	k
+token[ 30]: T_EOL,	
+token[ 31]: T_EOL,	
+token[ 32]: T_IF,	if
+token[ 33]: T_LBRACKET,	[
+token[ 34]: T_CMD_VARG,	k
+token[ 35]: T_CMD_ARG,	-eq
+token[ 36]: T_CMD_ARG,	2
+token[ 37]: T_RBRACKET,	]
+token[ 38]: T_SEMICOLON,	;
+token[ 39]: T_THEN,	then
+token[ 40]: T_EOL,	
+token[ 41]: T_VARIABLE,	l
+token[ 42]: T_ASSIGN,	=
+token[ 43]: T_VALUE,	0
+token[ 44]: T_EOL,	
+token[ 45]: T_WHILE,	while
+token[ 46]: T_LBRACKET,	[
+token[ 47]: T_CMD_VARG,	l
+token[ 48]: T_CMD_ARG,	-ne
+token[ 49]: T_CMD_ARG,	4
+token[ 50]: T_RBRACKET,	]
+token[ 51]: T_SEMICOLON,	;
+token[ 52]: T_DO,	do
+token[ 53]: T_EOL,	
+token[ 54]: T_BLTN_CMD,	echo
+token[ 55]: T_CMD_ARG,	l =
+token[ 56]: T_EOL,	
+token[ 57]: T_BLTN_CMD,	echo
+token[ 58]: T_CMD_VARG,	l
+token[ 59]: T_EOL,	
+token[ 60]: T_VARIABLE,	l
+token[ 61]: T_ASSIGN,	=
+token[ 62]: T_LBACKQUOTE,	`
+token[ 63]: T_BLTN_CMD,	expr
+token[ 64]: T_CMD_VARG,	l
+token[ 65]: T_CMD_ARG,	+
+token[ 66]: T_CMD_ARG,	1
+token[ 67]: T_RBACKQUOTE,	`
+token[ 68]: T_EOL,	
+token[ 69]: T_EOL,	
+token[ 70]: T_IF,	if
+token[ 71]: T_LBRACKET,	[
+token[ 72]: T_CMD_VARG,	l
+token[ 73]: T_CMD_ARG,	-eq
+token[ 74]: T_CMD_ARG,	3
+token[ 75]: T_RBRACKET,	]
+token[ 76]: T_SEMICOLON,	;
+token[ 77]: T_THEN,	then
+token[ 78]: T_EOL,	
+token[ 79]: T_BLTN_CMD,	echo
+token[ 80]: T_CMD_ARG,	break while loop l
+token[ 81]: T_EOL,	
+token[ 82]: T_BLTN_CMD,	break
+token[ 83]: T_EOL,	
+token[ 84]: T_FI,	fi
+token[ 85]: T_EOL,	
+token[ 86]: T_DONE,	done
+token[ 87]: T_EOL,	
+token[ 88]: T_ELSE,	else
+token[ 89]: T_EOL,	
+token[ 90]: T_BLTN_CMD,	echo
+token[ 91]: T_CMD_ARG,	k > 2
+token[ 92]: T_EOL,	
+token[ 93]: T_FI,	fi
+token[ 94]: T_EOL,	
+token[ 95]: T_DONE,	done
+token[ 96]: T_EOL,	
 
 Parsing tokens to make byte codes
 ---------------------------------
@@ -1033,7 +1033,7 @@ code[ 96] = OP_CMD_EXE
 code[ 97] = OP_BLTN_CMD
 code[ 98] = 04
 code[ 99] = OP_CMD_ARG
-code[100] = 01
+code[100] = 04
 code[101] = OP_CMD_EXE
 code[102] = OP_JUMP
 code[103] = 04
@@ -1879,11 +1879,384 @@ Execute code[ 99] = OP_CMD_ARG
 exe.e_procs = 1
 exe.e_proc[0].p_argc = 2
 argv[ 0] = break
-argv[ 1] = -ne
+argv[ 1] = 1
 variable[  0]: k = 2
 variable[  1]: l = 3
 Execute code[101] = OP_CMD_EXE
 exe.e_procs = 0
 variable[  0]: k = 2
+variable[  1]: l = 3
+Execute code[  4] = OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0] = test
+variable[  0]: k = 2
+variable[  1]: l = 3
+Execute code[  6] = OP_CMD_VARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0] = test
+argv[ 1] = 2
+variable[  0]: k = 2
+variable[  1]: l = 3
+Execute code[  8] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 3
+argv[ 0] = test
+argv[ 1] = 2
+argv[ 2] = -ne
+variable[  0]: k = 2
+variable[  1]: l = 3
+Execute code[ 10] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 4
+argv[ 0] = test
+argv[ 1] = 2
+argv[ 2] = -ne
+argv[ 3] = 4
+variable[  0]: k = 2
+variable[  1]: l = 3
+Execute code[ 12] = OP_CMD_EXE_THEN_STACK
+exe.e_procs = 0
+stack[  0] = 00
+variable[  0]: k = 2
+variable[  1]: l = 3
+Execute code[ 13] = OP_JUMP_IF_FALSE
+exe.e_procs = 0
+variable[  0]: k = 2
+variable[  1]: l = 3
+Execute code[ 15] = OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0] = expr
+variable[  0]: k = 2
+variable[  1]: l = 3
+Execute code[ 17] = OP_CMD_VARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0] = expr
+argv[ 1] = 2
+variable[  0]: k = 2
+variable[  1]: l = 3
+Execute code[ 19] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 3
+argv[ 0] = expr
+argv[ 1] = 2
+argv[ 2] = +
+variable[  0]: k = 2
+variable[  1]: l = 3
+Execute code[ 21] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 4
+argv[ 0] = expr
+argv[ 1] = 2
+argv[ 2] = +
+argv[ 3] = 1
+variable[  0]: k = 2
+variable[  1]: l = 3
+Execute code[ 23] = OP_CMD_EXE_THEN_ASSIGN
+exe.e_procs = 0
+variable[  0]: k = 3
+variable[  1]: l = 3
+Execute code[ 25] = OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0] = echo
+variable[  0]: k = 3
+variable[  1]: l = 3
+Execute code[ 27] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0] = echo
+argv[ 1] = k =
+variable[  0]: k = 3
+variable[  1]: l = 3
+Execute code[ 29] = OP_CMD_EXE
+exe.e_procs = 0
+variable[  0]: k = 3
+variable[  1]: l = 3
+Execute code[ 30] = OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0] = echo
+variable[  0]: k = 3
+variable[  1]: l = 3
+Execute code[ 32] = OP_CMD_VARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0] = echo
+argv[ 1] = 3
+variable[  0]: k = 3
+variable[  1]: l = 3
+Execute code[ 34] = OP_CMD_EXE
+exe.e_procs = 0
+variable[  0]: k = 3
+variable[  1]: l = 3
+Execute code[ 35] = OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0] = test
+variable[  0]: k = 3
+variable[  1]: l = 3
+Execute code[ 37] = OP_CMD_VARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0] = test
+argv[ 1] = 3
+variable[  0]: k = 3
+variable[  1]: l = 3
+Execute code[ 39] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 3
+argv[ 0] = test
+argv[ 1] = 3
+argv[ 2] = -eq
+variable[  0]: k = 3
+variable[  1]: l = 3
+Execute code[ 41] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 4
+argv[ 0] = test
+argv[ 1] = 3
+argv[ 2] = -eq
+argv[ 3] = 2
+variable[  0]: k = 3
+variable[  1]: l = 3
+Execute code[ 43] = OP_CMD_EXE_THEN_STACK
+exe.e_procs = 0
+stack[  0] = 01
+variable[  0]: k = 3
+variable[  1]: l = 3
+Execute code[ 44] = OP_JUMP_IF_FALSE
+exe.e_procs = 0
+variable[  0]: k = 3
+variable[  1]: l = 3
+Execute code[106] = OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0] = echo
+variable[  0]: k = 3
+variable[  1]: l = 3
+Execute code[108] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0] = echo
+argv[ 1] = k > 2
+variable[  0]: k = 3
+variable[  1]: l = 3
+Execute code[110] = OP_CMD_EXE
+exe.e_procs = 0
+variable[  0]: k = 3
+variable[  1]: l = 3
+Execute code[111] = OP_JUMP
+exe.e_procs = 0
+variable[  0]: k = 3
+variable[  1]: l = 3
+Execute code[  4] = OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0] = test
+variable[  0]: k = 3
+variable[  1]: l = 3
+Execute code[  6] = OP_CMD_VARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0] = test
+argv[ 1] = 3
+variable[  0]: k = 3
+variable[  1]: l = 3
+Execute code[  8] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 3
+argv[ 0] = test
+argv[ 1] = 3
+argv[ 2] = -ne
+variable[  0]: k = 3
+variable[  1]: l = 3
+Execute code[ 10] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 4
+argv[ 0] = test
+argv[ 1] = 3
+argv[ 2] = -ne
+argv[ 3] = 4
+variable[  0]: k = 3
+variable[  1]: l = 3
+Execute code[ 12] = OP_CMD_EXE_THEN_STACK
+exe.e_procs = 0
+stack[  0] = 00
+variable[  0]: k = 3
+variable[  1]: l = 3
+Execute code[ 13] = OP_JUMP_IF_FALSE
+exe.e_procs = 0
+variable[  0]: k = 3
+variable[  1]: l = 3
+Execute code[ 15] = OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0] = expr
+variable[  0]: k = 3
+variable[  1]: l = 3
+Execute code[ 17] = OP_CMD_VARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0] = expr
+argv[ 1] = 3
+variable[  0]: k = 3
+variable[  1]: l = 3
+Execute code[ 19] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 3
+argv[ 0] = expr
+argv[ 1] = 3
+argv[ 2] = +
+variable[  0]: k = 3
+variable[  1]: l = 3
+Execute code[ 21] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 4
+argv[ 0] = expr
+argv[ 1] = 3
+argv[ 2] = +
+argv[ 3] = 1
+variable[  0]: k = 3
+variable[  1]: l = 3
+Execute code[ 23] = OP_CMD_EXE_THEN_ASSIGN
+exe.e_procs = 0
+variable[  0]: k = 4
+variable[  1]: l = 3
+Execute code[ 25] = OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0] = echo
+variable[  0]: k = 4
+variable[  1]: l = 3
+Execute code[ 27] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0] = echo
+argv[ 1] = k =
+variable[  0]: k = 4
+variable[  1]: l = 3
+Execute code[ 29] = OP_CMD_EXE
+exe.e_procs = 0
+variable[  0]: k = 4
+variable[  1]: l = 3
+Execute code[ 30] = OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0] = echo
+variable[  0]: k = 4
+variable[  1]: l = 3
+Execute code[ 32] = OP_CMD_VARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0] = echo
+argv[ 1] = 4
+variable[  0]: k = 4
+variable[  1]: l = 3
+Execute code[ 34] = OP_CMD_EXE
+exe.e_procs = 0
+variable[  0]: k = 4
+variable[  1]: l = 3
+Execute code[ 35] = OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0] = test
+variable[  0]: k = 4
+variable[  1]: l = 3
+Execute code[ 37] = OP_CMD_VARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0] = test
+argv[ 1] = 4
+variable[  0]: k = 4
+variable[  1]: l = 3
+Execute code[ 39] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 3
+argv[ 0] = test
+argv[ 1] = 4
+argv[ 2] = -eq
+variable[  0]: k = 4
+variable[  1]: l = 3
+Execute code[ 41] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 4
+argv[ 0] = test
+argv[ 1] = 4
+argv[ 2] = -eq
+argv[ 3] = 2
+variable[  0]: k = 4
+variable[  1]: l = 3
+Execute code[ 43] = OP_CMD_EXE_THEN_STACK
+exe.e_procs = 0
+stack[  0] = 01
+variable[  0]: k = 4
+variable[  1]: l = 3
+Execute code[ 44] = OP_JUMP_IF_FALSE
+exe.e_procs = 0
+variable[  0]: k = 4
+variable[  1]: l = 3
+Execute code[106] = OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0] = echo
+variable[  0]: k = 4
+variable[  1]: l = 3
+Execute code[108] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0] = echo
+argv[ 1] = k > 2
+variable[  0]: k = 4
+variable[  1]: l = 3
+Execute code[110] = OP_CMD_EXE
+exe.e_procs = 0
+variable[  0]: k = 4
+variable[  1]: l = 3
+Execute code[111] = OP_JUMP
+exe.e_procs = 0
+variable[  0]: k = 4
+variable[  1]: l = 3
+Execute code[  4] = OP_BLTN_CMD
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 1
+argv[ 0] = test
+variable[  0]: k = 4
+variable[  1]: l = 3
+Execute code[  6] = OP_CMD_VARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 2
+argv[ 0] = test
+argv[ 1] = 4
+variable[  0]: k = 4
+variable[  1]: l = 3
+Execute code[  8] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 3
+argv[ 0] = test
+argv[ 1] = 4
+argv[ 2] = -ne
+variable[  0]: k = 4
+variable[  1]: l = 3
+Execute code[ 10] = OP_CMD_ARG
+exe.e_procs = 1
+exe.e_proc[0].p_argc = 4
+argv[ 0] = test
+argv[ 1] = 4
+argv[ 2] = -ne
+argv[ 3] = 4
+variable[  0]: k = 4
+variable[  1]: l = 3
+Execute code[ 12] = OP_CMD_EXE_THEN_STACK
+exe.e_procs = 0
+stack[  0] = 01
+variable[  0]: k = 4
+variable[  1]: l = 3
+Execute code[ 13] = OP_JUMP_IF_FALSE
+exe.e_procs = 0
+variable[  0]: k = 4
 variable[  1]: l = 3
 All codes were successfully executed.

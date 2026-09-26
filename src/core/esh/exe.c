@@ -114,7 +114,7 @@ int exe_run_codes(struct code *code, struct exe *exe)
 		DP("Command: %s", proc->p_cmd->name);
 
 #if TODO_BREAK_WITH_ARGUMENT
-		if (0 == strcmp(proc->p_argv[0], "break"))
+		if (0 == strcmp(proc->p_argv[0], "break") && ret >= 0)
 			pc = code->c_ltab.l_addr[ret];
 		else
 #endif
