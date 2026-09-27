@@ -10,6 +10,7 @@ char * const token_type_str[] = {
 	"T_BLTN_CMD",
 	"T_CMD_ARG",
 	"T_CMD_VARG",
+	"T_CMD_QARG",
 	"T_VALUE",
 	"T_STRING",
 	"T_VARIABLE",
@@ -47,6 +48,7 @@ char * const lex_state_str[] = {
 	"LEX_CMD",
 	"LEX_CMD_ARG",
 	"LEX_SQUOTE",
+	"LEX_DQUOTE",
 	NULL
 };
 
@@ -93,6 +95,7 @@ char * const opcode_str[] = {
 	"OP_BLTN_CMD",
 	"OP_CMD_ARG",
 	"OP_CMD_VARG",
+	"OP_CMD_QARG",
 	"OP_CMD_EXE",
 	"OP_CMD_EXE_THEN_STACK",
 	"OP_CMD_EXE_THEN_ASSIGN",

@@ -35,6 +35,7 @@ enum lex_state {
 	LEX_CMD,
 	LEX_CMD_ARG,
 	LEX_SQUOTE,
+	LEX_DQUOTE,
 };
 
 struct lex {
@@ -122,6 +123,13 @@ int lex_analyze_token(char *str, struct token *token)
 			*type = T_STRING;
 			ret = LEXQUOTE;
 			state = LEX_SQUOTE;
+			lex.l_sprev = LEX_IDLE;
+			lex.l_tok = T_STRING;
+		} else if (c == '"') {
+			lex.l_scats = 0;
+			*type = T_STRING;
+			ret = LEXQUOTE;
+			state = LEX_DQUOTE;
 			lex.l_sprev = LEX_IDLE;
 			lex.l_tok = T_STRING;
 		} else if (isdigit(c)) {
@@ -231,6 +239,13 @@ int lex_analyze_token(char *str, struct token *token)
 			state = LEX_SQUOTE;
 			lex.l_sprev = LEX_CMD_ARG;
 			lex.l_tok = T_CMD_ARG;
+		} else if (c == '"') {
+			lex.l_scats = 0;
+			*type = T_CMD_QARG;
+			ret = LEXQUOTE;
+			state = LEX_DQUOTE;
+			lex.l_sprev = LEX_CMD_ARG;
+			lex.l_tok = T_CMD_QARG;
 		}
 		break;
 	case LEX_SQUOTE:
@@ -256,6 +271,27 @@ int lex_analyze_token(char *str, struct token *token)
 			*type = lex.l_tok;
 			ret = LEXQUOTE;
 			state = LEX_SQUOTE;
+		}
+		break;
+	case LEX_DQUOTE:
+		c = str[0];
+		if (c == '"') {
+			state = lex.l_sprev;
+		} else if (is_endofline(c)) {
+			EP("Open quote\n");
+			goto error;
+		} else {
+			if (lex.l_scats == 0) {
+				strncpy(sym, str, SYMCHARS);
+			} else {
+				memset(scat, 0, sizeof(scat));
+				strncpy(scat, sym, SYMCHARS);
+				snprintf(sym, SYMCHARS, "%s %s", scat, str);
+			}
+			lex.l_scats++;
+			*type = lex.l_tok;
+			ret = LEXQUOTE;
+			state = LEX_DQUOTE;
 		}
 		break;
 	default:

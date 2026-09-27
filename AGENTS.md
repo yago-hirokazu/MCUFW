@@ -174,3 +174,43 @@ docs/coding_style_summary_stm32cubefw.md
 9. プリプロセッサ処理
 10. データ構造
 11. 戻り値
+
+
+## コメント、コミットメッセージの書き方
+
+### 絶対ルール
+1. 冠詞を可能な限り省略し、電報スタイルでコメントを書くこととします。
+2. コメントが一文で終わる場合はピリオドなしとします。
+3. コメント記号`/*`および`*/`を含めて80文字（80カラム）を超えてはいけません。80行を超える場合は2行以上に分けます。一文が長い場合も同様です。
+4. インデントでコメントの開始位置が行の途中からの場合も80カラムを超えてはいけません。
+
+```c
+struct lex {
+	enum lex_state l_state;	/* State of lexical analysis */
+	enum lex_state l_sprev; /* Previous state */
+	enum token_type l_tok;  /* Token type */
+	char l_bquote;		/* Back QUOTE */
+	char l_brack;		/* BRACKet */
+	char l_while;		/* While statement */
+	char l_scats;		/* The number of concatinated strings */
+} lex;
+```
+
+### 絶対ルールの思想
+ ソースコードのコメントやコミットメッセージにおいて、冠詞（a, an, the）は基本的に省略します。
+理由は、限られたスペースでコードの意図を短く、素早く伝えるためです。
+
+### コメントの記述例
+省略のルールと使い分けのポイントを分かりやすく解説します。
+
+#### 冠詞を省略する主なケース
+ドキュメント（Javadocなど）ではなく、コード内のインラインコメントやコミットメッセージでは、主語や冠詞を省いた「電報スタイル（Telegraphic style）」が一般的です。
+
+1. 変数や関数の説明（インラインコメント）
+- NG: // Return a customer object.（冗長）
+- OK: // Return customer object.
+- OK: // Returns customer.（さらに簡潔に）
+
+2. コミットメッセージ
+- NG: Fix a bug in the login screen.（冗長）
+- OK: Fix bug in login screen.

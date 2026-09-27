@@ -54,6 +54,7 @@ struct tty_history {
 struct tty_context {
 	char t_indent;			/* is in indent */
 	char t_prevc;			/* Previously scanned character */
+	char t_quote;			/* Active quote character */
 };
 
 /**************************************************************************
@@ -236,11 +237,27 @@ int scan_normal(int c, struct qbyte *line_p)
 {
 	int delim=0, echo=0;
 	char prevc = tty.t_prevc;
+	char quote = tty.t_quote;
+
+	if (quote != 0) {
+		if (c == quote) {
+			if (!is_before_space(line_p))
+				qbput(' ', line_p);
+			qbput(c, line_p);
+			tty.t_quote = 0;
+		} else {
+			if (c == ' ')
+				delim |= DELIM_SP;
+			qbput(c, line_p);
+		}
+		goto ECHOBACK;
+	}
 
 	if (prevc == '=' ||
 	    prevc == ';' ||
 	    prevc == '`' ||
-	    prevc == '\''
+	    prevc == '\'' ||
+	    prevc == '"'
 		) {
 		if (c != ' ')
 			qbput(' ', line_p);
@@ -265,6 +282,15 @@ compop:
 		if (!is_before_space(line_p))
 			qbput(' ', line_p);
 		qbput(c, line_p);
+		goto ECHOBACK;
+	}
+
+	if (c == '"') {
+		if (!is_before_space(line_p))
+			qbput(' ', line_p);
+		qbput(c, line_p);
+		qbput(' ', line_p);
+		tty.t_quote = c;
 		goto ECHOBACK;
 	}
 
