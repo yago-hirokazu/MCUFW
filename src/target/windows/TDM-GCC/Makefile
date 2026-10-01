@@ -44,8 +44,11 @@ CSOURCES += qbyte.c
 CSOURCES += echo.c
 CSOURCES += esh.c
 CSOURCES += expr.c
+CSOURCES += file.c
 CSOURCES += help.c
+CSOURCES += pipe.c
 CSOURCES += run.c
+CSOURCES += sched.c
 CSOURCES += test.c
 CSOURCES += tty.c
 
