@@ -1,0 +1,53 @@
+/* esh_sched.h */
+
+#ifndef __ESH_SCHED_H__
+#define __ESH_SCHED_H__
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
+#include "esh_file.h"
+
+#define ESH_PIPELINE_MAX	4
+
+enum esh_proc_state {
+	ESH_PROC_NEW,
+	ESH_PROC_RUNNABLE,
+	ESH_PROC_RUNNING,
+	ESH_PROC_WAIT_READ,
+	ESH_PROC_WAIT_WRITE,
+	ESH_PROC_FINISHED,
+	ESH_PROC_ERROR
+};
+
+enum esh_wait_reason {
+	ESH_WAIT_READ,
+	ESH_WAIT_WRITE
+};
+
+struct esh_wait_chan;
+
+/* Portable execution state embedded in executor process */
+struct esh_proc {
+	enum esh_proc_state ep_state;
+	struct esh_fd_table ep_fd_table;
+	struct esh_wait_chan *ep_wait_chan;
+	struct esh_proc *ep_wait_next;
+	int ep_status;
+};
+
+/* Wait list ownership belongs to scheduler backend */
+struct esh_wait_chan {
+	struct esh_proc *wc_head;
+};
+
+int esh_sleep(void *chan, enum esh_wait_reason reason);
+void esh_wakeup(void *chan);
+struct esh_proc *esh_current_proc(void);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
+
+#endif
