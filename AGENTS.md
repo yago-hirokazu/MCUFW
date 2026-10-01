@@ -100,6 +100,8 @@ C:\Keil_v543a\ARM\ARMCLANG\bin
 
 ### src/target/windows
 
+PowerShell から `C:\msys64\mingw64\bin\gcc.exe` を直接起動したことです。MSYS2 shell 外では必要なDLL探索順が崩れ、各 `cc1.exe` が `clock_gettime64` を解決できず、エラーが発生します。PowerShell から `C:\msys64\mingw64\bin\gcc.exe` 直接起動はしないで、MSYS2 shell 経由だけで実行します。
+
 1. mingw64 シェルで下記を実行
 
 - cd src/target/windows
@@ -165,7 +167,7 @@ docs/coding_style_summary_stm32cubefw.md
 
 1. インデント
 2. 行の長さ
-3. 波括弧と空白
+3. 波括弧と空白q
 4. 名前の付け方
 5. `typedef`
 6. 関数
