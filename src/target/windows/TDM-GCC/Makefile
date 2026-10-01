@@ -21,6 +21,7 @@ vpath %.c ../../../core/usr/cmd
 vpath %.c ../../../core/elib
 vpath %.c ../../../core/esh
 vpath %.c ../../../core/esh/target/windows
+vpath %.S ../../../core/esh/target/windows
 vpath %.o _output
 vpath %.dll ./DLL
 
@@ -41,6 +42,7 @@ CSOURCES += getopt.c
 CSOURCES += qbyte.c
 
 ## ../../../core/esh
+CSOURCES += cortn.c
 CSOURCES += echo.c
 CSOURCES += esh.c
 CSOURCES += expr.c
@@ -53,9 +55,13 @@ CSOURCES += test.c
 CSOURCES += tty.c
 
 ## ../../../core/shell/target/windows
+CSOURCES += cortn_context.c
 CSOURCES += esh_adapt.c
 CSOURCES += stdio_adapt.c
 CSOURCES += tty_adapt.c
+
+# Assembly sources
+ASOURCES := cortn_switch.S
 
 # CPP sources
 ## reserved for future use
@@ -63,6 +69,7 @@ CSOURCES += tty_adapt.c
 # Make object file list from source file list
 _OBJS = $(CSOURCES:.c=.o)
 _OBJS += $(CPPSOURCES:.cpp=.o)
+_OBJS += $(ASOURCES:.S=.o)
 OBJS = $(addprefix $(OUTDIR)/, $(_OBJS))
 
 # Dependencies
@@ -115,6 +122,9 @@ $(OUTDIR)/%.o: %.c
 
 $(OUTDIR)/%.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c -MMD -MP $< -o $@
+
+$(OUTDIR)/%.o: %.S
+	$(CC) $(CFLAGS) -c -MMD -MP $< -o $@
 
 .PHONY: clean
 clean:
