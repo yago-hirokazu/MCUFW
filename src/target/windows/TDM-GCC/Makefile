@@ -89,6 +89,7 @@ INCLUDES += -I../../../core/esh/include
 INCLUDES += -I../../../core/esh/target/windows
 
 CFLAGS += $(INCLUDES)
+CFLAGS += -DESH_STDIO_PIPE
 # CFLAGS += -DADAFRUIT
 
 # CXXFLAGS

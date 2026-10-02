@@ -101,6 +101,7 @@ INCLUDES += -I../../../../target/windows/Adapt
 
 CFLAGS += $(INCLUDES)
 CFLAGS += -DUSE_STACKMACH
+CFLAGS += -DESH_STDIO_PIPE
 
 # CXXFLAGS
 CXXFLAGS := $(CFLAGS)

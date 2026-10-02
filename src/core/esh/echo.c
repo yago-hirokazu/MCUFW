@@ -15,12 +15,15 @@ int echo(int argc, char *argv[])
 		}
 	}
 	for (; k<argc; k++) {
-		printf("%s",argv[k]);
+		if (printf("%s", argv[k]) < 0)
+			return EXIT_FAILURE;
 		if (k < argc-1)
-			printf(" ");
+			if (printf(" ") < 0)
+				return EXIT_FAILURE;
 	}
 	if (opt_n == 0)
-		printf("\n");
+		if (printf("\n") < 0)
+			return EXIT_FAILURE;
 
 	return EXIT_SUCCESS;
 }

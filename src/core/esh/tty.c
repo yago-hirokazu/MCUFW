@@ -80,7 +80,7 @@ static int tokenize_meta(char *line);
 static void outc(char *str);
 static void outh(char *str);
 #define DP(fmt, ...) \
-	printf("[%s|%s()|L%d] " fmt,	\
+	fprintf(stderr, "[%s|%s()|L%d] " fmt,	\
 	       __FNAME__,__func__,__LINE__,	\
 	       ##__VA_ARGS__			\
 		)

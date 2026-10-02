@@ -11,7 +11,7 @@ extern "C" {
 
 #include "cortn_context.h"
 
-#define CORTN_WINDOWS_STACK_SIZE	(16U * 1024U)
+#define CORTN_WINDOWS_STACK_SIZE	(64U * 1024U)
 #define CORTN_STACK_GUARD_SIZE	16U
 #define CORTN_STACK_MIN_SIZE	512U
 

@@ -7,6 +7,9 @@
 #include "esh_file.h"
 #include "esh_pipe.h"
 #include "exe.h"
+#include "stdio_adapt.h"
+
+extern int echo(int argc, char **argv);
 
 #define TEST_DATA_SIZE	(ESH_PIPE_BUFFER_SIZE * 3 + 41)
 
@@ -19,7 +22,7 @@
 } while (0)
 
 static unsigned char source[TEST_DATA_SIZE];
-static unsigned char output[TEST_DATA_SIZE];
+static unsigned char output[TEST_DATA_SIZE + 2];
 static size_t output_count;
 
 static int producer_main(int argc, char **argv)
@@ -87,6 +90,36 @@ static struct applet producer = {"producer", producer_main};
 static struct applet filter = {"filter", filter_main};
 static struct applet consumer = {"consumer", consumer_main};
 static struct applet early_filter = {"early", early_filter_main};
+static struct applet echo_applet = {"echo", echo};
+
+static int stdio_producer_main(int argc, char **argv)
+{
+	(void)argc;
+	(void)argv;
+	CHECK(printf("%s", source) == TEST_DATA_SIZE - 1);
+	CHECK(putchar('!') == '!');
+	CHECK(fprintf(stdout, "%s", "?") == 1);
+	fprintf(stderr, "debug console only\n");
+	return 0;
+}
+
+static int getchar_consumer_main(int argc, char **argv)
+{
+	int ch;
+	int value;
+
+	(void)argc;
+	(void)argv;
+	CHECK(scanf("%d", &value) == EOF);
+	while ((ch = getchar()) != EOF) {
+		CHECK(output_count < sizeof(output));
+		output[output_count++] = (unsigned char)ch;
+	}
+	return 37;
+}
+
+static struct applet stdio_producer = {"stdio", stdio_producer_main};
+static struct applet getchar_consumer = {"getchar", getchar_consumer_main};
 
 static void init_command(struct proc *proc, struct applet *applet)
 {
@@ -114,7 +147,7 @@ static void test_three_stage_pipeline(void)
 		CHECK(proc[0].p_exec.ep_status == 11);
 		CHECK(proc[1].p_exec.ep_status == 22);
 		CHECK(proc[2].p_exec.ep_status == 37);
-		CHECK(output_count == sizeof(output));
+		CHECK(output_count == sizeof(source));
 		for (i = 0; i < TEST_DATA_SIZE; i++)
 			CHECK(output[i] == (unsigned char)toupper(source[i]));
 		CHECK(esh_file_in_use() == 0);
@@ -135,6 +168,34 @@ static void test_early_filter_exit(void)
 	CHECK(proc[1].p_exec.ep_status == 23);
 	CHECK(proc[2].p_exec.ep_status == 37);
 	CHECK(output_count == 0);
+	CHECK(esh_file_in_use() == 0);
+	CHECK(esh_pipe_in_use() == 0);
+}
+
+static void test_stdio_pipeline(void)
+{
+	struct proc proc[2];
+	char message[] = "hello pipe";
+
+	output_count = 0;
+	init_command(&proc[0], &echo_applet);
+	proc[0].p_argc = 2;
+	proc[0].p_argv[1] = message;
+	init_command(&proc[1], &getchar_consumer);
+	CHECK(exe_run_pipeline(proc, 2) == 37);
+	CHECK(output_count == strlen(message) + 1);
+	CHECK(!memcmp(output, "hello pipe\n", output_count));
+
+	memset(source, 'x', sizeof(source));
+	source[sizeof(source) - 1] = 0;
+	output_count = 0;
+	init_command(&proc[0], &stdio_producer);
+	init_command(&proc[1], &getchar_consumer);
+	CHECK(exe_run_pipeline(proc, 2) == 37);
+	CHECK(output_count == TEST_DATA_SIZE + 1);
+	CHECK(!memcmp(output, source, TEST_DATA_SIZE - 1));
+	CHECK(output[TEST_DATA_SIZE - 1] == '!');
+	CHECK(output[TEST_DATA_SIZE] == '?');
 	CHECK(esh_file_in_use() == 0);
 	CHECK(esh_pipe_in_use() == 0);
 }
@@ -204,6 +265,7 @@ static void test_pipeline_bytecode(void)
 int main(void)
 {
 	esh_file_system_init();
+	test_stdio_pipeline();
 	test_three_stage_pipeline();
 	test_early_filter_exit();
 	test_invalid_count();

@@ -9,7 +9,7 @@
 #if DEBUG
 #define DP(fmt, ...)\
 do {\
-	fprintf(stdout, "debug @ [%s|%s()|L%d] " fmt "\n",\
+	fprintf(stderr, "debug @ [%s|%s()|L%d] " fmt "\n",\
 		__FNAME__,__func__,__LINE__,\
 		##__VA_ARGS__\
 		);\

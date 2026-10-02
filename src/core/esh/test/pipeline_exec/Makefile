@@ -8,6 +8,7 @@ CFLAGS += -Wall -Wextra
 CFLAGS += -I. -I../../include -I../../../elib
 CFLAGS += -I../../target/windows -I../../../../target/windows/Adapt
 CFLAGS += -DUSE_STACKMACH
+CFLAGS += -DESH_STDIO_PIPE
 LDFLAGS = -lwinmm
 
 CSOURCES = test_pipeline_exec.c

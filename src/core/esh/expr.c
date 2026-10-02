@@ -14,7 +14,7 @@ static int find_closing_bracket(int argc, char *argv[], int argp);
 
 #if DEBUG_EXPR
 #define DP(fmt, ...) \
-	printf("[%s|%s()|L%d] " fmt "\n",	\
+	fprintf(stderr, "[%s|%s()|L%d] " fmt "\n",	\
 	       __FNAME__,__func__,__LINE__,	\
 	       ##__VA_ARGS__			\
 		)
