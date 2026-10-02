@@ -68,10 +68,12 @@ void esh_pipe_endpoint_close(struct esh_pipe_inode *inode,
 		if (!inode->pi_readers)
 			return;
 		inode->pi_readers--;
+		esh_wakeup(&inode->pi_write_chan);
 	} else {
 		if (!inode->pi_writers)
 			return;
 		inode->pi_writers--;
+		esh_wakeup(&inode->pi_read_chan);
 	}
 	inode->pi_refs--;
 	if (!inode->pi_readers && !inode->pi_writers)
@@ -136,7 +138,12 @@ discard_inode:
 
 int esh_pipe(int fd[2])
 {
-	return esh_pipe_for_proc(esh_current_proc(), fd);
+	int result;
+
+	esh_kernel_lock();
+	result = esh_pipe_for_proc(esh_current_proc(), fd);
+	esh_kernel_unlock();
+	return result;
 }
 
 struct esh_io_status esh_pipe_read_nonblock(struct esh_proc *proc, int fd,
@@ -219,33 +226,108 @@ struct esh_io_status esh_pipe_write_nonblock(struct esh_proc *proc, int fd,
 
 esh_ssize_t esh_read(int fd, void *buf, size_t count)
 {
+	struct esh_pipe_inode *inode;
 	struct esh_io_status status;
+	struct esh_proc *proc;
+	struct esh_file *file;
+	int result;
 
-	status = esh_pipe_read_nonblock(esh_current_proc(), fd, buf, count);
-	switch (status.io_result) {
-	case ESH_IO_PROGRESS:
-		return status.io_count;
-	case ESH_IO_EOF:
+	if (!count)
 		return 0;
-	case ESH_IO_WAIT_READ:
-		return -ESH_EAGAIN;
-	default:
-		return status.io_error;
+	if (!buf)
+		return -ESH_EINVAL;
+	proc = esh_current_proc();
+	esh_kernel_lock();
+	file = proc ? esh_fd_get(&proc->ep_fd_table, fd) : NULL;
+	if (!file || file->f_direction != ESH_FILE_READ) {
+		esh_kernel_unlock();
+		return -ESH_EBADF;
+	}
+	inode = file->f_inode;
+	for (;;) {
+		status = esh_pipe_read_nonblock(proc, fd, buf, count);
+		switch (status.io_result) {
+		case ESH_IO_PROGRESS:
+			esh_wakeup(&inode->pi_write_chan);
+			esh_kernel_unlock();
+			return status.io_count;
+		case ESH_IO_EOF:
+			esh_kernel_unlock();
+			return 0;
+		case ESH_IO_WAIT_READ:
+			if (!proc->ep_backend) {
+				esh_kernel_unlock();
+				return -ESH_EAGAIN;
+			}
+			result = esh_sleep(&inode->pi_read_chan,
+					   ESH_WAIT_READ);
+			if (result < 0) {
+				esh_kernel_unlock();
+				return result;
+			}
+			break;
+		default:
+			esh_kernel_unlock();
+			return status.io_error;
+		}
 	}
 }
 
 esh_ssize_t esh_write(int fd, const void *buf, size_t count)
 {
+	const unsigned char *bytes;
+	struct esh_pipe_inode *inode;
 	struct esh_io_status status;
+	struct esh_proc *proc;
+	struct esh_file *file;
+	size_t transferred;
+	int result;
 
-	status = esh_pipe_write_nonblock(esh_current_proc(), fd, buf, count);
-	switch (status.io_result) {
-	case ESH_IO_PROGRESS:
-		return status.io_count;
-	case ESH_IO_WAIT_WRITE:
-		return -ESH_EAGAIN;
-	default:
-		return status.io_error;
+	if (!count)
+		return 0;
+	if (!buf)
+		return -ESH_EINVAL;
+	proc = esh_current_proc();
+	esh_kernel_lock();
+	file = proc ? esh_fd_get(&proc->ep_fd_table, fd) : NULL;
+	if (!file || file->f_direction != ESH_FILE_WRITE) {
+		esh_kernel_unlock();
+		return -ESH_EBADF;
+	}
+	inode = file->f_inode;
+	bytes = buf;
+	transferred = 0;
+	for (;;) {
+		status = esh_pipe_write_nonblock(proc, fd,
+						 bytes + transferred,
+						 count - transferred);
+		switch (status.io_result) {
+		case ESH_IO_PROGRESS:
+			transferred += (size_t)status.io_count;
+			esh_wakeup(&inode->pi_read_chan);
+			if (transferred == count) {
+				esh_kernel_unlock();
+				return (esh_ssize_t)transferred;
+			}
+			break;
+		case ESH_IO_WAIT_WRITE:
+			if (!proc->ep_backend) {
+				esh_kernel_unlock();
+				if (transferred)
+					return (esh_ssize_t)transferred;
+				return -ESH_EAGAIN;
+			}
+			result = esh_sleep(&inode->pi_write_chan,
+					   ESH_WAIT_WRITE);
+			if (result < 0) {
+				esh_kernel_unlock();
+				return result;
+			}
+			break;
+		default:
+			esh_kernel_unlock();
+			return status.io_error;
+		}
 	}
 }
 
@@ -256,7 +338,10 @@ int esh_close(int fd)
 	proc = esh_current_proc();
 	if (!proc)
 		return -ESH_EINVAL;
-	return esh_fd_close(&proc->ep_fd_table, fd);
+	esh_kernel_lock();
+	fd = esh_fd_close(&proc->ep_fd_table, fd);
+	esh_kernel_unlock();
+	return fd;
 }
 
 size_t esh_pipe_in_use(void)

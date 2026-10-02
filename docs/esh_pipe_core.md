@@ -55,14 +55,15 @@ endpointのcloseをinodeへ反映し、両方が0になるとinodeとbufferをpo
 readとwriteは現在転送可能な分だけを転送する。ring bufferの末尾を越える場合も
 データ順序を維持する。
 
-Milestone 3の公開`esh_read()`と`esh_write()`は、待機が必要な場合に
-`-ESH_EAGAIN`を返す。Milestone 4で`esh_sleep()`と再試行loopを接続し、待機を
-公開API内部へ隠蔽する。
+Milestone 4以降の公開`esh_read()`と`esh_write()`は、scheduler backendが
+bindされたprocessを待機させ、再開後に条件を再検査する。backendをbindして
+いない単体利用では、待機が必要な場合に`-ESH_EAGAIN`または転送済みbyte数を
+返す。
 
 最終writer close後もbuffer内のデータをすべて読み出せる。その後のreadは0を
 返す。reader不在時のwriteは`-ESH_EPIPE`を返し、signalは発生させない。
 
 ## 排他制御
 
-Milestone 3の単体試験は単一実行単位で動かす。pool、参照数、ring bufferの
-排他制御はMilestone 4のkernel lockとsleep/wakeup接続時に追加する。
+Milestone 3の内部非blocking単体試験は単一実行単位で動かす。公開API経由の
+pool、参照数、ring buffer操作はMilestone 4のkernel lockで保護する。

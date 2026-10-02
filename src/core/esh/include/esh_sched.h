@@ -27,25 +27,31 @@ enum esh_wait_reason {
 };
 
 struct esh_wait_chan;
-
 /* Portable execution state embedded in executor process */
 struct esh_proc {
 	enum esh_proc_state ep_state;
 	struct esh_fd_table ep_fd_table;
 	struct esh_wait_chan *ep_wait_chan;
 	struct esh_proc *ep_wait_next;
+	void *ep_backend;
 	int ep_status;
 };
 
 /* Wait list ownership belongs to scheduler backend */
 struct esh_wait_chan {
 	struct esh_proc *wc_head;
+	struct esh_proc *wc_tail;
 };
 
+void esh_kernel_lock(void);
+void esh_kernel_unlock(void);
+int esh_kernel_is_locked(void);
 int esh_sleep(void *chan, enum esh_wait_reason reason);
 void esh_wakeup(void *chan);
 struct esh_proc *esh_current_proc(void);
 void esh_proc_init(struct esh_proc *proc);
+int esh_proc_bind_backend(struct esh_proc *proc, void *backend);
+int esh_sched_resume(struct esh_proc *proc);
 void esh_sched_set_current_proc(struct esh_proc *proc);
 
 #ifdef __cplusplus

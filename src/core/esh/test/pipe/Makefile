@@ -8,9 +8,13 @@ CFLAGS += -Wall -Wextra -Werror -pedantic
 CFLAGS += -I../../include -I../../target/windows
 
 OBJS = $(OUTDIR)/test_pipe.o
+OBJS += $(OUTDIR)/cortn.o
+OBJS += $(OUTDIR)/cortn_context.o
+OBJS += $(OUTDIR)/cortn_switch.o
 OBJS += $(OUTDIR)/file.o
 OBJS += $(OUTDIR)/pipe.o
 OBJS += $(OUTDIR)/sched.o
+OBJS += $(OUTDIR)/sched_cortn.o
 
 .PHONY: all clean
 
@@ -25,6 +29,15 @@ $(OUTDIR):
 $(OUTDIR)/test_pipe.o: test_pipe.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
+$(OUTDIR)/cortn.o: ../../cortn.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OUTDIR)/cortn_context.o: ../../target/windows/cortn_context.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OUTDIR)/cortn_switch.o: ../../target/windows/cortn_switch.S
+	$(CC) $(CFLAGS) -c $< -o $@
+
 $(OUTDIR)/file.o: ../../file.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
@@ -32,6 +45,9 @@ $(OUTDIR)/pipe.o: ../../pipe.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OUTDIR)/sched.o: ../../sched.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OUTDIR)/sched_cortn.o: ../../target/windows/sched_cortn.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

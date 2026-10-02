@@ -51,6 +51,7 @@ CSOURCES += help.c
 CSOURCES += pipe.c
 CSOURCES += run.c
 CSOURCES += sched.c
+CSOURCES += sched_cortn.c
 CSOURCES += test.c
 CSOURCES += tty.c
 
