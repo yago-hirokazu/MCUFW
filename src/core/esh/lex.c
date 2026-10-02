@@ -70,6 +70,7 @@ static const struct reserved_token kwtab[] = {
 static const struct reserved_token optab[] = {
 	{T_ASSIGN   , "="},
 	{T_SEMICOLON, ";"},
+	{T_PIPE     , "|"},
 };
 
 enum {NKWTAB = sizeof(kwtab) / sizeof(struct reserved_token)};
@@ -196,6 +197,11 @@ int lex_analyze_token(char *str, struct token *token)
 		if (c == ' ' || c == '\0') {
 			EP("Null symbol",0);
 			goto error;
+		} else if (c == '|' && str[1] == '\0') {
+			DP("PIPE: %c", c);
+			*type = T_PIPE;
+			sym[0] = c;
+			state = LEX_CMD;
 		} else if (c == '$') {
 			DP("VARG: %s",str);
 			strncpy(sym, str+1, SYMCHARS);

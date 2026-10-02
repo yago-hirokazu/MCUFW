@@ -51,6 +51,8 @@ struct parse {
 	char p_varid;
 	char p_elses;
 	char p_break;
+	char p_pipeline;
+	char p_pipe_command;
 	struct label
 	{
 		int l_loop;

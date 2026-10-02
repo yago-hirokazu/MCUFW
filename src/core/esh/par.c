@@ -247,6 +247,12 @@ parse_cmdline(struct parse *par, struct token *tok, struct code *code)
 	DUMPCX(__func__, tok);
 
 	int ret = 0;
+	int command_expected;
+
+	command_expected = par->p_pipe_command;
+	if (command_expected && tok->t_type != T_USER_CMD &&
+	    tok->t_type != T_BLTN_CMD)
+		goto error;
 
 	if (tok->t_type == T_USER_CMD) {
 		ret = find_cmd(tok, usercmds);
@@ -256,6 +262,7 @@ parse_cmdline(struct parse *par, struct token *tok, struct code *code)
 		par->p_break = 0;
 		add_code(OP_USER_CMD, code);
 		add_code(ret, code);
+		par->p_pipe_command = 0;
 		return PARONGO;
 	} else if (tok->t_type == T_BLTN_CMD) {
 		ret = find_cmd(tok, builtins);
@@ -268,6 +275,7 @@ parse_cmdline(struct parse *par, struct token *tok, struct code *code)
 			par->p_break = 0;
 		add_code(OP_BLTN_CMD, code);
 		add_code(ret, code);
+		par->p_pipe_command = 0;
 		return PARONGO;
 	} else if (tok->t_type == T_CMD_ARG ||
 		   tok->t_type == T_CMD_VARG ||
@@ -275,6 +283,13 @@ parse_cmdline(struct parse *par, struct token *tok, struct code *code)
 		ret = parse_cmdarg(tok, code);
 		DP("%d = parse_cmdarg(...)", ret);
 		return ret;
+	} else if (tok->t_type == T_PIPE) {
+		if (par->p_break)
+			goto error;
+		add_code(OP_PIPE_NEXT, code);
+		par->p_pipeline = 1;
+		par->p_pipe_command = 1;
+		return PARONGO;
 	} else if (tok->t_type == T_EOL) {
 		if (par->p_break == 1) {
 			ret = parse_break_loop_arg(code);
@@ -282,6 +297,7 @@ parse_cmdline(struct parse *par, struct token *tok, struct code *code)
 				goto error;
 		}
 		par->p_break = 0;
+		par->p_pipeline = 0;
 		add_code(OP_CMD_EXE, code);
 		return PARDONE;
 	}
@@ -442,6 +458,9 @@ parse_assign(struct parse *par, struct token *tok, struct code *code)
 	case PAR_ASSIGN_CMDRESULT:
 		if (tok->t_type == T_RBACKQUOTE) {
 			DP("tok->t_type == T_RBACKQUOTE");
+			if (par->p_pipe_command)
+				goto error;
+			par->p_pipeline = 0;
 			add_code(OP_CMD_EXE_THEN_ASSIGN, code);
 			add_code(par->p_varid, code);
 			par->p_state1 = PAR_HALT;

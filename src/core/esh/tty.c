@@ -75,6 +75,7 @@ static void puth(struct qbyte *line_p, struct tty_history *history_p);
 static void geth(struct tty_history *history_p, struct qbyte *line_p);
 static void reprompt(void);
 static int is_indent(int c, struct qbyte *line_p);
+static int tokenize_meta(char *line);
 #if DEBUG_TTY
 static void outc(char *str);
 static void outh(char *str);
@@ -178,6 +179,8 @@ struct tty_arg *tokenize(char *line, struct tty_arg *arg)
 
 	if (cp == NULL)
 		return NULL;
+	if (tokenize_meta(line) < 0)
+		return NULL;
 
 	arg->v[0] = cp;
 	arg->c = 1;
@@ -212,6 +215,50 @@ struct tty_arg *tokenize(char *line, struct tty_arg *arg)
 
 out:
 	return (struct tty_arg *)arg;
+}
+
+static int tokenize_meta(char *line)
+{
+	char split[TTY_NBUF];
+	size_t dst;
+	size_t src;
+	char quote;
+
+	dst = 0;
+	quote = 0;
+	for (src = 0; line[src] != '\0'; src++) {
+		char c = line[src];
+
+		if (c == '\'' || c == '"') {
+			if (!quote)
+				quote = c;
+			else if (quote == c)
+				quote = 0;
+		}
+		if (c == '|' && !quote) {
+			if (dst && split[dst - 1] != ' ') {
+				if (dst >= TTY_BBUF)
+					return -1;
+				split[dst++] = ' ';
+			}
+			if (dst >= TTY_BBUF)
+				return -1;
+			split[dst++] = c;
+			if (line[src + 1] != ' ' &&
+			    line[src + 1] != '\0') {
+				if (dst >= TTY_BBUF)
+					return -1;
+				split[dst++] = ' ';
+			}
+			continue;
+		}
+		if (dst >= TTY_BBUF)
+			return -1;
+		split[dst++] = c;
+	}
+	split[dst] = '\0';
+	memcpy(line, split, dst + 1);
+	return 0;
 }
 
 struct tty_arg *make_argvect(char *line, struct tty_arg *arg)
