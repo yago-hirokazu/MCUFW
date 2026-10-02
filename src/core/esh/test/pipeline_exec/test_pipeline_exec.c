@@ -228,6 +228,39 @@ static void test_pipe_exhaustion_cleanup(void)
 	CHECK(esh_file_in_use() == 0);
 }
 
+static void blocker_entry(void *arg)
+{
+	(void)arg;
+	CHECK(0);
+}
+
+static void test_backend_exhaustion_cleanup(void)
+{
+	struct esh_proc blockers[ESH_PIPELINE_MAX - 1];
+	struct proc proc[2];
+	int i;
+
+	for (i = 0; i < ESH_PIPELINE_MAX - 1; i++) {
+		esh_proc_init(&blockers[i]);
+		CHECK(esh_sched_prepare(&blockers[i], blocker_entry,
+					NULL) == 0);
+	}
+	init_command(&proc[0], &producer);
+	init_command(&proc[1], &consumer);
+	CHECK(exe_run_pipeline(proc, 2) == -ESH_ENOMEM);
+	CHECK(esh_file_in_use() == 0);
+	CHECK(esh_pipe_in_use() == 0);
+	for (i = 0; i < ESH_PIPELINE_MAX - 1; i++)
+		esh_sched_release(&blockers[i]);
+
+	output_count = 0;
+	CHECK(exe_run_pipeline(proc, 2) == 37);
+	CHECK(output_count == sizeof(source));
+	CHECK(!memcmp(source, output, sizeof(source)));
+	CHECK(esh_file_in_use() == 0);
+	CHECK(esh_pipe_in_use() == 0);
+}
+
 static void test_pipeline_bytecode(void)
 {
 	struct code code;
@@ -270,6 +303,7 @@ int main(void)
 	test_early_filter_exit();
 	test_invalid_count();
 	test_pipe_exhaustion_cleanup();
+	test_backend_exhaustion_cleanup();
 	test_pipeline_bytecode();
 	printf("all tests passed\n");
 	return EXIT_SUCCESS;

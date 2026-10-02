@@ -7,6 +7,17 @@
 #include "esh_sched_backend.h"
 
 static unsigned char esh_lock_held;
+static struct esh_proc *esh_current;
+
+struct esh_proc *esh_sched_backend_current(void)
+{
+	return esh_current;
+}
+
+void esh_sched_backend_set_current(struct esh_proc *proc)
+{
+	esh_current = proc;
+}
 
 struct esh_cortn_slot {
 	struct cortn cs_cortn;
@@ -99,8 +110,12 @@ int esh_sched_backend_yield(struct esh_proc *proc,
 		yield_reason = CORTN_YIELD_WAIT_WRITE;
 	else
 		return -ESH_EINVAL;
-	if (cortn_yield(cortn, yield_reason) != CORTN_SUCCESS)
+	esh_kernel_unlock();
+	if (cortn_yield(cortn, yield_reason) != CORTN_SUCCESS) {
+		esh_kernel_lock();
 		return -ESH_EINVAL;
+	}
+	esh_kernel_lock();
 	return 0;
 }
 

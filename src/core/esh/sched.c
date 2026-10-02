@@ -6,8 +6,6 @@
 #include "esh_sched.h"
 #include "esh_sched_backend.h"
 
-static struct esh_proc *esh_current;
-
 static void esh_wait_remove(struct esh_wait_chan *chan,
 			    struct esh_proc *proc)
 {
@@ -78,9 +76,7 @@ int esh_sleep(void *channel, enum esh_wait_reason reason)
 		chan->wc_head = proc;
 	chan->wc_tail = proc;
 
-	esh_kernel_unlock();
 	result = esh_sched_backend_yield(proc, reason);
-	esh_kernel_lock();
 	if (result != 0) {
 		esh_wait_remove(chan, proc);
 		proc->ep_state = ESH_PROC_ERROR;
@@ -116,7 +112,7 @@ void esh_wakeup(void *channel)
 
 struct esh_proc *esh_current_proc(void)
 {
-	return esh_current;
+	return esh_sched_backend_current();
 }
 
 void esh_proc_init(struct esh_proc *proc)
@@ -157,6 +153,10 @@ void esh_sched_release(struct esh_proc *proc)
 {
 	if (!proc || !proc->ep_backend)
 		return;
+	esh_kernel_lock();
+	if (proc->ep_wait_chan)
+		esh_wait_remove(proc->ep_wait_chan, proc);
+	esh_kernel_unlock();
 	esh_sched_backend_release(proc->ep_backend);
 	proc->ep_backend = NULL;
 }
@@ -165,22 +165,33 @@ int esh_sched_resume(struct esh_proc *proc)
 {
 	int result;
 
-	if (!proc || !proc->ep_backend || esh_current ||
-	    proc->ep_state != ESH_PROC_RUNNABLE)
+	if (!proc || !proc->ep_backend || esh_current_proc())
 		return -ESH_EINVAL;
-	esh_current = proc;
-	proc->ep_state = ESH_PROC_RUNNING;
-	result = esh_sched_backend_resume(proc);
-	esh_current = NULL;
-	if (result == ESH_PROC_ERROR) {
-		proc->ep_state = ESH_PROC_ERROR;
+	esh_kernel_lock();
+	if (proc->ep_state != ESH_PROC_RUNNABLE) {
+		esh_kernel_unlock();
 		return -ESH_EINVAL;
 	}
-	proc->ep_state = (enum esh_proc_state)result;
+	esh_sched_set_current_proc(proc);
+	proc->ep_state = ESH_PROC_RUNNING;
+	esh_kernel_unlock();
+	result = esh_sched_backend_resume(proc);
+	esh_sched_set_current_proc(NULL);
+	if (result == ESH_PROC_ERROR) {
+		esh_kernel_lock();
+		proc->ep_state = ESH_PROC_ERROR;
+		esh_kernel_unlock();
+		return -ESH_EINVAL;
+	}
+	/* Keep wakeup published after backend reported wait state */
+	esh_kernel_lock();
+	if (result != ESH_PROC_WAIT_READ && result != ESH_PROC_WAIT_WRITE)
+		proc->ep_state = (enum esh_proc_state)result;
+	esh_kernel_unlock();
 	return 0;
 }
 
 void esh_sched_set_current_proc(struct esh_proc *proc)
 {
-	esh_current = proc;
+	esh_sched_backend_set_current(proc);
 }

@@ -4,6 +4,7 @@ TARGET = test_exe.exe
 
 # Commands
 CC = gcc
+include ../../target/windows/sched_backend.mk
 ifeq ($(MSYSTEM),MINGW64)
 DEL = rm -f
 COPY = cp
@@ -62,13 +63,11 @@ CSOURCES += tok.c
 CSOURCES += tty.c
 
 ## ../../target/windows/
-CSOURCES += cortn.c
-CSOURCES += cortn_context.c
-CSOURCES += sched_cortn.c
+CSOURCES += $(ESH_SCHED_CSOURCES)
 CSOURCES += stdio_adapt.c
 CSOURCES += tty_adapt.c
 
-ASOURCES := cortn_switch.S
+ASOURCES := $(ESH_SCHED_ASOURCES)
 
 ## ../../../usr/cmd
 CSOURCES += cmd_sample.c
@@ -102,6 +101,7 @@ INCLUDES += -I../../../../target/windows/Adapt
 CFLAGS += $(INCLUDES)
 CFLAGS += -DUSE_STACKMACH
 CFLAGS += -DESH_STDIO_PIPE
+CFLAGS += $(ESH_SCHED_CPPFLAGS)
 
 # CXXFLAGS
 CXXFLAGS := $(CFLAGS)

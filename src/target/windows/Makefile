@@ -5,6 +5,7 @@ TARGET = main.exe
 # Commands
 CXX = g++
 CC = gcc
+include ../../core/esh/target/windows/sched_backend.mk
 ifeq ($(MSYSTEM),MINGW64)
 DEL = rm -f
 COPY = cp
@@ -55,7 +56,7 @@ CSOURCES += getopt.c
 CSOURCES += qbyte.c
 
 ## ../../core/esh
-CSOURCES += cortn.c
+CSOURCES += $(ESH_SCHED_CSOURCES)
 CSOURCES += echo.c
 CSOURCES += esh.c
 CSOURCES += expr.c
@@ -64,18 +65,16 @@ CSOURCES += help.c
 CSOURCES += pipe.c
 CSOURCES += run.c
 CSOURCES += sched.c
-CSOURCES += sched_cortn.c
 CSOURCES += test.c
 CSOURCES += tty.c
 
 ## ../../core/shell/target/windows
-CSOURCES += cortn_context.c
 CSOURCES += esh_adapt.c
 CSOURCES += stdio_adapt.c
 CSOURCES += tty_adapt.c
 
 # Assembly sources
-ASOURCES := cortn_switch.S
+ASOURCES := $(ESH_SCHED_ASOURCES)
 
 # CPP sources
 ## reserved for future use
@@ -103,6 +102,7 @@ INCLUDES += -I../../core/esh/target/windows
 
 CFLAGS += $(INCLUDES)
 CFLAGS += -DESH_STDIO_PIPE
+CFLAGS += $(ESH_SCHED_CPPFLAGS)
 
 # CXXFLAGS
 CXXFLAGS := $(CFLAGS)
