@@ -11,6 +11,7 @@ enum esh_error {
 	ESH_ENOMEM,
 	ESH_EINVAL,
 	ESH_EPIPE,
+	ESH_EAGAIN,
 	ESH_ENOSYS
 };
 

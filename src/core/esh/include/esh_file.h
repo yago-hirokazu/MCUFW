@@ -43,8 +43,19 @@ esh_ssize_t esh_read(int fd, void *buf, size_t count);
 esh_ssize_t esh_write(int fd, const void *buf, size_t count);
 int esh_close(int fd);
 
+/* Call only when no process owns file references */
+void esh_file_system_init(void);
+void esh_fd_table_init(struct esh_fd_table *table);
+struct esh_file *esh_file_alloc(enum esh_file_direction direction,
+				struct esh_pipe_inode *inode);
+void esh_file_put(struct esh_file *file);
+int esh_fd_install(struct esh_fd_table *table, struct esh_file *file);
+struct esh_file *esh_fd_get(struct esh_fd_table *table, int fd);
+int esh_fd_close(struct esh_fd_table *table, int fd);
+
 /* Process exit closes each non-NULL entry exactly once */
 void esh_close_all(struct esh_fd_table *table);
+size_t esh_file_in_use(void);
 
 #ifdef __cplusplus
 }

@@ -45,6 +45,8 @@ struct esh_wait_chan {
 int esh_sleep(void *chan, enum esh_wait_reason reason);
 void esh_wakeup(void *chan);
 struct esh_proc *esh_current_proc(void);
+void esh_proc_init(struct esh_proc *proc);
+void esh_sched_set_current_proc(struct esh_proc *proc);
 
 #ifdef __cplusplus
 }
