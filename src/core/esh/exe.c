@@ -3,6 +3,9 @@
 
 #include "esh.h"
 #include "esh_debug.h"
+#include "esh_errno.h"
+#include "esh_file.h"
+#include "esh_pipe.h"
 #include "exe.h"
 #include "test.h"
 
@@ -35,6 +38,153 @@ extern char *get_symbol_from_variable(char var_p, struct code *code);
 extern char *get_string(char id, struct code *code);
 
 static void expand_quoted_arg(char *dst, char *src, struct code *code);
+static void exe_proc_entry(void *arg);
+static void exe_close_proc_fds(struct proc *proc, int count);
+static int exe_connect_proc(struct proc *writer, struct proc *reader);
+static int exe_execute_commands(struct exe *exe);
+static void exe_reset_commands(struct exe *exe);
+
+static void exe_proc_entry(void *arg)
+{
+	struct proc *proc;
+
+	proc = arg;
+	proc->p_exec.ep_status = proc->p_cmd->main(proc->p_argc,
+						     proc->p_argv);
+	esh_kernel_lock();
+	esh_close_all(&proc->p_exec.ep_fd_table);
+	esh_kernel_unlock();
+}
+
+static void exe_close_proc_fds(struct proc *proc, int count)
+{
+	int i;
+
+	esh_kernel_lock();
+	for (i = 0; i < count; i++)
+		esh_close_all(&proc[i].p_exec.ep_fd_table);
+	esh_kernel_unlock();
+}
+
+static int exe_connect_proc(struct proc *writer, struct proc *reader)
+{
+	struct esh_proc owner;
+	struct esh_file *read_file;
+	struct esh_file *write_file;
+	int fd[2];
+	int result;
+
+	esh_proc_init(&owner);
+	result = esh_pipe_for_proc(&owner, fd);
+	if (result < 0)
+		return result;
+	read_file = esh_fd_get(&owner.ep_fd_table, fd[0]);
+	write_file = esh_fd_get(&owner.ep_fd_table, fd[1]);
+	result = esh_fd_install_at(&writer->p_exec.ep_fd_table,
+				   ESH_FD_STDOUT, write_file);
+	if (result < 0)
+		goto out;
+	result = esh_fd_install_at(&reader->p_exec.ep_fd_table,
+				   ESH_FD_STDIN, read_file);
+	if (result < 0)
+		esh_fd_close(&writer->p_exec.ep_fd_table,
+			     ESH_FD_STDOUT);
+out:
+	esh_close_all(&owner.ep_fd_table);
+	return result < 0 ? result : 0;
+}
+
+int exe_run_pipeline(struct proc *proc, int count)
+{
+	int finished;
+	int prepared;
+	int progress;
+	int result;
+	int i;
+
+	if (!proc || count < 2 || count > PROCS)
+		return -ESH_EINVAL;
+	for (i = 0; i < count; i++) {
+		if (!proc[i].p_cmd || !proc[i].p_cmd->main)
+			return -ESH_EINVAL;
+		esh_proc_init(&proc[i].p_exec);
+	}
+	for (i = 0; i < count - 1; i++) {
+		result = exe_connect_proc(&proc[i], &proc[i + 1]);
+		if (result < 0)
+			goto close_fds;
+	}
+	prepared = 0;
+	for (i = 0; i < count; i++) {
+		result = esh_sched_prepare(&proc[i].p_exec, exe_proc_entry,
+					   &proc[i]);
+		if (result < 0)
+			goto release;
+		prepared++;
+	}
+
+	result = -ESH_EINVAL;
+	for (;;) {
+		finished = 0;
+		progress = 0;
+		for (i = 0; i < count; i++) {
+			if (proc[i].p_exec.ep_state == ESH_PROC_FINISHED) {
+				finished++;
+				continue;
+			}
+			if (proc[i].p_exec.ep_state == ESH_PROC_ERROR)
+				goto release;
+			if (proc[i].p_exec.ep_state != ESH_PROC_RUNNABLE)
+				continue;
+			if (esh_sched_resume(&proc[i].p_exec) < 0)
+				goto release;
+			progress = 1;
+		}
+		if (finished == count) {
+			result = proc[count - 1].p_exec.ep_status;
+			break;
+		}
+		if (!progress)
+			break;
+	}
+
+release:
+	exe_close_proc_fds(proc, count);
+	for (i = 0; i < prepared; i++)
+		esh_sched_release(&proc[i].p_exec);
+	return result;
+
+close_fds:
+	exe_close_proc_fds(proc, count);
+	return result;
+}
+
+static int exe_execute_commands(struct exe *exe)
+{
+	struct proc *proc;
+
+	if (exe->e_procs <= 0)
+		return -ESH_EINVAL;
+	if (exe->e_procs > 1)
+		return exe_run_pipeline(exe->e_proc, exe->e_procs);
+	proc = &exe->e_proc[0];
+	return proc->p_cmd->main(proc->p_argc, proc->p_argv);
+}
+
+static void exe_reset_commands(struct exe *exe)
+{
+	int i;
+
+	for (i = 0; i < exe->e_procs; i++) {
+		exe->e_proc[i].p_cmd = NULL;
+		exe->e_proc[i].p_argc = 0;
+		memset(exe->e_proc[i].p_argv, 0,
+		       sizeof(exe->e_proc[i].p_argv));
+		memset(exe->e_proc[i].p_argbuf, 0,
+		       sizeof(exe->e_proc[i].p_argbuf));
+	}
+	exe->e_procs = 0;
+}
 
 int exe_run_codes(struct code *code, struct exe *exe)
 {
@@ -50,8 +200,13 @@ int exe_run_codes(struct code *code, struct exe *exe)
 
 	switch (code->c_code[pc]) {
 	case OP_USER_CMD:
-		proc = &exe->e_proc[0];
+		if (exe->e_procs >= PROCS)
+			return EXIT_FAILURE;
+		proc = &exe->e_proc[(int)exe->e_procs];
+		memset(proc, 0, sizeof(*proc));
 		c = proc->p_argc;
+		if (c >= TTY_NARG)
+			return EXIT_FAILURE;
 		cid = code->c_code[pc+1];
 		proc->p_cmd = (struct applet *)&usercmds[cid];
 
@@ -66,8 +221,13 @@ int exe_run_codes(struct code *code, struct exe *exe)
 		pc += 2;
 		break;
 	case OP_BLTN_CMD:
-		proc = &exe->e_proc[0];
+		if (exe->e_procs >= PROCS)
+			return EXIT_FAILURE;
+		proc = &exe->e_proc[(int)exe->e_procs];
+		memset(proc, 0, sizeof(*proc));
 		c = proc->p_argc;
+		if (c >= TTY_NARG)
+			return EXIT_FAILURE;
 		cid = code->c_code[pc+1];
 		proc->p_cmd = (struct applet *)&builtins[cid];
 
@@ -82,8 +242,12 @@ int exe_run_codes(struct code *code, struct exe *exe)
 		pc += 2;
 		break;
 	case OP_CMD_ARG:
-		proc = &exe->e_proc[0];
+		if (exe->e_procs <= 0)
+			return EXIT_FAILURE;
+		proc = &exe->e_proc[(int)exe->e_procs - 1];
 		c = proc->p_argc;
+		if (c >= TTY_NARG)
+			return EXIT_FAILURE;
 		sid = code->c_code[pc+1];
 		proc->p_argv[c++] = get_string(sid, code);
 		proc->p_argc = c;
@@ -95,8 +259,12 @@ int exe_run_codes(struct code *code, struct exe *exe)
 		pc += 2;
 		break;
 	case OP_CMD_VARG:
-		proc = &exe->e_proc[0];
+		if (exe->e_procs <= 0)
+			return EXIT_FAILURE;
+		proc = &exe->e_proc[(int)exe->e_procs - 1];
 		c = proc->p_argc;
+		if (c >= TTY_NARG)
+			return EXIT_FAILURE;
 		vid = code->c_code[pc+1];
 		proc->p_argv[c++] = get_symbol_from_variable(vid, code);
 		proc->p_argc = c;
@@ -108,8 +276,12 @@ int exe_run_codes(struct code *code, struct exe *exe)
 		pc += 2;
 		break;
 	case OP_CMD_QARG:
-		proc = &exe->e_proc[0];
+		if (exe->e_procs <= 0)
+			return EXIT_FAILURE;
+		proc = &exe->e_proc[(int)exe->e_procs - 1];
 		c = proc->p_argc;
+		if (c >= TTY_NARG)
+			return EXIT_FAILURE;
 		sid = code->c_code[pc+1];
 		expand_quoted_arg(proc->p_argbuf[c], get_string(sid, code), code);
 		proc->p_argv[c] = proc->p_argbuf[c];
@@ -117,11 +289,15 @@ int exe_run_codes(struct code *code, struct exe *exe)
 
 		pc += 2;
 		break;
+	case OP_PIPE_NEXT:
+		if (exe->e_procs <= 0 || exe->e_procs >= PROCS)
+			return EXIT_FAILURE;
+		pc += 1;
+		break;
 	case OP_CMD_EXE:
-		proc = &exe->e_proc[0];
-		ret = proc->p_cmd->main(proc->p_argc, proc->p_argv);
-		exe->e_procs--;
-		exe->e_proc->p_argc=0;
+		proc = &exe->e_proc[(int)exe->e_procs - 1];
+		ret = exe_execute_commands(exe);
+		exe->e_status = ret;
 
 		DP("Command: %s", proc->p_cmd->name);
 
@@ -131,25 +307,25 @@ int exe_run_codes(struct code *code, struct exe *exe)
 		else
 #endif
 		pc += 1;
+		exe_reset_commands(exe);
 		break;
 	case OP_CMD_EXE_THEN_STACK:
-		proc = &exe->e_proc[0];
-		ret = proc->p_cmd->main(proc->p_argc, proc->p_argv);
+		proc = &exe->e_proc[(int)exe->e_procs - 1];
+		ret = exe_execute_commands(exe);
+		exe->e_status = ret;
 		exe->e_stack[sp] = ret;
-		exe->e_procs--;
-		exe->e_proc->p_argc=0;
 
 		DP("Command: %s --> ret = %d", proc->p_cmd->name, ret);
 		DP("ret --> stack[%d]", ret, sp);
 
 		sp += 1;
 		pc += 1;
+		exe_reset_commands(exe);
 		break;
 	case OP_CMD_EXE_THEN_ASSIGN:
-		proc = &exe->e_proc[0];
-		ret = proc->p_cmd->main(proc->p_argc, proc->p_argv);
-		exe->e_procs--;
-		exe->e_proc->p_argc=0;
+		proc = &exe->e_proc[(int)exe->e_procs - 1];
+		ret = exe_execute_commands(exe);
+		exe->e_status = ret;
 		sprintf(str, "%d", ret);
 		vid = code->c_code[pc+1];
 		set_symbol_to_variable(vid, str, code);
@@ -162,6 +338,7 @@ int exe_run_codes(struct code *code, struct exe *exe)
 		   : &code->c_vtab.v_var[vid * SYMCHARS]);
 
 		pc += 2;
+		exe_reset_commands(exe);
 		break;
 	case OP_JUMP_IF_FALSE:
 		if (exe->e_stack[sp-1] == TEST_FALSE) {

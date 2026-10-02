@@ -1,10 +1,32 @@
 /* sched_cortn.c */
 
+#include <string.h>
+
 #include "cortn.h"
 #include "esh_errno.h"
 #include "esh_sched_backend.h"
 
 static unsigned char esh_lock_held;
+
+struct esh_cortn_slot {
+	struct cortn cs_cortn;
+	esh_proc_entry_t cs_entry;
+	void *cs_arg;
+	unsigned char cs_stack[CORTN_WINDOWS_STACK_SIZE]
+		__attribute__((aligned(16)));
+	unsigned char cs_used;
+};
+
+static struct esh_cortn_slot esh_cortn_slots[ESH_PIPELINE_MAX];
+
+static void esh_cortn_entry(struct cortn *cortn, void *arg)
+{
+	struct esh_cortn_slot *slot;
+
+	(void)cortn;
+	slot = arg;
+	slot->cs_entry(slot->cs_arg);
+}
 
 void esh_sched_backend_lock(void)
 {
@@ -20,6 +42,48 @@ void esh_sched_backend_unlock(void)
 int esh_sched_backend_is_locked(void)
 {
 	return esh_lock_held != 0;
+}
+
+void *esh_sched_backend_prepare(esh_proc_entry_t entry, void *arg)
+{
+	struct esh_cortn_slot *slot;
+	int i;
+
+	if (!entry)
+		return NULL;
+	for (i = 0; i < ESH_PIPELINE_MAX; i++) {
+		slot = &esh_cortn_slots[i];
+		if (slot->cs_used)
+			continue;
+		memset(slot, 0, sizeof(*slot));
+		slot->cs_used = 1;
+		slot->cs_entry = entry;
+		slot->cs_arg = arg;
+		if (cortn_init(&slot->cs_cortn, slot->cs_stack,
+			       sizeof(slot->cs_stack), esh_cortn_entry,
+			       slot) != CORTN_SUCCESS) {
+			memset(slot, 0, sizeof(*slot));
+			return NULL;
+		}
+		return &slot->cs_cortn;
+	}
+	return NULL;
+}
+
+void esh_sched_backend_release(void *backend)
+{
+	struct esh_cortn_slot *slot;
+	int i;
+
+	if (!backend)
+		return;
+	for (i = 0; i < ESH_PIPELINE_MAX; i++) {
+		slot = &esh_cortn_slots[i];
+		if (&slot->cs_cortn != backend)
+			continue;
+		memset(slot, 0, sizeof(*slot));
+		return;
+	}
 }
 
 int esh_sched_backend_yield(struct esh_proc *proc,

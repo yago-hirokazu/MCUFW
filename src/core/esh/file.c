@@ -78,6 +78,21 @@ int esh_fd_install(struct esh_fd_table *table, struct esh_file *file)
 	return -ESH_EMFILE;
 }
 
+int esh_fd_install_at(struct esh_fd_table *table, int fd,
+		      struct esh_file *file)
+{
+	if (!table || fd < 0 || fd >= ESH_OPEN_MAX || !file ||
+	    !file->f_refs)
+		return -ESH_EINVAL;
+	if (table->fd_file[fd])
+		return -ESH_EMFILE;
+	if (file->f_refs == UCHAR_MAX)
+		return -ESH_ENFILE;
+	table->fd_file[fd] = file;
+	file->f_refs++;
+	return fd;
+}
+
 struct esh_file *esh_fd_get(struct esh_fd_table *table, int fd)
 {
 	if (!table || fd < 0 || fd >= ESH_OPEN_MAX)

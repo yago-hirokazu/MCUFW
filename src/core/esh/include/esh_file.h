@@ -50,6 +50,8 @@ struct esh_file *esh_file_alloc(enum esh_file_direction direction,
 				struct esh_pipe_inode *inode);
 void esh_file_put(struct esh_file *file);
 int esh_fd_install(struct esh_fd_table *table, struct esh_file *file);
+int esh_fd_install_at(struct esh_fd_table *table, int fd,
+		      struct esh_file *file);
 struct esh_file *esh_fd_get(struct esh_fd_table *table, int fd);
 int esh_fd_close(struct esh_fd_table *table, int fd);
 

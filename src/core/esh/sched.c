@@ -136,6 +136,31 @@ int esh_proc_bind_backend(struct esh_proc *proc, void *backend)
 	return 0;
 }
 
+int esh_sched_prepare(struct esh_proc *proc, esh_proc_entry_t entry,
+		      void *arg)
+{
+	void *backend;
+
+	if (!proc || !entry || proc->ep_state != ESH_PROC_NEW)
+		return -ESH_EINVAL;
+	backend = esh_sched_backend_prepare(entry, arg);
+	if (!backend)
+		return -ESH_ENOMEM;
+	if (esh_proc_bind_backend(proc, backend) < 0) {
+		esh_sched_backend_release(backend);
+		return -ESH_EINVAL;
+	}
+	return 0;
+}
+
+void esh_sched_release(struct esh_proc *proc)
+{
+	if (!proc || !proc->ep_backend)
+		return;
+	esh_sched_backend_release(proc->ep_backend);
+	proc->ep_backend = NULL;
+}
+
 int esh_sched_resume(struct esh_proc *proc)
 {
 	int result;

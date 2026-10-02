@@ -33,12 +33,14 @@ struct exe {
 	char e_pc;			/* Program counter */
 	char e_sp;			/* Stackk pointer */
 	char e_procs;			/* # of procs to be executed */
+	int e_status;			/* Last command or pipeline status */
 	struct proc e_proc[PROCS];	/* Process */
 };
 
 
 extern struct exe exe;
 int exe_run_codes(struct code *code, struct exe *exe);
+int exe_run_pipeline(struct proc *proc, int count);
 
 
 #ifdef __cplusplus
