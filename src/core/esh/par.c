@@ -36,6 +36,7 @@ do {\
 #define NO_SYMBOL -1
 #define NULL_SYMBOL -2
 
+/* Break execution reads loop metadata before next parser reset */
 struct parse parse[MAXNESTS];
 int nest_p, maxnests;
 int loop_at[MAXNESTS], loops;
@@ -44,6 +45,7 @@ static int parse_error;
 
 
 static void add_code(int byte, struct code *code);
+static void par_mark_error(void);
 static char find_symbol(char *sym, char sym_tab[]);
 static char make_symbol(char *sym, char sym_tab[], char *sym_num);
 extern void set_symbol_to_variable(char var_p, char *sym, struct code *code);
@@ -73,7 +75,9 @@ static void nest_restore_if_needed(int *nest_p, int maxnests);
 static int break_label(struct parse *par, int *loop_at, int loop_p);
 #endif
 
+#if DEBUG_PAR
 static void dump_context(const char *s, struct token *tok);
+#endif
 
 
 char par_make_code(struct token *tok, struct code *code)
@@ -110,11 +114,16 @@ void par_init(void)
 	parse_error = 0;
 }
 
+static void par_mark_error(void)
+{
+	parse_error = 1;
+}
+
 static void add_code(int byte, struct code *code)
 {
 	int c = code->c_codes;
 	if (c >= CODES || parse_error) {
-		parse_error = 1;
+		par_mark_error();
 		return;
 	}
 	code->c_code[c++] = byte;
@@ -152,7 +161,7 @@ static char make_symbol(char *sym, char sym_tab[], char *sym_num)
 	char n2 = n1;
 	if (n1 < 0 || n1 >= SYMBOLS || !sym ||
 	    !memchr(sym, 0, SYMCHARS)) {
-		parse_error = 1;
+		par_mark_error();
 		return NO_SYMBOL;
 	}
 
@@ -182,7 +191,7 @@ extern void set_symbol_to_variable(char var_p, char *sym, struct code *code)
 	struct variable_table *v;
 
 	if (!code || !sym || var_p < 0 || var_p >= SYMBOLS) {
-		parse_error = 1;
+		par_mark_error();
 		return;
 	}
 	v = &code->c_vtab;
@@ -204,7 +213,7 @@ static char make_label(struct code *code)
 {
 	char label_p = code->c_ltab.l_num;
 	if (label_p < 0 || label_p >= LABELS) {
-		parse_error = 1;
+		par_mark_error();
 		return NO_SYMBOL;
 	}
 	DP("make label = %3d", label_p);
@@ -217,7 +226,7 @@ static char set_code_addr_to_label(char label_p, int code_addr,
 {
 	if (label_p < 0 || label_p >= LABELS ||
 	    code_addr < 0 || code_addr > CODES) {
-		parse_error = 1;
+		par_mark_error();
 		return PARINVLD;
 	}
 	DP("l_addr[%d] = %3d", label_p, code_addr);
@@ -375,7 +384,7 @@ _par_make_code(struct parse *par, struct token *tok, struct code *code)
 		DP("par->p_state1 = PAR_HALT");
 		par->p_state1 = PAR_IDLE;
 		ret = PARONGO;
-		/* break; */
+		/* Fall through */
 	case PAR_IDLE:
 		DP("par->p_state1 = PAR_IDLE");
 		ret = parse_idle(par, tok, code);
@@ -670,7 +679,7 @@ parse_if(struct parse *par, struct token *tok, struct code *code)
 {
 	DUMPCX(__func__, tok);
 
-	int label=0, caddr=0, elses=0, status=PARONGO;
+	int label=0, caddr=0, status=PARONGO;
 
 	switch (par->p_state2) {
 	case PAR_IF_LBRACKET:
@@ -708,7 +717,6 @@ parse_if(struct parse *par, struct token *tok, struct code *code)
 			EP("Exceed max nests");
 			goto error;
 		}
-		elses = par->p_elses;
 		if (par->p_elses >= ELSES) {
 			EP("Exceed max elif else statements");
 			goto error;
@@ -865,6 +873,7 @@ static int break_label(struct parse *par, int *loop_at, int loop_p)
 }
 #endif
 
+#if DEBUG_PAR
 static void dump_context(const char *s, struct token *tok)
 {
 	DP("called @ %s", s);
@@ -873,7 +882,7 @@ static void dump_context(const char *s, struct token *tok)
 	   (tok->t_symbol[0]==0) ? "(null)" : tok->t_symbol);
 	DP("nest_p=%d, maxnests=%d",nest_p,maxnests);
 	for (int k=0; k<=maxnests; k++) {
-		DP("&parse[%d]=0x%08X",k,(int)&parse[k]);
+		DP("&parse[%d]=%p", k, (void *)&parse[k]);
 	}
 	for (int k=0; k<=maxnests; k++) {
 		if (k == nest_p) {
@@ -897,6 +906,7 @@ static void dump_context(const char *s, struct token *tok)
 		}
 	}
 }
+#endif
 
 /* EOF */
 

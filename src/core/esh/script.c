@@ -20,6 +20,11 @@ static struct code script_code;
 static struct exe script_exe;
 
 /**************************************************************************
+ * LOCAL FUNCTION PROTOTYPES
+ **************************************************************************/
+static void script_reset_preserving_variables(void);
+
+/**************************************************************************
  * FUNCTION DEFINITIONS
  **************************************************************************/
 void esh_script_init(void)
@@ -32,10 +37,10 @@ void esh_script_init(void)
 
 int esh_script_line(char *line)
 {
-	struct variable_table variables;
 	struct tty_arg args;
 	struct token token;
-	int status;
+	int lex_status;
+	int result;
 	int i;
 
 	memset(&args, 0, sizeof(args));
@@ -44,30 +49,37 @@ int esh_script_line(char *line)
 	if (!args.c || !is_endofline(args.v[args.c - 1][0]))
 		goto error;
 	lex_init();
-	status = LEXDONE;
+	lex_status = LEXDONE;
 	for (i = 0; i < args.c; i++) {
-		status = lex_analyze_token(args.v[i], &token);
-		if (status == LEXQUOTE)
+		lex_status = lex_analyze_token(args.v[i], &token);
+		if (lex_status == LEXQUOTE)
 			continue;
-		if (status == LEXERROR ||
+		if (lex_status == LEXERROR ||
 		    par_make_code(&token, &script_code) == PARINVLD)
 			goto error;
 	}
-	if (status == LEXQUOTE)
+	if (lex_status == LEXQUOTE)
 		goto error;
 	if (parse[0].p_state1 != PAR_IDLE && parse[0].p_state1 != PAR_HALT)
 		return 1;
+	/* Execute before reset so break can read parser loop metadata */
 	while (script_exe.e_pc < script_code.c_codes)
 		if (exe_run_codes(&script_code, &script_exe))
 			goto error;
-	status = script_exe.e_status;
-	variables = script_code.c_vtab;
-	esh_script_init();
-	script_code.c_vtab = variables;
-	return status;
+	result = script_exe.e_status;
+	goto out;
 error:
+	result = -ESH_EINVAL;
+out:
+	script_reset_preserving_variables();
+	return result;
+}
+
+static void script_reset_preserving_variables(void)
+{
+	struct variable_table variables;
+
 	variables = script_code.c_vtab;
 	esh_script_init();
 	script_code.c_vtab = variables;
-	return -ESH_EINVAL;
 }

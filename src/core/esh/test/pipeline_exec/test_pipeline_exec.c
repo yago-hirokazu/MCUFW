@@ -427,6 +427,7 @@ static void test_console_script(void)
 	esh_script_init();
 	CHECK(script_line("echo hello|cat|cat|cat \n") == 0);
 	CHECK(script_line("k = 1 \n") == 0);
+	/* Incomplete block retains parser state and returns one */
 	CHECK(script_line("while [ $k -le 2 ] \n") == 1);
 	CHECK(script_line("do \n") == 1);
 	CHECK(script_line("k = ` expr $k + 1 ` \n") == 1);
@@ -437,8 +438,10 @@ static void test_console_script(void)
 	CHECK(script_line("then \n") == 1);
 	CHECK(script_line("echo \" value $k \"|cat \n") == 1);
 	CHECK(script_line("fi \n") == 0);
+	/* Error reset preserves variable table */
 	CHECK(script_line("echo | \n") == -ESH_EINVAL);
 	CHECK(script_line("test $k -eq 3 \n") == 0);
+	/* Break execution uses loop metadata before script reset */
 	CHECK(script_line("while [ 1 -eq 1 ] \n") == 1);
 	CHECK(script_line("do \n") == 1);
 	CHECK(script_line("while [ 1 -eq 1 ] \n") == 1);

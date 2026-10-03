@@ -51,7 +51,7 @@
 | R7 | Scheduler waiter・release試験 | R1 | done | 試験 |
 | R8 | Executor不正bytecode試験 | R1 | done | 試験 |
 | R9 | Executor検査処理整理 | R8 | done | Refactoring |
-| R10 | Script/parser機械的整理 | R4、R8 | pending | Refactoring |
+| R10 | Script/parser機械的整理 | R4、R8 | done | Refactoring |
 | RV | 全体回帰確認と記録更新 | 選択したR1〜R10 | pending | 検証 |
 
 R6とR7は調査結果により修正が不要な場合、試験追加だけで`done`にできる。
@@ -595,7 +595,7 @@ Executorが不正bytecodeを範囲外参照なしで拒否し、再利用でき�
 
 ### R10: Script/parser機械的整理
 
-状態: `pending`
+状態: `done`
 
 依存: R4、R8
 
@@ -636,6 +636,23 @@ Executorが不正bytecodeを範囲外参照なしで拒否し、再利用でき�
 - Parser test1、test2
 - Executor test1〜12
 - Pipeline script integration cortn/thread O0/O2
+
+#### 実施結果
+
+- `esh_script_line()`の成功・error cleanupを共通出口へ集約
+- variable table退避・reset・復元をprivate helperへ集約
+- lexer状態とcommand結果のlocal変数を分離
+- parser error flag設定を`par_mark_error()`へ集約
+- break実行までparser loop metadataを保持する寿命をコメントで明示
+- 未完block、error後variable保持、break metadata試験を明示
+- debug用context dumpを`DEBUG_PAR`有効時だけbuild
+- 未使用local、暗黙fall-through、debug pointer表示warningを整理
+- Parser test1、test2: pass
+- Executor test1〜12 cortn/thread: pass
+- Pipeline script integration cortn/thread O0/O2: pass
+- `DEBUG_PAR=1` build、pipeline integration: pass
+- 戻り値、rollback、singleton、public API変更なし
+- Cortex-M/RTOS移植には未着手
 
 ### RV: 全体回帰確認と記録更新
 
