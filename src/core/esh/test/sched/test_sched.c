@@ -42,6 +42,12 @@ struct reader_arg {
 	ptrdiff_t last_result;
 };
 
+struct yield_failure_arg {
+	struct esh_wait_chan *chan;
+	int result;
+	int lock_held;
+};
+
 static int failures;
 
 static void writer_entry(void *arg);
@@ -59,11 +65,16 @@ static void test_multiple_waiters(void);
 static void unused_entry(void *arg);
 static void test_prepare_exhaustion(void);
 static void test_release_waiter(void);
+static void test_wake_then_release(void);
+static void yield_failure_entry(void *arg);
+static void test_yield_failure_cleanup(void);
 #ifdef ESH_SCHED_THREAD
 static void race_reader_entry(void *arg);
 static unsigned __stdcall race_writer_entry(void *arg);
 static void test_native_race_and_handles(void);
 #endif
+
+extern void esh_sched_test_fail_next_yield(void);
 
 int main(void)
 {
@@ -72,6 +83,8 @@ int main(void)
 	test_multiple_waiters();
 	test_prepare_exhaustion();
 	test_release_waiter();
+	test_wake_then_release();
+	test_yield_failure_cleanup();
 #ifdef ESH_SCHED_THREAD
 	test_native_race_and_handles();
 #endif
@@ -375,6 +388,7 @@ static void test_release_waiter(void)
 	init_proc(&procs[1], reader_entry, &reader);
 	CHECK(esh_sched_resume(&procs[1]) == 0);
 	CHECK(procs[1].ep_state == ESH_PROC_WAIT_READ);
+	CHECK(run_scheduler(&procs[1], 1) == -1);
 	esh_sched_release(&procs[1]);
 	CHECK(inode->pi_read_chan.wc_head == NULL);
 	CHECK(inode->pi_read_chan.wc_tail == NULL);
@@ -384,6 +398,79 @@ static void test_release_waiter(void)
 	esh_kernel_unlock();
 	CHECK(esh_file_in_use() == 0);
 	CHECK(esh_pipe_in_use() == 0);
+}
+
+static void test_wake_then_release(void)
+{
+	struct esh_proc procs[2];
+	struct reader_arg reader;
+	struct esh_pipe_inode *inode;
+	unsigned char byte;
+	int write_fd;
+	int read_fd;
+
+	esh_file_system_init();
+	esh_proc_init(&procs[0]);
+	esh_proc_init(&procs[1]);
+	CHECK(connect_pipe(&procs[0], &procs[1], &write_fd, &read_fd) == 0);
+	inode = esh_fd_get(&procs[1].ep_fd_table, read_fd)->f_inode;
+	memset(&reader, 0, sizeof(reader));
+	reader.data = &byte;
+	reader.capacity = 1;
+	reader.fd = read_fd;
+	init_proc(&procs[1], reader_entry, &reader);
+	CHECK(esh_sched_resume(&procs[1]) == 0);
+	CHECK(procs[1].ep_state == ESH_PROC_WAIT_READ);
+	esh_kernel_lock();
+	esh_wakeup(&inode->pi_read_chan);
+	esh_kernel_unlock();
+	CHECK(procs[1].ep_state == ESH_PROC_RUNNABLE);
+	CHECK(inode->pi_read_chan.wc_head == NULL);
+	CHECK(inode->pi_read_chan.wc_tail == NULL);
+	esh_sched_release(&procs[1]);
+	CHECK(procs[1].ep_backend == NULL);
+	CHECK(inode->pi_read_chan.wc_head == NULL);
+	CHECK(inode->pi_read_chan.wc_tail == NULL);
+	esh_kernel_lock();
+	esh_close_all(&procs[0].ep_fd_table);
+	esh_close_all(&procs[1].ep_fd_table);
+	esh_kernel_unlock();
+	CHECK(esh_file_in_use() == 0);
+	CHECK(esh_pipe_in_use() == 0);
+}
+
+static void yield_failure_entry(void *arg)
+{
+	struct yield_failure_arg *failure;
+
+	failure = arg;
+	esh_kernel_lock();
+	failure->result = esh_sleep(failure->chan, ESH_WAIT_READ);
+	failure->lock_held = esh_kernel_is_locked();
+	esh_kernel_unlock();
+}
+
+static void test_yield_failure_cleanup(void)
+{
+	struct yield_failure_arg failure;
+	struct esh_wait_chan chan;
+	struct esh_proc proc;
+
+	memset(&chan, 0, sizeof(chan));
+	esh_proc_init(&proc);
+	failure.chan = &chan;
+	failure.result = 0;
+	failure.lock_held = 0;
+	init_proc(&proc, yield_failure_entry, &failure);
+	esh_sched_test_fail_next_yield();
+	CHECK(esh_sched_resume(&proc) == 0);
+	CHECK(failure.result == -ESH_EINVAL);
+	CHECK(failure.lock_held);
+	CHECK(chan.wc_head == NULL);
+	CHECK(chan.wc_tail == NULL);
+	CHECK(proc.ep_wait_chan == NULL);
+	CHECK(proc.ep_wait_next == NULL);
+	esh_sched_release(&proc);
 }
 
 #ifdef ESH_SCHED_THREAD

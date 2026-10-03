@@ -7,6 +7,7 @@ include ../../target/windows/sched_backend.mk
 CFLAGS = -mno-ms-bitfields -g $(OPT)
 CFLAGS += -Wall -Wextra -Werror -pedantic
 CFLAGS += -I../../include -I../../target/windows
+CFLAGS += -DESH_SCHED_TEST
 CFLAGS += $(ESH_SCHED_CPPFLAGS)
 
 OBJS = $(OUTDIR)/test_sched.o

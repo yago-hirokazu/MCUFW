@@ -6,8 +6,23 @@
 #include "esh_sched.h"
 #include "esh_sched_backend.h"
 
+#ifdef ESH_SCHED_TEST
+static int esh_test_fail_yield;
+#endif
+
 static void esh_wait_remove(struct esh_wait_chan *chan,
 			    struct esh_proc *proc);
+
+#ifdef ESH_SCHED_TEST
+void esh_sched_test_fail_next_yield(void);
+#endif
+
+#ifdef ESH_SCHED_TEST
+void esh_sched_test_fail_next_yield(void)
+{
+	esh_test_fail_yield = 1;
+}
+#endif
 
 void esh_kernel_lock(void)
 {
@@ -53,7 +68,16 @@ int esh_sleep(void *channel, enum esh_wait_reason reason)
 		chan->wc_head = proc;
 	chan->wc_tail = proc;
 
+#ifdef ESH_SCHED_TEST
+	if (esh_test_fail_yield) {
+		esh_test_fail_yield = 0;
+		result = -ESH_EINVAL;
+	} else {
+		result = esh_sched_backend_yield(proc, reason);
+	}
+#else
 	result = esh_sched_backend_yield(proc, reason);
+#endif
 	if (result != 0) {
 		esh_wait_remove(chan, proc);
 		proc->ep_state = ESH_PROC_ERROR;

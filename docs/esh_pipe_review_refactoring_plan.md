@@ -48,7 +48,7 @@
 | R4 | Pipeline失敗・再利用試験 | R1 | done | 試験 |
 | R5 | Pipeline cleanup整理 | R4 | done | Refactoring |
 | R6 | Pipe close・部分転送試験 | R1 | done | 試験 |
-| R7 | Scheduler waiter・release試験 | R1 | pending | 試験 |
+| R7 | Scheduler waiter・release試験 | R1 | done | 試験 |
 | R8 | Executor不正bytecode試験 | R1 | pending | 試験 |
 | R9 | Executor検査処理整理 | R8 | pending | Refactoring |
 | R10 | Script/parser機械的整理 | R4、R8 | pending | Refactoring |
@@ -443,7 +443,7 @@ EOF、EPIPE、部分転送、close wakeupの現行動作を明示する。
 
 ### R7: Scheduler waiter・release試験
 
-状態: `pending`
+状態: `done`
 
 #### 目的
 
@@ -476,6 +476,21 @@ wait list、wake、release、thread joinの境界を試験で固定する。
 
 - Scheduler cortn/thread O0/O2
 - Pipe cortn/thread O0
+
+#### 実施結果
+
+- 複数waiterを全wakeし、空条件を再検査する既存試験を確認
+- 待機processのreleaseでwait listから切り離す既存試験を確認
+- wake直後のreleaseでwait listとbackendを回収する試験を追加
+- test build限定one-shot hookでbackend yield失敗を注入
+- yield失敗時にwait list、`ep_wait_chan`、`ep_wait_next`を回収する試験を追加
+- runnableなし、unfinishedありをdeadlockとして検出する試験を追加
+- native thread handle数が100反復後に増加しない既存試験を確認
+- controllerとworkerのTLS current process分離を既存試験で確認
+- Scheduler cortn/thread × O0/O2、`-Werror`: pass
+- Pipe cortn/thread O0、`-Werror`: pass
+- Windows scheduler backend変更なし
+- Cortex-M/RTOS移植には未着手
 
 ### R8: Executor不正bytecode試験
 
