@@ -1,6 +1,6 @@
 # esh pipe API・データモデル
 
-更新日: 2026-10-02
+更新日: 2026-10-03
 
 ## 対象範囲
 
@@ -84,8 +84,13 @@ pipeline全体の終了statusは最後のcommandのstatusとする。途中のco
 
 ## Coroutine引き継ぎ条件
 
-Windows版coroutine stack初期容量は16 KiBとする。両端にguard patternを置き、
-yieldと終了時に破壊を検査し、使用量watermarkを取得できるようにする。
+Windows版coroutine stack容量は64 KiBとする。16 KiBではCRT formattingの
+結合試験中にcontext returnで問題が発生したため、64 KiBへ拡大した。
+この値はWindows coroutine backend専用である。MCU stack容量はMilestone 10の
+移植時に決定し、本書では規定しない。
+
+stack両端にguard patternを置き、yieldと終了時に破壊を検査し、使用量
+watermarkを取得できるようにする。
 
 Microsoft x64 ABIの非volatile整数レジスタ、`XMM6`～`XMM15`、x87 control word、
 `MXCSR`を保存・復元する。Windows上でFPU/SIMD利用を制限する方式は採用しない。

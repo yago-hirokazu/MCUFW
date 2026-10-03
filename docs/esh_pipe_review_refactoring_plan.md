@@ -44,7 +44,7 @@
 | R0 | Baseline固定と試験入口整理 | なし | done | 基準 |
 | R1 | 追加ファイルのコーディング規約整備 | R0 | done | Refactoring |
 | R2 | Debug build修正 | R1 | done | 不具合修正 |
-| R3 | 文書と実装の整合 | R1 | pending | 文書 |
+| R3 | 文書と実装の整合 | R1 | done | 文書 |
 | R4 | Pipeline失敗・再利用試験 | R1 | pending | 試験 |
 | R5 | Pipeline cleanup整理 | R4 | pending | Refactoring |
 | R6 | Pipe close・部分転送試験 | R1 | pending | 試験 |
@@ -257,7 +257,7 @@ Test code:
 
 ### R3: 文書と実装の整合
 
-状態: `pending`
+状態: `done`
 
 #### 目的
 
@@ -285,6 +285,17 @@ Test code:
 
 - 文書内定数とheader定数の目視照合
 - C/header変更がなければbuild不要
+
+#### 実施結果
+
+- `esh_pipe_api.md` と `cortn_windows.md` の16 KiB記述を64 KiBへ訂正
+- 16 KiBでのCRT formatting結合試験失敗と64 KiBへの拡大理由を記録
+- 64 KiBがWindows coroutine backend専用値であることを明記
+- MCU stack容量はMilestone 10で決定する未確定事項として維持
+- stdio、thread、regression文書に矛盾がないことを確認
+- `CORTN_WINDOWS_STACK_SIZE` の64 KiBと文書内定数を目視照合
+- C/header変更なしのためbuild未実施
+- `git diff --check`: pass
 
 ### R4: Pipeline失敗・再利用試験
 

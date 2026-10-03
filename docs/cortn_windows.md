@@ -1,6 +1,6 @@
 # Windows stackful coroutine
 
-更新日: 2026-10-02
+更新日: 2026-10-03
 
 ## 役割
 
@@ -42,8 +42,10 @@ context構造のassembler依存offsetは`cortn_context.c`でコンパイル時�
 
 ## Stack
 
-初期Windows stack容量は16 KiBとする。stack領域は利用者が所有し、coroutineの
-実行中と待機中は解放してはならない。
+Windows stack容量は64 KiBとする。16 KiBではCRT formattingの結合試験中に
+context returnで問題が発生したため、64 KiBへ拡大した。この値はWindows
+coroutine backend専用であり、MCU stack容量はMilestone 10の移植時に決定する。
+stack領域は利用者が所有し、coroutineの実行中と待機中は解放してはならない。
 
 上下16 byteをguard patternに使用する。残りをwatermark patternで初期化し、
 使用量を測定する。guard検査はresume前後に行う。guardは事後検出であり、
