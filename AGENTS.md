@@ -132,9 +132,9 @@ mingw64 シェルで `src/core/esh/test/exe` に移動し、下記を実行し�
 
 ## 共通コーディングルール
 
-typedef を使うと型が一目でわからなくなり、プログラムが読みにくくなるため、使わないものとする。
+1. typedef を使うと型が一目でわからなくなり、プログラムが読みにくくなるため、使わないものとする。
 
-ソースファイルは下記の構成とする。`/MCUFW/src/core/esh/tty.c`がモデル。
+2. ソースファイルは下記の構成とする。`/MCUFW/src/core/esh/tty.c`がモデル。
 - standard include files
 - project-specific include files
 - (exported) global variable definitions
@@ -147,6 +147,15 @@ typedef を使うと型が一目でわからなくなり、プログラムが読
 - export function definitions
 - local (static) function definitions
 
+
+3. ヘッダファイルのガードマクロは下記の書式とする
+
+``` c
+#ifndef __NAME_H__
+#define __NAME_H__
+...
+#endif
+```
 
 ## ターゲット別コーディングルール
 
