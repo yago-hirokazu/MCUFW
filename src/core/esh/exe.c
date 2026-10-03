@@ -45,15 +45,45 @@ static void exe_cleanup_pipeline(struct proc *proc, int pipe_count,
 static int exe_connect_proc(struct proc *writer, struct proc *reader);
 static int exe_execute_commands(struct exe *exe);
 static void exe_reset_commands(struct exe *exe);
+static int exe_instruction_width(int op);
+static int exe_valid_context(const struct code *code, const struct exe *exe);
+static int exe_valid_applet(int op, int operand);
+static int exe_valid_string(const struct code *code, int operand);
+static int exe_valid_variable(const struct code *code, int operand,
+			      int check_value);
+static int exe_valid_label(const struct code *code, int operand);
+static int exe_valid_operand(const struct code *code, int op, int operand);
+static int exe_valid_stack(const struct code *code, const struct exe *exe,
+			   int op);
+static int exe_valid_process(const struct exe *exe, int op);
 
-static int exe_valid_instruction(struct code *code, struct exe *exe)
+static int exe_instruction_width(int op)
 {
-	const struct applet *table;
-	int op;
-	int operand;
-	int width;
-	int i;
+	switch (op) {
+	case OP_NOP:
+	case OP_CMD_EXE:
+	case OP_CMD_EXE_THEN_STACK:
+	case OP_PIPE_NEXT:
+		return 1;
+	case OP_USER_CMD:
+	case OP_BLTN_CMD:
+	case OP_CMD_ARG:
+	case OP_CMD_VARG:
+	case OP_CMD_QARG:
+	case OP_CMD_EXE_THEN_ASSIGN:
+	case OP_JUMP_IF_FALSE:
+	case OP_JUMP:
+	case OP_PUSH_SYMBOL:
+	case OP_POP_SYMBOL_THEN_ASSIGN:
+	case OP_BREAK_LOOP:
+		return 2;
+	default:
+		return 0;
+	}
+}
 
+static int exe_valid_context(const struct code *code, const struct exe *exe)
+{
 	if (!code || !exe || code->c_codes < 0 || code->c_codes > CODES ||
 	    exe->e_pc < 0 || exe->e_pc >= code->c_codes ||
 	    exe->e_sp < 0 || exe->e_sp > STACKS ||
@@ -62,71 +92,105 @@ static int exe_valid_instruction(struct code *code, struct exe *exe)
 	    code->c_vtab.v_num < 0 || code->c_vtab.v_num > SYMBOLS ||
 	    code->c_ltab.l_num < 0 || code->c_ltab.l_num > LABELS)
 		return 0;
-	op = code->c_code[exe->e_pc];
-	if (op < OP_NOP || op > OP_PIPE_NEXT)
+	return 1;
+}
+
+static int exe_valid_applet(int op, int operand)
+{
+	const struct applet *table;
+	int i;
+
+	table = op == OP_USER_CMD ? usercmds : builtins;
+	for (i = 0; table[i].name; i++)
+		if (i == operand)
+			return table[i].main != NULL;
+	return 0;
+}
+
+static int exe_valid_string(const struct code *code, int operand)
+{
+	if (operand < 0 || operand >= code->c_stab.s_num)
 		return 0;
-	width = (op == OP_NOP || op == OP_CMD_EXE ||
-		 op == OP_CMD_EXE_THEN_STACK || op == OP_PIPE_NEXT) ? 1 : 2;
-	if (exe->e_pc > code->c_codes - width)
+	return memchr(&code->c_stab.s_str[operand * SYMCHARS], 0,
+		      SYMCHARS) != NULL;
+}
+
+static int exe_valid_variable(const struct code *code, int operand,
+			      int check_value)
+{
+	if (operand < 0 || operand >= code->c_vtab.v_num)
 		return 0;
-	operand = width == 2 ? code->c_code[exe->e_pc + 1] : 0;
-	if (width == 2 && operand < 0)
+	if (!check_value)
+		return 1;
+	return memchr(&code->c_vtab.v_val[operand * SYMCHARS], 0,
+		      SYMCHARS) != NULL;
+}
+
+static int exe_valid_label(const struct code *code, int operand)
+{
+	if (operand < 0 || operand >= code->c_ltab.l_num)
 		return 0;
+	return code->c_ltab.l_addr[operand] >= 0 &&
+	       code->c_ltab.l_addr[operand] <= code->c_codes;
+}
+
+static int exe_valid_operand(const struct code *code, int op, int operand)
+{
 	switch (op) {
 	case OP_USER_CMD:
 	case OP_BLTN_CMD:
-		table = op == OP_USER_CMD ? usercmds : builtins;
-		for (i = 0; table[i].name; i++)
-			if (i == operand)
-				return table[i].main && exe->e_procs < PROCS;
-		return 0;
+		return exe_valid_applet(op, operand);
 	case OP_CMD_ARG:
 	case OP_CMD_QARG:
-		if (operand >= code->c_stab.s_num ||
-		    !memchr(&code->c_stab.s_str[operand * SYMCHARS],
-			    0, SYMCHARS))
-			return 0;
-		break;
+	case OP_PUSH_SYMBOL:
+		return exe_valid_string(code, operand);
 	case OP_CMD_VARG:
+		return exe_valid_variable(code, operand, 1);
 	case OP_CMD_EXE_THEN_ASSIGN:
 	case OP_POP_SYMBOL_THEN_ASSIGN:
-		if (operand >= code->c_vtab.v_num)
-			return 0;
-		if (op == OP_CMD_VARG &&
-		    !memchr(&code->c_vtab.v_val[operand * SYMCHARS],
-			    0, SYMCHARS))
-			return 0;
-		break;
+		return exe_valid_variable(code, operand, 0);
 	case OP_JUMP:
 	case OP_JUMP_IF_FALSE:
 	case OP_BREAK_LOOP:
-		if (operand >= code->c_ltab.l_num ||
-		    code->c_ltab.l_addr[operand] < 0 ||
-		    code->c_ltab.l_addr[operand] > code->c_codes)
-			return 0;
-		break;
-	case OP_PUSH_SYMBOL:
-		if (operand >= code->c_stab.s_num ||
-		    !memchr(&code->c_stab.s_str[operand * SYMCHARS],
-			    0, SYMCHARS))
-			return 0;
-		break;
+		return exe_valid_label(code, operand);
 	default:
-		break;
+		return 1;
 	}
+}
+
+static int exe_valid_stack(const struct code *code, const struct exe *exe,
+			   int op)
+{
 	if ((op == OP_PUSH_SYMBOL || op == OP_CMD_EXE_THEN_STACK) &&
 	    exe->e_sp == STACKS)
 		return 0;
-	if ((op == OP_JUMP_IF_FALSE || op == OP_POP_SYMBOL_THEN_ASSIGN) &&
-	    !exe->e_sp)
+	if (op != OP_JUMP_IF_FALSE && op != OP_POP_SYMBOL_THEN_ASSIGN)
+		return 1;
+	if (!exe->e_sp)
 		return 0;
 	if (op == OP_POP_SYMBOL_THEN_ASSIGN &&
 	    (exe->e_stack[exe->e_sp - 1] < 0 ||
 	     exe->e_stack[exe->e_sp - 1] >= code->c_stab.s_num))
 		return 0;
-	if (op >= OP_CMD_ARG && op <= OP_CMD_EXE_THEN_ASSIGN) {
-		struct proc *proc;
+	return 1;
+}
 
+static int exe_valid_process(const struct exe *exe, int op)
+{
+	const struct proc *proc;
+
+	switch (op) {
+	case OP_USER_CMD:
+	case OP_BLTN_CMD:
+		return exe->e_procs < PROCS;
+	case OP_PIPE_NEXT:
+		return exe->e_procs > 0 && exe->e_procs < PROCS;
+	case OP_CMD_ARG:
+	case OP_CMD_VARG:
+	case OP_CMD_QARG:
+	case OP_CMD_EXE:
+	case OP_CMD_EXE_THEN_STACK:
+	case OP_CMD_EXE_THEN_ASSIGN:
 		if (!exe->e_procs)
 			return 0;
 		proc = &exe->e_proc[exe->e_procs - 1];
@@ -134,8 +198,34 @@ static int exe_valid_instruction(struct code *code, struct exe *exe)
 		    proc->p_argc < 1 || proc->p_argc > TTY_NARG ||
 		    !proc->p_argv[0])
 			return 0;
+		if ((op == OP_CMD_ARG || op == OP_CMD_VARG ||
+		     op == OP_CMD_QARG) && proc->p_argc == TTY_NARG)
+			return 0;
+		return 1;
+	default:
+		return 1;
 	}
-	return 1;
+}
+
+static int exe_valid_instruction(struct code *code, struct exe *exe)
+{
+	int op;
+	int operand;
+	int width;
+
+	if (!exe_valid_context(code, exe))
+		return 0;
+	op = code->c_code[exe->e_pc];
+	width = exe_instruction_width(op);
+	if (!width || exe->e_pc > code->c_codes - width)
+		return 0;
+	operand = width == 2 ? code->c_code[exe->e_pc + 1] : 0;
+	if (width == 2 &&
+	    (operand < 0 || !exe_valid_operand(code, op, operand)))
+		return 0;
+	if (!exe_valid_stack(code, exe, op))
+		return 0;
+	return exe_valid_process(exe, op);
 }
 
 static void exe_proc_entry(void *arg)
@@ -314,13 +404,9 @@ int exe_run_codes(struct code *code, struct exe *exe)
 
 	switch (code->c_code[pc]) {
 	case OP_USER_CMD:
-		if (exe->e_procs >= PROCS)
-			return EXIT_FAILURE;
 		proc = &exe->e_proc[(int)exe->e_procs];
 		memset(proc, 0, sizeof(*proc));
 		c = proc->p_argc;
-		if (c >= TTY_NARG)
-			return EXIT_FAILURE;
 		cid = code->c_code[pc+1];
 		proc->p_cmd = (struct applet *)&usercmds[cid];
 
@@ -335,13 +421,9 @@ int exe_run_codes(struct code *code, struct exe *exe)
 		pc += 2;
 		break;
 	case OP_BLTN_CMD:
-		if (exe->e_procs >= PROCS)
-			return EXIT_FAILURE;
 		proc = &exe->e_proc[(int)exe->e_procs];
 		memset(proc, 0, sizeof(*proc));
 		c = proc->p_argc;
-		if (c >= TTY_NARG)
-			return EXIT_FAILURE;
 		cid = code->c_code[pc+1];
 		proc->p_cmd = (struct applet *)&builtins[cid];
 
@@ -356,12 +438,8 @@ int exe_run_codes(struct code *code, struct exe *exe)
 		pc += 2;
 		break;
 	case OP_CMD_ARG:
-		if (exe->e_procs <= 0)
-			return EXIT_FAILURE;
 		proc = &exe->e_proc[(int)exe->e_procs - 1];
 		c = proc->p_argc;
-		if (c >= TTY_NARG)
-			return EXIT_FAILURE;
 		sid = code->c_code[pc+1];
 		proc->p_argv[c++] = get_string(sid, code);
 		proc->p_argc = c;
@@ -373,12 +451,8 @@ int exe_run_codes(struct code *code, struct exe *exe)
 		pc += 2;
 		break;
 	case OP_CMD_VARG:
-		if (exe->e_procs <= 0)
-			return EXIT_FAILURE;
 		proc = &exe->e_proc[(int)exe->e_procs - 1];
 		c = proc->p_argc;
-		if (c >= TTY_NARG)
-			return EXIT_FAILURE;
 		vid = code->c_code[pc+1];
 		proc->p_argv[c++] = get_symbol_from_variable(vid, code);
 		proc->p_argc = c;
@@ -390,12 +464,8 @@ int exe_run_codes(struct code *code, struct exe *exe)
 		pc += 2;
 		break;
 	case OP_CMD_QARG:
-		if (exe->e_procs <= 0)
-			return EXIT_FAILURE;
 		proc = &exe->e_proc[(int)exe->e_procs - 1];
 		c = proc->p_argc;
-		if (c >= TTY_NARG)
-			return EXIT_FAILURE;
 		sid = code->c_code[pc+1];
 		expand_quoted_arg(proc->p_argbuf[c], get_string(sid, code), code);
 		proc->p_argv[c] = proc->p_argbuf[c];
@@ -404,8 +474,6 @@ int exe_run_codes(struct code *code, struct exe *exe)
 		pc += 2;
 		break;
 	case OP_PIPE_NEXT:
-		if (exe->e_procs <= 0 || exe->e_procs >= PROCS)
-			return EXIT_FAILURE;
 		pc += 1;
 		break;
 	case OP_CMD_EXE:

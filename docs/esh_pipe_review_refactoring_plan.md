@@ -50,7 +50,7 @@
 | R6 | Pipe close・部分転送試験 | R1 | done | 試験 |
 | R7 | Scheduler waiter・release試験 | R1 | done | 試験 |
 | R8 | Executor不正bytecode試験 | R1 | done | 試験 |
-| R9 | Executor検査処理整理 | R8 | pending | Refactoring |
+| R9 | Executor検査処理整理 | R8 | done | Refactoring |
 | R10 | Script/parser機械的整理 | R4、R8 | pending | Refactoring |
 | RV | 全体回帰確認と記録更新 | 選択したR1〜R10 | pending | 検証 |
 
@@ -544,7 +544,7 @@ Executorが不正bytecodeを範囲外参照なしで拒否し、再利用でき�
 
 ### R9: Executor検査処理整理
 
-状態: `pending`
+状態: `done`
 
 依存: R8
 
@@ -578,6 +578,20 @@ Executorが不正bytecodeを範囲外参照なしで拒否し、再利用でき�
 - Executor test1〜10
 - Parser test1、test2
 - Pipeline executor cortn/thread O0/O2
+
+#### 実施結果
+
+- 命令幅判定を`exe_instruction_width()`へ集約
+- context、operand、stack、process検査をprivate helperへ分離
+- opcodeごとのoperand種別と命令幅をswitchで明示
+- process容量、引数上限、pipeline境界の重複検査を実行switchから除去
+- process容量、引数上限、空pipelineの拒否試験を追加
+- Pipeline executor cortn/thread O0/O2: pass
+- Executor test1〜10 cortn/thread: golden一致
+- Parser test1、test2: pass
+- `exe.c` cortn/thread、O2、`-Werror`: pass
+- public API、valid bytecodeの意味、scheduler backend変更なし
+- Cortex-M/RTOS移植には未着手
 
 ### R10: Script/parser機械的整理
 

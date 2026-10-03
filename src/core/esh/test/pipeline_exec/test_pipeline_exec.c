@@ -350,6 +350,9 @@ static void test_executor_bounds(void)
 	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
 	init_executor_instruction(&code, &executor, OP_USER_CMD, 999);
 	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
+	init_executor_instruction(&code, &executor, OP_BLTN_CMD, C_ECHO);
+	executor.e_procs = PROCS;
+	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
 
 	init_executor_instruction(&code, &executor, OP_PUSH_SYMBOL, -1);
 	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
@@ -387,12 +390,17 @@ static void test_executor_bounds(void)
 	code.c_stab.s_num = 1;
 	code.c_stab.s_str[0] = 0;
 	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
+	init_command(&executor.e_proc[0], &echo_applet);
+	executor.e_proc[0].p_argc = TTY_NARG;
+	executor.e_procs = 1;
+	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
 	init_executor_instruction(&code, &executor, OP_CMD_EXE, 0);
 	code.c_codes = 1;
 	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
 
 	init_executor_instruction(&code, &executor, OP_PIPE_NEXT, 0);
 	code.c_codes = 1;
+	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
 	executor.e_procs = PROCS;
 	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
 
