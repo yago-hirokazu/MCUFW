@@ -40,6 +40,8 @@ extern char *get_string(char id, struct code *code);
 static void expand_quoted_arg(char *dst, char *src, struct code *code);
 static void exe_proc_entry(void *arg);
 static void exe_close_proc_fds(struct proc *proc, int count);
+static void exe_cleanup_pipeline(struct proc *proc, int pipe_count,
+				 int prepared);
 static int exe_connect_proc(struct proc *writer, struct proc *reader);
 static int exe_execute_commands(struct exe *exe);
 static void exe_reset_commands(struct exe *exe);
@@ -158,6 +160,16 @@ static void exe_close_proc_fds(struct proc *proc, int count)
 	esh_kernel_unlock();
 }
 
+static void exe_cleanup_pipeline(struct proc *proc, int pipe_count,
+				 int prepared)
+{
+	int i;
+
+	exe_close_proc_fds(proc, pipe_count + 1);
+	for (i = 0; i < prepared; i++)
+		esh_sched_release(&proc[i].p_exec);
+}
+
 static int exe_connect_proc(struct proc *writer, struct proc *reader)
 {
 	struct esh_proc owner;
@@ -189,6 +201,7 @@ out:
 int exe_run_pipeline(struct proc *proc, int count)
 {
 	int finished;
+	int pipe_count;
 	int prepared;
 	int progress;
 	int result;
@@ -205,17 +218,19 @@ int exe_run_pipeline(struct proc *proc, int count)
 	for (i = 0; i < count; i++) {
 		esh_proc_init(&proc[i].p_exec);
 	}
+	pipe_count = 0;
+	prepared = 0;
 	for (i = 0; i < count - 1; i++) {
 		result = exe_connect_proc(&proc[i], &proc[i + 1]);
 		if (result < 0)
-			goto close_fds;
+			goto out;
+		pipe_count++;
 	}
-	prepared = 0;
 	for (i = 0; i < count; i++) {
 		result = esh_sched_prepare(&proc[i].p_exec, exe_proc_entry,
 					   &proc[i]);
 		if (result < 0)
-			goto release;
+			goto out;
 		prepared++;
 	}
 
@@ -229,11 +244,11 @@ int exe_run_pipeline(struct proc *proc, int count)
 				continue;
 			}
 			if (proc[i].p_exec.ep_state == ESH_PROC_ERROR)
-				goto release;
+				goto out;
 			if (proc[i].p_exec.ep_state != ESH_PROC_RUNNABLE)
 				continue;
 			if (esh_sched_resume(&proc[i].p_exec) < 0)
-				goto release;
+				goto out;
 			progress = 1;
 		}
 		if (finished == count) {
@@ -244,14 +259,8 @@ int exe_run_pipeline(struct proc *proc, int count)
 			break;
 	}
 
-release:
-	exe_close_proc_fds(proc, count);
-	for (i = 0; i < prepared; i++)
-		esh_sched_release(&proc[i].p_exec);
-	return result;
-
-close_fds:
-	exe_close_proc_fds(proc, count);
+out:
+	exe_cleanup_pipeline(proc, pipe_count, prepared);
 	return result;
 }
 

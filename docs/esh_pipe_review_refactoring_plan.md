@@ -46,7 +46,7 @@
 | R2 | Debug build修正 | R1 | done | 不具合修正 |
 | R3 | 文書と実装の整合 | R1 | done | 文書 |
 | R4 | Pipeline失敗・再利用試験 | R1 | done | 試験 |
-| R5 | Pipeline cleanup整理 | R4 | pending | Refactoring |
+| R5 | Pipeline cleanup整理 | R4 | done | Refactoring |
 | R6 | Pipe close・部分転送試験 | R1 | pending | 試験 |
 | R7 | Scheduler waiter・release試験 | R1 | pending | 試験 |
 | R8 | Executor不正bytecode試験 | R1 | pending | 試験 |
@@ -343,7 +343,7 @@ Pipeline準備失敗後のrollbackと次回実行を試験で固定する。
 
 ### R5: Pipeline cleanup整理
 
-状態: `pending`
+状態: `done`
 
 依存: R4
 
@@ -376,6 +376,19 @@ Pipelineの成功・失敗経路を、所有段階が読み取れる終了処理
 - R4全試験
 - Pipe、scheduler cortn/thread O0
 - Executor test1〜10
+
+#### 実施結果
+
+- 作成済みpipe数を`pipe_count`で明示
+- 準備済みbackend数を`prepared`で明示
+- 成功、pipe確保失敗、backend準備失敗、実行失敗を単一cleanupへ集約
+- cleanupをfd close後にbackend release/joinする順序で共通化
+- 成功時に最後のcommand statusを返す規則を維持
+- R4 Pipeline executor cortn/thread × O0/O2: pass
+- Pipe、scheduler cortn/thread O0: pass
+- Executor test1〜10 cortn/thread: pass
+- 既存のshell、parser warningのみで新規warningなし
+- Cortex-M/RTOS移植には未着手
 
 ### R6: Pipe close・部分転送試験
 
