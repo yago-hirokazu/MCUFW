@@ -19,7 +19,7 @@
 			__FNAME__,__func__,__LINE__,		\
 			##__VA_ARGS__				\
 			);					\
-		ffush(stdout);					\
+		fflush(stdout);				\
 	} while (0);
 #else
 #define DP(fmt, ...)

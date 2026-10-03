@@ -43,7 +43,7 @@
 |---|---|---|---|---|
 | R0 | Baseline固定と試験入口整理 | なし | done | 基準 |
 | R1 | 追加ファイルのコーディング規約整備 | R0 | done | Refactoring |
-| R2 | Debug build修正 | R1 | pending | 不具合修正 |
+| R2 | Debug build修正 | R1 | done | 不具合修正 |
 | R3 | 文書と実装の整合 | R1 | pending | 文書 |
 | R4 | Pipeline失敗・再利用試験 | R1 | pending | 試験 |
 | R5 | Pipeline cleanup整理 | R4 | pending | Refactoring |
@@ -216,7 +216,7 @@ Test code:
 
 ### R2: Debug build修正
 
-状態: `pending`
+状態: `done`
 
 #### 目的
 
@@ -244,6 +244,16 @@ Test code:
 
 - 対象debug build
 - Pipeline executor cortn/thread O0
+
+#### 実施結果
+
+- `run.c` の debug print macro にある `ffush()` を `fflush()` に修正
+- `DEBUG_SHELL` を build option から上書き可能に変更
+- `DEBUG_SHELL=1` の最小 compile 確認に合格
+- coroutine/thread 両 backend の debug pipeline 結合試験に合格
+- debug print が pipeline payload に混入しないことを確認
+- `DEBUG_SHELL` の既定値 `0` を維持し、通常 build の動作を変更しない構成
+- Cortex-M/RTOS 移植には未着手
 
 ### R3: 文書と実装の整合
 
