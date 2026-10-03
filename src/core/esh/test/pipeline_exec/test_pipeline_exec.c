@@ -455,20 +455,32 @@ static void test_parser_bounds(void)
 
 static void test_pipe_exhaustion_cleanup(void)
 {
-	struct esh_proc blocker;
-	struct proc proc[PROCS];
+	struct esh_proc blockers[ESH_PIPE_MAX - 1];
+	struct proc proc[3];
+	size_t j;
 	int fd[2];
+	int i;
 
-	esh_proc_init(&blocker);
-	CHECK(esh_pipe_for_proc(&blocker, fd) == 0);
+	for (i = 0; i < ESH_PIPE_MAX - 1; i++) {
+		esh_proc_init(&blockers[i]);
+		CHECK(esh_pipe_for_proc(&blockers[i], fd) == 0);
+	}
 	init_command(&proc[0], &producer);
 	init_command(&proc[1], &filter);
-	init_command(&proc[2], &filter);
-	init_command(&proc[3], &consumer);
-	CHECK(exe_run_pipeline(proc, PROCS) == -ESH_ENFILE);
-	CHECK(esh_pipe_in_use() == 1);
-	CHECK(esh_file_in_use() == 2);
-	esh_close_all(&blocker.ep_fd_table);
+	init_command(&proc[2], &consumer);
+	CHECK(exe_run_pipeline(proc, 3) == -ESH_ENFILE);
+	CHECK(esh_pipe_in_use() == ESH_PIPE_MAX - 1);
+	CHECK(esh_file_in_use() == (ESH_PIPE_MAX - 1) * 2);
+	for (i = 0; i < ESH_PIPE_MAX - 1; i++)
+		esh_close_all(&blockers[i].ep_fd_table);
+	CHECK(esh_pipe_in_use() == 0);
+	CHECK(esh_file_in_use() == 0);
+
+	output_count = 0;
+	CHECK(exe_run_pipeline(proc, 3) == 37);
+	CHECK(output_count == source_count);
+	for (j = 0; j < source_count; j++)
+		CHECK(output[j] == (unsigned char)toupper(source[j]));
 	CHECK(esh_pipe_in_use() == 0);
 	CHECK(esh_file_in_use() == 0);
 }

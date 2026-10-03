@@ -45,7 +45,7 @@
 | R1 | 追加ファイルのコーディング規約整備 | R0 | done | Refactoring |
 | R2 | Debug build修正 | R1 | done | 不具合修正 |
 | R3 | 文書と実装の整合 | R1 | done | 文書 |
-| R4 | Pipeline失敗・再利用試験 | R1 | pending | 試験 |
+| R4 | Pipeline失敗・再利用試験 | R1 | done | 試験 |
 | R5 | Pipeline cleanup整理 | R4 | pending | Refactoring |
 | R6 | Pipe close・部分転送試験 | R1 | pending | 試験 |
 | R7 | Scheduler waiter・release試験 | R1 | pending | 試験 |
@@ -299,7 +299,7 @@ Test code:
 
 ### R4: Pipeline失敗・再利用試験
 
-状態: `pending`
+状態: `done`
 
 #### 目的
 
@@ -328,6 +328,18 @@ Pipeline準備失敗後のrollbackと次回実行を試験で固定する。
 #### 最小試験
 
 - Pipeline executor cortn/thread O0/O2
+
+#### 実施結果
+
+- 既存pipe枯渇試験を1本目作成後の後続pipe確保失敗へ明確化
+- 失敗直後にfile、inode、fdが事前使用数へ戻ることを確認
+- blocker解放後に同一process配列の3段pipeline再実行が成功
+- 一部backend prepare後の失敗でfile、inode、backend slot回収を確認
+- backend blocker解放後に同一process配列の再実行が成功
+- Pipeline executor cortn/thread × O0/O2: pass
+- production code変更なし
+- 既存のshell、parser warningのみで新規warningなし
+- Cortex-M/RTOS移植には未着手
 
 ### R5: Pipeline cleanup整理
 
