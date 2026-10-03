@@ -41,9 +41,11 @@ CSOURCES += cmd_sample.c
 ## ../../../core/elib
 CSOURCES += getopt.c
 CSOURCES += qbyte.c
+CSOURCES += symchar.c
 
 ## ../../../core/esh
 CSOURCES += $(ESH_SCHED_CSOURCES)
+CSOURCES += break.c cat.c code.c esh_debug.c exe.c lex.c par.c script.c tok.c
 CSOURCES += echo.c
 CSOURCES += esh.c
 CSOURCES += expr.c
@@ -89,6 +91,7 @@ INCLUDES += -I../../../core/esh/target/windows
 
 CFLAGS += $(INCLUDES)
 CFLAGS += -DESH_STDIO_PIPE
+CFLAGS += -DUSE_STACKMACH -DESH_SCRIPT
 CFLAGS += $(ESH_SCHED_CPPFLAGS)
 # CFLAGS += -DADAFRUIT
 
@@ -127,6 +130,8 @@ $(OUTDIR)/%.o: %.cpp
 
 $(OUTDIR)/%.o: %.S
 	$(CC) $(CFLAGS) -c -MMD -MP $< -o $@
+
+$(OBJS): Makefile ../../../core/esh/target/windows/sched_backend.mk
 
 .PHONY: clean
 clean:

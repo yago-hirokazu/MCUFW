@@ -96,10 +96,15 @@ int lex_analyze_token(char *str, struct token *token)
 {
 	int ret = LEXONGO;
 	enum lex_state state = lex.l_state;
-	enum token_type *type = &token->t_type;
-	char *sym = &token->t_symbol[0];
+	enum token_type *type;
+	char *sym;
 	char c = 0;
 	char scat[SYMCHARS];
+
+	if (!str || !token || strlen(str) >= SYMCHARS)
+		return LEXERROR;
+	type = &token->t_type;
+	sym = &token->t_symbol[0];
 
 	DP("state=%s, str=%s",lex_state_str[state],str);
 	switch (state) {
@@ -268,6 +273,8 @@ int lex_analyze_token(char *str, struct token *token)
 				strncpy(sym, str, SYMCHARS);
 				DP("sym=%s",sym);
 			} else {
+				if (strlen(sym) + strlen(str) + 1 >= SYMCHARS)
+					goto error;
 				memset(scat, 0, sizeof(scat));
 				strncpy(scat, sym, SYMCHARS);
 				snprintf(sym, SYMCHARS, "%s %s", scat, str);
@@ -290,6 +297,8 @@ int lex_analyze_token(char *str, struct token *token)
 			if (lex.l_scats == 0) {
 				strncpy(sym, str, SYMCHARS);
 			} else {
+				if (strlen(sym) + strlen(str) + 1 >= SYMCHARS)
+					goto error;
 				memset(scat, 0, sizeof(scat));
 				strncpy(scat, sym, SYMCHARS);
 				snprintf(sym, SYMCHARS, "%s %s", scat, str);

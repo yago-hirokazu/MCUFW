@@ -45,6 +45,8 @@ int esh_close(int fd);
 
 /* Call only when no process owns file references */
 void esh_file_system_init(void);
+/* Internal helpers need kernel lock once processes can access pools */
+/* Alloc returns owned ref; install adds ref; get borrows; close drops ref */
 void esh_fd_table_init(struct esh_fd_table *table);
 struct esh_file *esh_file_alloc(enum esh_file_direction direction,
 				struct esh_pipe_inode *inode);

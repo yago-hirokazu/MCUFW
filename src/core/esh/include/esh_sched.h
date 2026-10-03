@@ -44,6 +44,8 @@ struct esh_wait_chan {
 	struct esh_proc *wc_tail;
 };
 
+/* One non-recursive kernel lock protects pipe predicates and wait lists */
+/* Release joins backend outside lock; close fds before releasing process */
 void esh_kernel_lock(void);
 void esh_kernel_unlock(void);
 int esh_kernel_is_locked(void);

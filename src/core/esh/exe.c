@@ -44,6 +44,98 @@ static int exe_connect_proc(struct proc *writer, struct proc *reader);
 static int exe_execute_commands(struct exe *exe);
 static void exe_reset_commands(struct exe *exe);
 
+static int exe_valid_instruction(struct code *code, struct exe *exe)
+{
+	const struct applet *table;
+	int op;
+	int operand;
+	int width;
+	int i;
+
+	if (!code || !exe || code->c_codes < 0 || code->c_codes > CODES ||
+	    exe->e_pc < 0 || exe->e_pc >= code->c_codes ||
+	    exe->e_sp < 0 || exe->e_sp > STACKS ||
+	    exe->e_procs < 0 || exe->e_procs > PROCS ||
+	    code->c_stab.s_num < 0 || code->c_stab.s_num > SYMBOLS ||
+	    code->c_vtab.v_num < 0 || code->c_vtab.v_num > SYMBOLS ||
+	    code->c_ltab.l_num < 0 || code->c_ltab.l_num > LABELS)
+		return 0;
+	op = code->c_code[exe->e_pc];
+	if (op < OP_NOP || op > OP_PIPE_NEXT)
+		return 0;
+	width = (op == OP_NOP || op == OP_CMD_EXE ||
+		 op == OP_CMD_EXE_THEN_STACK || op == OP_PIPE_NEXT) ? 1 : 2;
+	if (exe->e_pc > code->c_codes - width)
+		return 0;
+	operand = width == 2 ? code->c_code[exe->e_pc + 1] : 0;
+	if (width == 2 && operand < 0)
+		return 0;
+	switch (op) {
+	case OP_USER_CMD:
+	case OP_BLTN_CMD:
+		table = op == OP_USER_CMD ? usercmds : builtins;
+		for (i = 0; table[i].name; i++)
+			if (i == operand)
+				return table[i].main && exe->e_procs < PROCS;
+		return 0;
+	case OP_CMD_ARG:
+	case OP_CMD_QARG:
+		if (operand >= code->c_stab.s_num ||
+		    !memchr(&code->c_stab.s_str[operand * SYMCHARS],
+			    0, SYMCHARS))
+			return 0;
+		break;
+	case OP_CMD_VARG:
+	case OP_CMD_EXE_THEN_ASSIGN:
+	case OP_POP_SYMBOL_THEN_ASSIGN:
+		if (operand >= code->c_vtab.v_num)
+			return 0;
+		if (op == OP_CMD_VARG &&
+		    !memchr(&code->c_vtab.v_val[operand * SYMCHARS],
+			    0, SYMCHARS))
+			return 0;
+		break;
+	case OP_JUMP:
+	case OP_JUMP_IF_FALSE:
+	case OP_BREAK_LOOP:
+		if (operand >= code->c_ltab.l_num ||
+		    code->c_ltab.l_addr[operand] < 0 ||
+		    code->c_ltab.l_addr[operand] > code->c_codes)
+			return 0;
+		break;
+	case OP_PUSH_SYMBOL:
+		if (operand >= code->c_stab.s_num ||
+		    !memchr(&code->c_stab.s_str[operand * SYMCHARS],
+			    0, SYMCHARS))
+			return 0;
+		break;
+	default:
+		break;
+	}
+	if ((op == OP_PUSH_SYMBOL || op == OP_CMD_EXE_THEN_STACK) &&
+	    exe->e_sp == STACKS)
+		return 0;
+	if ((op == OP_JUMP_IF_FALSE || op == OP_POP_SYMBOL_THEN_ASSIGN) &&
+	    !exe->e_sp)
+		return 0;
+	if (op == OP_POP_SYMBOL_THEN_ASSIGN &&
+	    (exe->e_stack[exe->e_sp - 1] < 0 ||
+	     exe->e_stack[exe->e_sp - 1] >= code->c_stab.s_num))
+		return 0;
+	if (op >= OP_CMD_ARG && op <= OP_CMD_EXE_THEN_ASSIGN) {
+		struct proc *proc;
+
+		if (!exe->e_procs)
+			return 0;
+		proc = &exe->e_proc[exe->e_procs - 1];
+		if (!proc->p_cmd || !proc->p_cmd->main ||
+		    proc->p_argc < 1 || proc->p_argc > TTY_NARG ||
+		    !proc->p_argv[0])
+			return 0;
+	}
+	return 1;
+}
+
 static void exe_proc_entry(void *arg)
 {
 	struct proc *proc;
@@ -105,8 +197,12 @@ int exe_run_pipeline(struct proc *proc, int count)
 	if (!proc || count < 2 || count > PROCS)
 		return -ESH_EINVAL;
 	for (i = 0; i < count; i++) {
-		if (!proc[i].p_cmd || !proc[i].p_cmd->main)
+		if (!proc[i].p_cmd || !proc[i].p_cmd->main ||
+		    !proc[i].p_cmd->name || proc[i].p_argc < 1 ||
+		    proc[i].p_argc > TTY_NARG || !proc[i].p_argv[0])
 			return -ESH_EINVAL;
+	}
+	for (i = 0; i < count; i++) {
 		esh_proc_init(&proc[i].p_exec);
 	}
 	for (i = 0; i < count - 1; i++) {
@@ -162,9 +258,13 @@ close_fds:
 static int exe_execute_commands(struct exe *exe)
 {
 	struct proc *proc;
+	int i;
 
-	if (exe->e_procs <= 0)
+	if (exe->e_procs <= 0 || exe->e_procs > PROCS)
 		return -ESH_EINVAL;
+	for (i = 0; i < exe->e_procs; i++)
+		if (!exe->e_proc[i].p_cmd || !exe->e_proc[i].p_cmd->main)
+			return -ESH_EINVAL;
 	if (exe->e_procs > 1)
 		return exe_run_pipeline(exe->e_proc, exe->e_procs);
 	proc = &exe->e_proc[0];
@@ -189,10 +289,15 @@ static void exe_reset_commands(struct exe *exe)
 int exe_run_codes(struct code *code, struct exe *exe)
 {
 	int c=0, cid=0, sid=0, vid=0, ret=0, label_p=0;
-	int pc = exe->e_pc;
-	int sp = exe->e_sp;
+	int pc;
+	int sp;
 	char str[SYMCHARS];
 	struct proc *proc;
+
+	if (!exe_valid_instruction(code, exe))
+		return EXIT_FAILURE;
+	pc = exe->e_pc;
+	sp = exe->e_sp;
 
 	DP("pc = %04d, sp = %04d", pc, sp);
 	DP("code->c_code[pc+0 = %4d] = %02X (opcode = %s)",
@@ -302,7 +407,8 @@ int exe_run_codes(struct code *code, struct exe *exe)
 		DP("Command: %s", proc->p_cmd->name);
 
 #if TODO_BREAK_WITH_ARGUMENT
-		if (0 == strcmp(proc->p_argv[0], "break") && ret >= 0)
+		if (0 == strcmp(proc->p_argv[0], "break") && ret >= 0 &&
+		    ret < code->c_ltab.l_num)
 			pc = code->c_ltab.l_addr[ret];
 		else
 #endif
@@ -400,8 +506,10 @@ int exe_run_codes(struct code *code, struct exe *exe)
 		pc += 2;
 		break;
 	case OP_NOP:
-	default:
+		pc++;
 		break;
+	default:
+		return EXIT_FAILURE;
 	}
 
 	exe->e_pc = pc;

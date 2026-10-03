@@ -10,11 +10,13 @@ CFLAGS += -I. -I../../include -I../../../elib
 CFLAGS += -I../../target/windows -I../../../../target/windows/Adapt
 CFLAGS += -DUSE_STACKMACH
 CFLAGS += -DESH_STDIO_PIPE
+CFLAGS += -DESH_SCRIPT
 CFLAGS += $(ESH_SCHED_CPPFLAGS)
 LDFLAGS = -lwinmm
 
 CSOURCES = test_pipeline_exec.c
 CSOURCES += break.c code.c echo.c esh_debug.c exe.c expr.c
+CSOURCES += cat.c script.c
 CSOURCES += file.c help.c lex.c par.c pipe.c run.c sched.c test.c
 CSOURCES += tok.c tty.c $(ESH_SCHED_CSOURCES)
 CSOURCES += stdio_adapt.c tty_adapt.c cmd_sample.c qbyte.c symchar.c

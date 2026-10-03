@@ -61,11 +61,13 @@ int break_command(int argc, char *argv[])
 	  argc    = 1 => invalid
 	*/
 
-	if (argc < 2 || argc > 3)
+	if (argc < 2 || argc > 3 || !argv || !argv[argc - 1] ||
+	    (argc == 3 && !argv[1]))
 		goto invalid_argument;
 
 	loop_p = strtol(argv[argc - 1], &end, 10);
-	if (*argv[argc - 1] == '\0' || *end != '\0' || loop_p < 0)
+	if (*argv[argc - 1] == '\0' || *end != '\0' ||
+	    loop_p < 0 || loop_p >= MAXNESTS)
 		goto invalid_argument;
 
 	if (argc == 3) {
@@ -92,6 +94,8 @@ static int break_label(struct parse *par, int *loop_at, int loop_p)
 	int label;
 
 	loopat = loop_at[loop_p];
+	if (loopat < 0 || loopat >= MAXNESTS)
+		return -1;
 	label = par[loopat].p_label.l_end;
 	DP("label = parse[loop_at[loop_p=%d]=%d].p_label.l_end = %d",
 	   loop_p, loop_at[loop_p], label);

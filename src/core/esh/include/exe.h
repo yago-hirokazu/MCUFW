@@ -30,8 +30,8 @@ struct proc {
 
 struct exe {
 	INT e_stack[STACKS];		/* Stack */
-	char e_pc;			/* Program counter */
-	char e_sp;			/* Stackk pointer */
+	int e_pc;			/* Program counter */
+	int e_sp;			/* Stack pointer */
 	char e_procs;			/* # of procs to be executed */
 	int e_status;			/* Last command or pipeline status */
 	struct proc e_proc[PROCS];	/* Process */

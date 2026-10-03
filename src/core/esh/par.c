@@ -40,6 +40,7 @@ struct parse parse[MAXNESTS];
 int nest_p, maxnests;
 int loop_at[MAXNESTS], loops;
 int cond_at[MAXNESTS], conds;
+static int parse_error;
 
 
 static void add_code(int byte, struct code *code);
@@ -48,7 +49,8 @@ static char make_symbol(char *sym, char sym_tab[], char *sym_num);
 extern void set_symbol_to_variable(char var_p, char *sym, struct code *code);
 extern char *get_symbol_from_variable(char var_p, struct code *code);
 static char make_label(struct code *code);
-static char set_code_addr_to_label(char label_p, int code_addr, struct code *code);
+static char set_code_addr_to_label(char label_p, int code_addr,
+				   struct code *code);
 extern char *get_string(char id, struct code *code);
 static int find_cmd(struct token *tok, const struct applet *cmd);
 
@@ -76,18 +78,45 @@ static void dump_context(const char *s, struct token *tok);
 
 char par_make_code(struct token *tok, struct code *code)
 {
+	char status;
+
+	if (!tok || !code || code->c_codes < 0 || code->c_codes > CODES ||
+	    !memchr(tok->t_symbol, 0, SYMCHARS) ||
+	    tok->t_type < T_UNDEF || tok->t_type > T_UNKNOWN ||
+	    code->c_stab.s_num < 0 || code->c_stab.s_num > SYMBOLS ||
+	    code->c_vtab.v_num < 0 || code->c_vtab.v_num > SYMBOLS ||
+	    code->c_ltab.l_num < 0 || code->c_ltab.l_num > LABELS)
+		return PARINVLD;
+	parse_error = 0;
 	if (parse[0].p_state1 == PAR_HALT) {
 		DP("parse[nest_p=%d].p_state1 == PAR_HALT",nest_p);
 		memset(&parse[0], 0, sizeof(struct parse));
 		parse[0].p_state1 = PAR_IDLE;
 	}
 	nest_p = 0;
-	return _par_make_code(&parse[nest_p], tok, code);
+	status = _par_make_code(&parse[nest_p], tok, code);
+	return parse_error ? PARINVLD : status;
+}
+
+void par_init(void)
+{
+	memset(parse, 0, sizeof(parse));
+	memset(loop_at, 0, sizeof(loop_at));
+	memset(cond_at, 0, sizeof(cond_at));
+	nest_p = 0;
+	maxnests = 0;
+	loops = 0;
+	conds = 0;
+	parse_error = 0;
 }
 
 static void add_code(int byte, struct code *code)
 {
 	int c = code->c_codes;
+	if (c >= CODES || parse_error) {
+		parse_error = 1;
+		return;
+	}
 	code->c_code[c++] = byte;
 	code->c_codes = c;
 }
@@ -121,6 +150,11 @@ static char make_symbol(char *sym, char sym_tab[], char *sym_num)
 {
 	char n1 = *sym_num;
 	char n2 = n1;
+	if (n1 < 0 || n1 >= SYMBOLS || !sym ||
+	    !memchr(sym, 0, SYMCHARS)) {
+		parse_error = 1;
+		return NO_SYMBOL;
+	}
 
 	assert(sym != NULL);
 	assert(*sym != 0);
@@ -145,33 +179,55 @@ static char make_symbol(char *sym, char sym_tab[], char *sym_num)
 
 extern void set_symbol_to_variable(char var_p, char *sym, struct code *code)
 {
-	struct variable_table *v = &code->c_vtab;
-	strncpy(&v->v_val[var_p * SYMCHARS], sym, SYMCHARS);
+	struct variable_table *v;
+
+	if (!code || !sym || var_p < 0 || var_p >= SYMBOLS) {
+		parse_error = 1;
+		return;
+	}
+	v = &code->c_vtab;
+	strncpy(&v->v_val[var_p * SYMCHARS], sym, SYMCHARS - 1);
+	v->v_val[var_p * SYMCHARS + SYMCHARS - 1] = 0;
 }
 
 extern char *get_symbol_from_variable(char var_p, struct code *code)
 {
-	struct variable_table *v = &code->c_vtab;
+	struct variable_table *v;
+
+	if (!code || var_p < 0 || var_p >= SYMBOLS)
+		return NULL;
+	v = &code->c_vtab;
 	return (char *)&v->v_val[var_p * SYMCHARS];
 }
 
 static char make_label(struct code *code)
 {
 	char label_p = code->c_ltab.l_num;
+	if (label_p < 0 || label_p >= LABELS) {
+		parse_error = 1;
+		return NO_SYMBOL;
+	}
 	DP("make label = %3d", label_p);
 	code->c_ltab.l_num++;
 	return label_p;
 }
 
-static char set_code_addr_to_label(char label_p, int code_addr, struct code *code)
+static char set_code_addr_to_label(char label_p, int code_addr,
+				   struct code *code)
 {
+	if (label_p < 0 || label_p >= LABELS ||
+	    code_addr < 0 || code_addr > CODES) {
+		parse_error = 1;
+		return PARINVLD;
+	}
 	DP("l_addr[%d] = %3d", label_p, code_addr);
 	code->c_ltab.l_addr[label_p] = code_addr;
+	return PARDONE;
 }
 
 extern char *get_string(char id, struct code *code)
 {
-	if (id >= SYMBOLS)
+	if (!code || id < 0 || id >= SYMBOLS)
 		return NULL;
 	return (char *)&code->c_stab.s_str[id * SYMCHARS];
 }
@@ -181,8 +237,7 @@ static int find_cmd(struct token *tok, const struct applet *cmd)
 	int k=0;
 	struct applet *ap = find_applet(tok->t_symbol, cmd, &k);
 	if (ap == NULL || ap->name == NULL) {
-		DP("ap = 0x%08X", (uint32_t)ap);
-		DP("ap->name = 0x%08X", (uint32_t)ap->name);
+		DP("Applet not found");
 		return -1;
 	}
 	return k;
@@ -383,6 +438,8 @@ parse_idle(struct parse *par, struct token *tok, struct code *code)
 		par->p_state2 = PAR_ASSIGN_EQUAL;
 		return PARONGO;
 	case T_WHILE:
+		if (loops < 0 || loops >= MAXNESTS)
+			return PARINVLD;
 		DP("loop_at[loops=%d] = nest_p = %d",loops,nest_p);
 		loop_at[loops] = nest_p;
 		loops++;
@@ -390,6 +447,8 @@ parse_idle(struct parse *par, struct token *tok, struct code *code)
 		par->p_state2 = PAR_WHILE_LBRACKET;
 		return PARONGO;
 	case T_IF:
+		if (conds < 0 || conds >= MAXNESTS)
+			return PARINVLD;
 		DP("cond_at[conds=%d] = nest_p = %d",conds,nest_p);
 		cond_at[conds] = nest_p;
 		conds++;
@@ -532,7 +591,7 @@ parse_while(struct parse *par, struct token *tok, struct code *code)
 			EP("while statement syntax error: no do");
 			goto error;
 		}
-		if (nest_p >= MAXNESTS) {
+		if (nest_p >= MAXNESTS - 1) {
 			EP("Exceed max nests");
 			goto error;
 		}
@@ -547,6 +606,8 @@ parse_while(struct parse *par, struct token *tok, struct code *code)
 	case PAR_WHILE_BLOCK:
 		nest_restore_if_needed(&nest_p, maxnests);
 		if (tok->t_type == T_DONE) {
+			if (loops <= 0 || loops > MAXNESTS)
+				goto error;
 			DP("done statement");
 			int loop_p = loops-1;
 			int loopat = loop_at[loop_p];
@@ -643,7 +704,7 @@ parse_if(struct parse *par, struct token *tok, struct code *code)
 			EP("if statement syntax error: no then");
 			goto error;
 		}
-		if (nest_p >= MAXNESTS) {
+		if (nest_p >= MAXNESTS - 1) {
 			EP("Exceed max nests");
 			goto error;
 		}
@@ -663,6 +724,8 @@ parse_if(struct parse *par, struct token *tok, struct code *code)
 	case PAR_IF_BLOCK:
 		nest_restore_if_needed(&nest_p, maxnests);
 		if (0 == strcmp(tok->t_symbol, "elif")) {
+			if (par->p_elses < 0 || par->p_elses >= ELSES)
+				goto error;
 			DP("elfi statement");
 			nest_leave(&nest_p, &maxnests);
 			add_code(OP_JUMP, code);
@@ -674,6 +737,8 @@ parse_if(struct parse *par, struct token *tok, struct code *code)
 			par->p_state2 = PAR_IF_LBRACKET;
 			return PARONGO;
 		} else if (0 == strcmp(tok->t_symbol, "else")) {
+			if (par->p_elses < 0 || par->p_elses >= ELSES)
+				goto error;
 			DP("else statement");
 			add_code(OP_JUMP, code);
 			add_code(par->p_label.l_end, code);
@@ -685,6 +750,8 @@ parse_if(struct parse *par, struct token *tok, struct code *code)
 			par->p_state2 = PAR_IF_BLOCK;
 			return PARONGO;
 		} else if (0 == strcmp(tok->t_symbol, "fi")) {
+			if (conds <= 0 || conds > MAXNESTS)
+				goto error;
 			DP("fi statement");
 			int cond_p = conds-1;
 			int condat = cond_at[cond_p];
