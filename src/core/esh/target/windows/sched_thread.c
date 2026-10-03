@@ -3,24 +3,20 @@
 #ifndef _WIN32_WINNT
 #define _WIN32_WINNT 0x0600
 #endif
-#include <windows.h>
 #include <process.h>
 #include <stdint.h>
 #include <string.h>
+#include <windows.h>
 
 #include "esh_errno.h"
 #include "esh_sched_backend.h"
-
-static SRWLOCK esh_kernel_mutex = SRWLOCK_INIT;
-static _Thread_local int esh_lock_held;
-static _Thread_local struct esh_proc *esh_current;
 
 struct esh_thread_slot {
 	HANDLE ts_thread;
 	CONDITION_VARIABLE ts_run_cv;
 	CONDITION_VARIABLE ts_report_cv;
 	struct esh_proc *ts_proc;
-	esh_proc_entry_t ts_entry;
+	void (*ts_entry)(void *arg);
 	void *ts_arg;
 	int ts_used;
 	int ts_run;
@@ -28,7 +24,13 @@ struct esh_thread_slot {
 	int ts_stop;
 };
 
+static SRWLOCK esh_kernel_mutex = SRWLOCK_INIT;
+static _Thread_local int esh_lock_held;
+static _Thread_local struct esh_proc *esh_current;
 static struct esh_thread_slot esh_thread_slots[ESH_PIPELINE_MAX];
+
+static int esh_thread_wait(CONDITION_VARIABLE *cv);
+static unsigned __stdcall esh_thread_entry(void *arg);
 
 struct esh_proc *esh_sched_backend_current(void)
 {
@@ -57,42 +59,7 @@ int esh_sched_backend_is_locked(void)
 	return esh_lock_held;
 }
 
-static int esh_thread_wait(CONDITION_VARIABLE *cv)
-{
-	BOOL result;
-
-	esh_lock_held = 0;
-	result = SleepConditionVariableSRW(cv, &esh_kernel_mutex,
-					  INFINITE, 0);
-	esh_lock_held = 1;
-	return result ? 0 : -ESH_EINVAL;
-}
-
-static unsigned __stdcall esh_thread_entry(void *arg)
-{
-	struct esh_thread_slot *slot = arg;
-
-	esh_kernel_lock();
-	while (!slot->ts_run && !slot->ts_stop) {
-		if (esh_thread_wait(&slot->ts_run_cv) < 0)
-			slot->ts_stop = 1;
-	}
-	if (!slot->ts_stop) {
-		esh_sched_set_current_proc(slot->ts_proc);
-		esh_kernel_unlock();
-		slot->ts_entry(slot->ts_arg);
-		esh_kernel_lock();
-		slot->ts_proc->ep_state = ESH_PROC_FINISHED;
-	}
-	slot->ts_done = 1;
-	slot->ts_run = 0;
-	WakeAllConditionVariable(&slot->ts_report_cv);
-	esh_kernel_unlock();
-	esh_sched_set_current_proc(NULL);
-	return 0;
-}
-
-void *esh_sched_backend_prepare(esh_proc_entry_t entry, void *arg)
+void *esh_sched_backend_prepare(void (*entry)(void *arg), void *arg)
 {
 	struct esh_thread_slot *slot;
 	uintptr_t thread;
@@ -199,4 +166,39 @@ enum esh_proc_state esh_sched_backend_resume(struct esh_proc *proc)
 	state = proc->ep_state;
 	esh_kernel_unlock();
 	return state;
+}
+
+static int esh_thread_wait(CONDITION_VARIABLE *cv)
+{
+	BOOL result;
+
+	esh_lock_held = 0;
+	result = SleepConditionVariableSRW(cv, &esh_kernel_mutex,
+					  INFINITE, 0);
+	esh_lock_held = 1;
+	return result ? 0 : -ESH_EINVAL;
+}
+
+static unsigned __stdcall esh_thread_entry(void *arg)
+{
+	struct esh_thread_slot *slot = arg;
+
+	esh_kernel_lock();
+	while (!slot->ts_run && !slot->ts_stop) {
+		if (esh_thread_wait(&slot->ts_run_cv) < 0)
+			slot->ts_stop = 1;
+	}
+	if (!slot->ts_stop) {
+		esh_sched_set_current_proc(slot->ts_proc);
+		esh_kernel_unlock();
+		slot->ts_entry(slot->ts_arg);
+		esh_kernel_lock();
+		slot->ts_proc->ep_state = ESH_PROC_FINISHED;
+	}
+	slot->ts_done = 1;
+	slot->ts_run = 0;
+	WakeAllConditionVariable(&slot->ts_report_cv);
+	esh_kernel_unlock();
+	esh_sched_set_current_proc(NULL);
+	return 0;
 }

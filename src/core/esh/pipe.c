@@ -9,15 +9,7 @@
 static struct esh_pipe_inode esh_pipe_table[ESH_PIPE_MAX];
 
 static struct esh_io_status esh_io_status(enum esh_io_result result,
-					  esh_ssize_t count, int error)
-{
-	struct esh_io_status status;
-
-	status.io_result = result;
-	status.io_count = count;
-	status.io_error = error;
-	return status;
-}
+					  ptrdiff_t count, int error);
 
 void esh_pipe_pool_init(void)
 {
@@ -224,7 +216,7 @@ struct esh_io_status esh_pipe_write_nonblock(struct esh_proc *proc, int fd,
 	return esh_io_status(ESH_IO_PROGRESS, transferred, 0);
 }
 
-esh_ssize_t esh_read(int fd, void *buf, size_t count)
+ptrdiff_t esh_read(int fd, void *buf, size_t count)
 {
 	struct esh_pipe_inode *inode;
 	struct esh_io_status status;
@@ -273,7 +265,7 @@ esh_ssize_t esh_read(int fd, void *buf, size_t count)
 	}
 }
 
-esh_ssize_t esh_write(int fd, const void *buf, size_t count)
+ptrdiff_t esh_write(int fd, const void *buf, size_t count)
 {
 	const unsigned char *bytes;
 	struct esh_pipe_inode *inode;
@@ -307,14 +299,14 @@ esh_ssize_t esh_write(int fd, const void *buf, size_t count)
 			esh_wakeup(&inode->pi_read_chan);
 			if (transferred == count) {
 				esh_kernel_unlock();
-				return (esh_ssize_t)transferred;
+				return (ptrdiff_t)transferred;
 			}
 			break;
 		case ESH_IO_WAIT_WRITE:
 			if (!proc->ep_backend) {
 				esh_kernel_unlock();
 				if (transferred)
-					return (esh_ssize_t)transferred;
+					return (ptrdiff_t)transferred;
 				return -ESH_EAGAIN;
 			}
 			result = esh_sleep(&inode->pi_write_chan,
@@ -355,4 +347,15 @@ size_t esh_pipe_in_use(void)
 			count++;
 	}
 	return count;
+}
+
+static struct esh_io_status esh_io_status(enum esh_io_result result,
+					  ptrdiff_t count, int error)
+{
+	struct esh_io_status status;
+
+	status.io_result = result;
+	status.io_count = count;
+	status.io_error = error;
+	return status;
 }

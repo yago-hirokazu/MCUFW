@@ -7,30 +7,7 @@
 #include "esh_sched_backend.h"
 
 static void esh_wait_remove(struct esh_wait_chan *chan,
-			    struct esh_proc *proc)
-{
-	struct esh_proc *current;
-	struct esh_proc *previous;
-
-	previous = NULL;
-	current = chan->wc_head;
-	while (current) {
-		if (current == proc)
-			break;
-		previous = current;
-		current = current->ep_wait_next;
-	}
-	if (!current)
-		return;
-	if (previous)
-		previous->ep_wait_next = current->ep_wait_next;
-	else
-		chan->wc_head = current->ep_wait_next;
-	if (chan->wc_tail == current)
-		chan->wc_tail = previous;
-	current->ep_wait_chan = NULL;
-	current->ep_wait_next = NULL;
-}
+			    struct esh_proc *proc);
 
 void esh_kernel_lock(void)
 {
@@ -132,7 +109,7 @@ int esh_proc_bind_backend(struct esh_proc *proc, void *backend)
 	return 0;
 }
 
-int esh_sched_prepare(struct esh_proc *proc, esh_proc_entry_t entry,
+int esh_sched_prepare(struct esh_proc *proc, void (*entry)(void *arg),
 		      void *arg)
 {
 	void *backend;
@@ -194,4 +171,30 @@ int esh_sched_resume(struct esh_proc *proc)
 void esh_sched_set_current_proc(struct esh_proc *proc)
 {
 	esh_sched_backend_set_current(proc);
+}
+
+static void esh_wait_remove(struct esh_wait_chan *chan,
+			    struct esh_proc *proc)
+{
+	struct esh_proc *current;
+	struct esh_proc *previous;
+
+	previous = NULL;
+	current = chan->wc_head;
+	while (current) {
+		if (current == proc)
+			break;
+		previous = current;
+		current = current->ep_wait_next;
+	}
+	if (!current)
+		return;
+	if (previous)
+		previous->ep_wait_next = current->ep_wait_next;
+	else
+		chan->wc_head = current->ep_wait_next;
+	if (chan->wc_tail == current)
+		chan->wc_tail = previous;
+	current->ep_wait_chan = NULL;
+	current->ep_wait_next = NULL;
 }

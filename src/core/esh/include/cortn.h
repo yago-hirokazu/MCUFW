@@ -42,12 +42,11 @@ enum cortn_result {
 };
 
 struct cortn;
-typedef void (*cortn_entry_t)(struct cortn *self, void *arg);
 
 struct cortn {
 	struct cortn_context c_context;
 	struct cortn_context c_caller;
-	cortn_entry_t c_entry;
+	void (*c_entry)(struct cortn *self, void *arg);
 	void *c_arg;
 	unsigned char *c_stack;
 	size_t c_stack_size;
@@ -56,7 +55,7 @@ struct cortn {
 };
 
 int cortn_init(struct cortn *self, void *stack, size_t stack_size,
-	       cortn_entry_t entry, void *arg);
+	       void (*entry)(struct cortn *self, void *arg), void *arg);
 int cortn_resume(struct cortn *self);
 int cortn_yield(struct cortn *self, enum cortn_yield_reason reason);
 int cortn_wake(struct cortn *self);

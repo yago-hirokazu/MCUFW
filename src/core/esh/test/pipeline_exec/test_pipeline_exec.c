@@ -1,3 +1,5 @@
+/* test_pipeline_exec.c */
+
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,12 +9,10 @@
 #include "esh_file.h"
 #include "esh_pipe.h"
 #include "exe.h"
-#include "stdio_adapt.h"
-#include "script.h"
-#include "par.h"
 #include "lex.h"
-
-extern int echo(int argc, char **argv);
+#include "par.h"
+#include "script.h"
+#include "stdio_adapt.h"
 
 #define TEST_DATA_SIZE	(ESH_PIPE_BUFFER_SIZE * 8 + 41)
 
@@ -29,9 +29,51 @@ static unsigned char output[TEST_DATA_SIZE + 2];
 static size_t output_count;
 static size_t source_count = TEST_DATA_SIZE;
 
+static int producer_main(int argc, char **argv);
+static int filter_main(int argc, char **argv);
+static int consumer_main(int argc, char **argv);
+static int early_filter_main(int argc, char **argv);
+static int error_main(int argc, char **argv);
+static int stdio_producer_main(int argc, char **argv);
+static int getchar_consumer_main(int argc, char **argv);
+static void init_command(struct proc *proc, struct applet *applet);
+static void test_three_stage_pipeline(void);
+static void test_early_filter_exit(void);
+static void test_stdio_pipeline(void);
+static void test_invalid_count(void);
+static void test_transfer_matrix(void);
+static void test_executor_bounds(void);
+static int script_line(const char *text);
+static void test_console_script(void);
+static void test_parser_bounds(void);
+static void test_pipe_exhaustion_cleanup(void);
+static void blocker_entry(void *arg);
+static void test_backend_exhaustion_cleanup(void);
+static void test_pipeline_bytecode(void);
+
+extern int echo(int argc, char **argv);
+
+int main(void)
+{
+	esh_file_system_init();
+	test_stdio_pipeline();
+	test_three_stage_pipeline();
+	test_early_filter_exit();
+	test_invalid_count();
+	test_pipe_exhaustion_cleanup();
+	test_backend_exhaustion_cleanup();
+	test_pipeline_bytecode();
+	test_transfer_matrix();
+	test_executor_bounds();
+	test_console_script();
+	test_parser_bounds();
+	printf("all tests passed\n");
+	return EXIT_SUCCESS;
+}
+
 static int producer_main(int argc, char **argv)
 {
-	esh_ssize_t count;
+	ptrdiff_t count;
 
 	(void)argc;
 	(void)argv;
@@ -39,14 +81,14 @@ static int producer_main(int argc, char **argv)
 	count = esh_write(ESH_FD_STDOUT, source, source_count);
 	if (count < 0)
 		return (int)count;
-	return count == (esh_ssize_t)source_count ? 11 : -ESH_EINVAL;
+	return count == (ptrdiff_t)source_count ? 11 : -ESH_EINVAL;
 }
 
 static int filter_main(int argc, char **argv)
 {
 	unsigned char buffer[73];
-	esh_ssize_t count;
-	esh_ssize_t written;
+	ptrdiff_t count;
+	ptrdiff_t written;
 	int i;
 
 	(void)argc;
@@ -66,7 +108,7 @@ static int filter_main(int argc, char **argv)
 
 static int consumer_main(int argc, char **argv)
 {
-	esh_ssize_t count;
+	ptrdiff_t count;
 
 	(void)argc;
 	(void)argv;
@@ -496,22 +538,4 @@ static void test_pipeline_bytecode(void)
 	CHECK(executor.e_procs == 0);
 	CHECK(esh_file_in_use() == 0);
 	CHECK(esh_pipe_in_use() == 0);
-}
-
-int main(void)
-{
-	esh_file_system_init();
-	test_stdio_pipeline();
-	test_three_stage_pipeline();
-	test_early_filter_exit();
-	test_invalid_count();
-	test_pipe_exhaustion_cleanup();
-	test_backend_exhaustion_cleanup();
-	test_pipeline_bytecode();
-	test_transfer_matrix();
-	test_executor_bounds();
-	test_console_script();
-	test_parser_bounds();
-	printf("all tests passed\n");
-	return EXIT_SUCCESS;
 }

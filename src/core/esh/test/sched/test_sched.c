@@ -4,9 +4,9 @@
 #include <string.h>
 
 #ifdef ESH_SCHED_THREAD
-#include <windows.h>
 #include <process.h>
 #include <stdint.h>
+#include <windows.h>
 #endif
 
 #include "esh_errno.h"
@@ -17,8 +17,6 @@
 #define TEST_DATA_SIZE	(ESH_PIPE_BUFFER_SIZE * 4 + 37)
 #define TEST_PROCS	3
 #define SCHED_LIMIT	1000
-
-static int failures;
 
 #define CHECK(condition) \
 	do { \
@@ -33,7 +31,7 @@ struct writer_arg {
 	const unsigned char *data;
 	size_t count;
 	int fd;
-	esh_ssize_t result;
+	ptrdiff_t result;
 };
 
 struct reader_arg {
@@ -41,8 +39,49 @@ struct reader_arg {
 	size_t capacity;
 	size_t count;
 	int fd;
-	esh_ssize_t last_result;
+	ptrdiff_t last_result;
 };
+
+static int failures;
+
+static void writer_entry(void *arg);
+static void reader_entry(void *arg);
+static int run_scheduler(struct esh_proc *procs, int count);
+static int connect_pipe(struct esh_proc *writer, struct esh_proc *reader,
+			int *write_fd, int *read_fd);
+static void init_proc(struct esh_proc *proc, void (*entry)(void *arg),
+		      void *arg);
+static void test_blocking_transfer(void);
+static void close_reader_entry(void *arg);
+static void test_broken_pipe_wakeup(void);
+static void single_read_entry(void *arg);
+static void test_multiple_waiters(void);
+static void unused_entry(void *arg);
+static void test_prepare_exhaustion(void);
+static void test_release_waiter(void);
+#ifdef ESH_SCHED_THREAD
+static void race_reader_entry(void *arg);
+static unsigned __stdcall race_writer_entry(void *arg);
+static void test_native_race_and_handles(void);
+#endif
+
+int main(void)
+{
+	test_blocking_transfer();
+	test_broken_pipe_wakeup();
+	test_multiple_waiters();
+	test_prepare_exhaustion();
+	test_release_waiter();
+#ifdef ESH_SCHED_THREAD
+	test_native_race_and_handles();
+#endif
+	if (failures) {
+		printf("%d tests failed\n", failures);
+		return 1;
+	}
+	printf("all tests passed\n");
+	return 0;
+}
 
 static void writer_entry(void *arg)
 {
@@ -56,7 +95,7 @@ static void writer_entry(void *arg)
 static void reader_entry(void *arg)
 {
 	struct reader_arg *reader;
-	esh_ssize_t count;
+	ptrdiff_t count;
 
 	reader = arg;
 	for (;;) {
@@ -119,7 +158,7 @@ static int connect_pipe(struct esh_proc *writer, struct esh_proc *reader,
 	return 0;
 }
 
-static void init_proc(struct esh_proc *proc, esh_proc_entry_t entry,
+static void init_proc(struct esh_proc *proc, void (*entry)(void *arg),
 		      void *arg)
 {
 	CHECK(esh_sched_prepare(proc, entry, arg) == 0);
@@ -456,21 +495,3 @@ static void test_native_race_and_handles(void)
 	CHECK(handles_after == handles_before);
 }
 #endif
-
-int main(void)
-{
-	test_blocking_transfer();
-	test_broken_pipe_wakeup();
-	test_multiple_waiters();
-	test_prepare_exhaustion();
-	test_release_waiter();
-#ifdef ESH_SCHED_THREAD
-	test_native_race_and_handles();
-#endif
-	if (failures) {
-		printf("%d tests failed\n", failures);
-		return 1;
-	}
-	printf("all tests passed\n");
-	return 0;
-}

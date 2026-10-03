@@ -27,7 +27,6 @@ enum esh_wait_reason {
 };
 
 struct esh_wait_chan;
-typedef void (*esh_proc_entry_t)(void *arg);
 /* Portable execution state embedded in executor process */
 struct esh_proc {
 	enum esh_proc_state ep_state;
@@ -44,7 +43,7 @@ struct esh_wait_chan {
 	struct esh_proc *wc_tail;
 };
 
-/* One non-recursive kernel lock protects pipe predicates and wait lists */
+/* Non-recursive kernel lock protects pipe predicates and wait lists */
 /* Release joins backend outside lock; close fds before releasing process */
 void esh_kernel_lock(void);
 void esh_kernel_unlock(void);
@@ -54,7 +53,7 @@ void esh_wakeup(void *chan);
 struct esh_proc *esh_current_proc(void);
 void esh_proc_init(struct esh_proc *proc);
 int esh_proc_bind_backend(struct esh_proc *proc, void *backend);
-int esh_sched_prepare(struct esh_proc *proc, esh_proc_entry_t entry,
+int esh_sched_prepare(struct esh_proc *proc, void (*entry)(void *arg),
 		      void *arg);
 void esh_sched_release(struct esh_proc *proc);
 int esh_sched_resume(struct esh_proc *proc);

@@ -1,8 +1,11 @@
-#include "machdep.h"
+/* test_pipeline.c */
+
 #include "tty_config.h"
+
 #include "code.h"
 #include "esh.h"
 #include "lex.h"
+#include "machdep.h"
 #include "par.h"
 #include "qbyte.h"
 #include "tok.h"
@@ -19,6 +22,31 @@
 extern struct parse parse[MAXNESTS];
 static struct qbyte input_line;
 static char input_buffer[TTY_NBUF];
+
+static void parser_reset(void);
+static int parse_line(char *line, struct code *code);
+static int parse_script(const char *script, struct code *code);
+static int count_opcode(const struct code *code, enum opcode opcode);
+static void test_tokenizer(void);
+static void test_two_stage(void);
+static void test_three_stage_without_spaces(void);
+static void test_quoted_pipe(void);
+static void test_variable_argument(void);
+static void test_nested_pipeline(void);
+static void test_invalid_pipeline(void);
+
+int main(void)
+{
+	test_tokenizer();
+	test_two_stage();
+	test_three_stage_without_spaces();
+	test_quoted_pipe();
+	test_variable_argument();
+	test_nested_pipeline();
+	test_invalid_pipeline();
+	printf("all tests passed\n");
+	return EXIT_SUCCESS;
+}
 
 static void parser_reset(void)
 {
@@ -163,17 +191,4 @@ static void test_invalid_pipeline(void)
 	CHECK(!parse_script("| echo one\n", &code));
 	CHECK(!parse_script("echo one |\n", &code));
 	CHECK(!parse_script("echo one || echo two\n", &code));
-}
-
-int main(void)
-{
-	test_tokenizer();
-	test_two_stage();
-	test_three_stage_without_spaces();
-	test_quoted_pipe();
-	test_variable_argument();
-	test_nested_pipeline();
-	test_invalid_pipeline();
-	printf("all tests passed\n");
-	return EXIT_SUCCESS;
 }

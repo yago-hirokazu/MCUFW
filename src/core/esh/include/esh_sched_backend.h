@@ -14,7 +14,7 @@ void esh_sched_backend_unlock(void);
 int esh_sched_backend_is_locked(void);
 struct esh_proc *esh_sched_backend_current(void);
 void esh_sched_backend_set_current(struct esh_proc *proc);
-void *esh_sched_backend_prepare(esh_proc_entry_t entry, void *arg);
+void *esh_sched_backend_prepare(void (*entry)(void *arg), void *arg);
 void esh_sched_backend_release(void *backend);
 /* Yield enters and returns with kernel lock held */
 int esh_sched_backend_yield(struct esh_proc *proc,

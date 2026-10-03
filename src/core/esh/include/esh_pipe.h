@@ -43,7 +43,7 @@ enum esh_io_result {
 
 struct esh_io_status {
 	enum esh_io_result io_result;
-	esh_ssize_t io_count;
+	ptrdiff_t io_count;
 	int io_error;
 };
 

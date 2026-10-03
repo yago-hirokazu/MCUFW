@@ -1,16 +1,16 @@
 /* cortn_context.c */
 
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <string.h>
 
 #include "cortn.h"
 
-extern void cortn_boot(void);
-
 #define CORTN_OFFSET_CHECK(member, value) \
-	typedef char member##_offset_mismatch[ \
-		offsetof(struct cortn_context, member) == (value) ? 1 : -1]
+	_Static_assert(offsetof(struct cortn_context, member) == (value), \
+		       #member " offset mismatch")
+
+extern void cortn_boot(void);
 
 CORTN_OFFSET_CHECK(cc_rsp, 0);
 CORTN_OFFSET_CHECK(cc_rbx, 8);

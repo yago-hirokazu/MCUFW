@@ -8,8 +8,6 @@
 #include "esh_pipe.h"
 #include "esh_sched.h"
 
-static int failures;
-
 #define CHECK(condition) \
 	do { \
 		if (!(condition)) { \
@@ -18,6 +16,41 @@ static int failures;
 			failures++; \
 		} \
 	} while (0)
+
+static int failures;
+
+static void setup(struct esh_proc *proc);
+static void teardown(struct esh_proc *proc);
+static void test_create_and_transfer(void);
+static void test_wait_states(void);
+static void test_wrap_around(void);
+static void test_eof(void);
+static void test_broken_pipe(void);
+static void test_fd_reference(void);
+static void test_invalid_operations(void);
+static void test_pipe_exhaustion(void);
+static void test_file_exhaustion(void);
+static void test_fd_exhaustion_rollback(void);
+
+int main(void)
+{
+	test_create_and_transfer();
+	test_wait_states();
+	test_wrap_around();
+	test_eof();
+	test_broken_pipe();
+	test_fd_reference();
+	test_invalid_operations();
+	test_pipe_exhaustion();
+	test_file_exhaustion();
+	test_fd_exhaustion_rollback();
+	if (failures) {
+		printf("%d tests failed\n", failures);
+		return 1;
+	}
+	printf("all tests passed\n");
+	return 0;
+}
 
 static void setup(struct esh_proc *proc)
 {
@@ -233,24 +266,4 @@ static void test_fd_exhaustion_rollback(void)
 	CHECK(esh_file_in_use() == 1);
 	CHECK(esh_pipe_in_use() == 1);
 	teardown(&proc);
-}
-
-int main(void)
-{
-	test_create_and_transfer();
-	test_wait_states();
-	test_wrap_around();
-	test_eof();
-	test_broken_pipe();
-	test_fd_reference();
-	test_invalid_operations();
-	test_pipe_exhaustion();
-	test_file_exhaustion();
-	test_fd_exhaustion_rollback();
-	if (failures) {
-		printf("%d tests failed\n", failures);
-		return 1;
-	}
-	printf("all tests passed\n");
-	return 0;
 }

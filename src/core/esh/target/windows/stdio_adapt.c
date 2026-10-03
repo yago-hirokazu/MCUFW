@@ -58,7 +58,7 @@ static int win_vfprintf(FILE *stream, const char *fmt, va_list args)
 	va_list copy;
 	char *buffer;
 	int length;
-	esh_ssize_t count;
+	ptrdiff_t count;
 
 	if (stream == stdout && win_pipe_fd(1)) {
 #if DEBUG_STDIO

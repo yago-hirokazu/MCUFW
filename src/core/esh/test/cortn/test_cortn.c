@@ -8,10 +8,6 @@
 #define TEST_COROUTINES	2
 #define ROUND_COUNT	3
 
-static int failures;
-static int order[TEST_COROUTINES * ROUND_COUNT];
-static int order_count;
-
 #define CHECK(condition) \
 	do { \
 		if (!(condition)) { \
@@ -40,6 +36,9 @@ struct simd_value {
 	uint64_t high;
 };
 
+static int failures;
+static int order[TEST_COROUTINES * ROUND_COUNT];
+static int order_count;
 static unsigned char basic_stack[CORTN_WINDOWS_STACK_SIZE]
 	__attribute__((aligned(16)));
 static unsigned char wait_stack[CORTN_WINDOWS_STACK_SIZE]
@@ -48,6 +47,32 @@ static unsigned char simd_stack[CORTN_WINDOWS_STACK_SIZE]
 	__attribute__((aligned(16)));
 static unsigned char round_stack[TEST_COROUTINES][CORTN_WINDOWS_STACK_SIZE]
 	__attribute__((aligned(16)));
+
+static void nested_yield(struct cortn *self, struct basic_data *data);
+static void basic_entry(struct cortn *self, void *arg);
+static void wait_entry(struct cortn *self, void *arg);
+static void round_entry(struct cortn *self, void *arg);
+static void simd_entry(struct cortn *self, void *arg);
+static void test_basic(void);
+static void test_wait(void);
+static void test_round_robin(void);
+static void test_stack_guard(void);
+static void test_simd_and_fpu(void);
+
+int main(void)
+{
+	test_basic();
+	test_wait();
+	test_round_robin();
+	test_stack_guard();
+	test_simd_and_fpu();
+	if (failures) {
+		printf("%d tests failed\n", failures);
+		return 1;
+	}
+	printf("all tests passed\n");
+	return 0;
+}
 
 static void nested_yield(struct cortn *self, struct basic_data *data)
 {
@@ -223,19 +248,4 @@ static void test_simd_and_fpu(void)
 	CHECK(cortn_resume(&cortn) == CORTN_SUCCESS);
 	CHECK(cortn_resume(&cortn) == CORTN_SUCCESS);
 	CHECK(cortn.c_state == CORTN_FINISHED);
-}
-
-int main(void)
-{
-	test_basic();
-	test_wait();
-	test_round_robin();
-	test_stack_guard();
-	test_simd_and_fpu();
-	if (failures) {
-		printf("%d tests failed\n", failures);
-		return 1;
-	}
-	printf("all tests passed\n");
-	return 0;
 }

@@ -6,8 +6,20 @@
 #include "esh_errno.h"
 #include "esh_sched_backend.h"
 
+struct esh_cortn_slot {
+	struct cortn cs_cortn;
+	void (*cs_entry)(void *arg);
+	void *cs_arg;
+	unsigned char cs_stack[CORTN_WINDOWS_STACK_SIZE]
+		__attribute__((aligned(16)));
+	unsigned char cs_used;
+};
+
 static unsigned char esh_lock_held;
 static struct esh_proc *esh_current;
+static struct esh_cortn_slot esh_cortn_slots[ESH_PIPELINE_MAX];
+
+static void esh_cortn_entry(struct cortn *cortn, void *arg);
 
 struct esh_proc *esh_sched_backend_current(void)
 {
@@ -17,26 +29,6 @@ struct esh_proc *esh_sched_backend_current(void)
 void esh_sched_backend_set_current(struct esh_proc *proc)
 {
 	esh_current = proc;
-}
-
-struct esh_cortn_slot {
-	struct cortn cs_cortn;
-	esh_proc_entry_t cs_entry;
-	void *cs_arg;
-	unsigned char cs_stack[CORTN_WINDOWS_STACK_SIZE]
-		__attribute__((aligned(16)));
-	unsigned char cs_used;
-};
-
-static struct esh_cortn_slot esh_cortn_slots[ESH_PIPELINE_MAX];
-
-static void esh_cortn_entry(struct cortn *cortn, void *arg)
-{
-	struct esh_cortn_slot *slot;
-
-	(void)cortn;
-	slot = arg;
-	slot->cs_entry(slot->cs_arg);
 }
 
 void esh_sched_backend_lock(void)
@@ -55,7 +47,7 @@ int esh_sched_backend_is_locked(void)
 	return esh_lock_held != 0;
 }
 
-void *esh_sched_backend_prepare(esh_proc_entry_t entry, void *arg)
+void *esh_sched_backend_prepare(void (*entry)(void *arg), void *arg)
 {
 	struct esh_cortn_slot *slot;
 	int i;
@@ -148,4 +140,13 @@ enum esh_proc_state esh_sched_backend_resume(struct esh_proc *proc)
 	default:
 		return ESH_PROC_ERROR;
 	}
+}
+
+static void esh_cortn_entry(struct cortn *cortn, void *arg)
+{
+	struct esh_cortn_slot *slot;
+
+	(void)cortn;
+	slot = arg;
+	slot->cs_entry(slot->cs_arg);
 }

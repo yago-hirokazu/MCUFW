@@ -10,29 +10,11 @@
 
 static struct cortn *cortn_current;
 
-static int cortn_guard_is_valid(const unsigned char *guard)
-{
-	size_t i;
-
-	for (i = 0; i < CORTN_STACK_GUARD_SIZE; i++) {
-		if (guard[i] != CORTN_GUARD_PATTERN)
-			return 0;
-	}
-	return 1;
-}
-
-static unsigned char *cortn_stack_top(const struct cortn *self)
-{
-	uintptr_t top;
-
-	top = (uintptr_t)(self->c_stack + self->c_stack_size -
-			  CORTN_STACK_GUARD_SIZE);
-	top &= ~(uintptr_t)0xf;
-	return (unsigned char *)top;
-}
+static int cortn_guard_is_valid(const unsigned char *guard);
+static unsigned char *cortn_stack_top(const struct cortn *self);
 
 int cortn_init(struct cortn *self, void *stack, size_t stack_size,
-	       cortn_entry_t entry, void *arg)
+	       void (*entry)(struct cortn *self, void *arg), void *arg)
 {
 	unsigned char *bytes;
 	unsigned char *upper_guard;
@@ -163,4 +145,25 @@ void cortn_boot_main(struct cortn *self)
 	self->c_reason = CORTN_YIELD_ERROR;
 	for (;;)
 		;
+}
+
+static int cortn_guard_is_valid(const unsigned char *guard)
+{
+	size_t i;
+
+	for (i = 0; i < CORTN_STACK_GUARD_SIZE; i++) {
+		if (guard[i] != CORTN_GUARD_PATTERN)
+			return 0;
+	}
+	return 1;
+}
+
+static unsigned char *cortn_stack_top(const struct cortn *self)
+{
+	uintptr_t top;
+
+	top = (uintptr_t)(self->c_stack + self->c_stack_size -
+			  CORTN_STACK_GUARD_SIZE);
+	top &= ~(uintptr_t)0xf;
+	return (unsigned char *)top;
 }
