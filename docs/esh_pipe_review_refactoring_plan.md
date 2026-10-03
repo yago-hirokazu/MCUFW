@@ -47,7 +47,7 @@
 | R3 | 文書と実装の整合 | R1 | done | 文書 |
 | R4 | Pipeline失敗・再利用試験 | R1 | done | 試験 |
 | R5 | Pipeline cleanup整理 | R4 | done | Refactoring |
-| R6 | Pipe close・部分転送試験 | R1 | pending | 試験 |
+| R6 | Pipe close・部分転送試験 | R1 | done | 試験 |
 | R7 | Scheduler waiter・release試験 | R1 | pending | 試験 |
 | R8 | Executor不正bytecode試験 | R1 | pending | 試験 |
 | R9 | Executor検査処理整理 | R8 | pending | Refactoring |
@@ -392,7 +392,7 @@ Pipelineの成功・失敗経路を、所有段階が読み取れる終了処理
 
 ### R6: Pipe close・部分転送試験
 
-状態: `pending`
+状態: `done`
 
 #### 目的
 
@@ -425,6 +425,21 @@ EOF、EPIPE、部分転送、close wakeupの現行動作を明示する。
 
 - Pipe cortn/thread O0/O2
 - Scheduler cortn/thread O0
+
+#### 実施結果
+
+- zero-length read/writeがfdとpeerを検査せず0を返す既存試験を確認
+- 最終writer close後に残データを読み切りEOFとなる既存試験を確認
+- 非backend利用時のread/write待機が`-ESH_EAGAIN`となることを確認
+- 非backend writeがbuffer容量までの部分byte数を返すことを確認
+- ring wrap境界でbyte順序を維持する既存試験を確認
+- reader closeが満杯pipeの待機writerをwakeし`-ESH_EPIPE`となる試験を追加
+- blocking write途中のreader closeが`-ESH_EPIPE`となる現行動作を固定
+- writer closeが空pipeの待機readerをwakeしEOFとなる試験を追加
+- Pipe cortn/thread × O0/O2、`-Werror`: pass
+- Scheduler cortn/thread O0: pass
+- production code変更なし
+- Cortex-M/RTOS移植には未着手
 
 ### R7: Scheduler waiter・release試験
 
