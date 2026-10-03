@@ -49,7 +49,7 @@
 | R5 | Pipeline cleanup整理 | R4 | done | Refactoring |
 | R6 | Pipe close・部分転送試験 | R1 | done | 試験 |
 | R7 | Scheduler waiter・release試験 | R1 | done | 試験 |
-| R8 | Executor不正bytecode試験 | R1 | pending | 試験 |
+| R8 | Executor不正bytecode試験 | R1 | done | 試験 |
 | R9 | Executor検査処理整理 | R8 | pending | Refactoring |
 | R10 | Script/parser機械的整理 | R4、R8 | pending | Refactoring |
 | RV | 全体回帰確認と記録更新 | 選択したR1〜R10 | pending | 検証 |
@@ -494,7 +494,7 @@ wait list、wake、release、thread joinの境界を試験で固定する。
 
 ### R8: Executor不正bytecode試験
 
-状態: `pending`
+状態: `done`
 
 #### 目的
 
@@ -529,6 +529,18 @@ Executorが不正bytecodeを範囲外参照なしで拒否し、再利用でき�
 - 新規不正bytecode試験
 - Executor test1〜10
 - Pipeline executor cortn/thread O0
+
+#### 実施結果
+
+- operand欠落、不明opcode、各table ID範囲外の拒否試験を追加
+- 未終端stringとvariable valueの拒否試験を追加
+- stack underflow/overflowとprocessなし命令の拒否試験を追加
+- pipeline段数超過とcode範囲外jump先の拒否試験を追加
+- 不正bytecode拒否後にvalid bytecodeを実行できることを確認
+- Pipeline executor cortn/thread O0: pass
+- Executor test1〜10 cortn/thread: golden一致
+- production code変更なし
+- Cortex-M/RTOS移植には未着手
 
 ### R9: Executor検査処理整理
 

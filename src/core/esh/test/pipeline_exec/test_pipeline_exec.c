@@ -37,6 +37,8 @@ static int error_main(int argc, char **argv);
 static int stdio_producer_main(int argc, char **argv);
 static int getchar_consumer_main(int argc, char **argv);
 static void init_command(struct proc *proc, struct applet *applet);
+static void init_executor_instruction(struct code *code, struct exe *executor,
+				      int opcode, int operand);
 static void test_three_stage_pipeline(void);
 static void test_early_filter_exit(void);
 static void test_stdio_pipeline(void);
@@ -186,6 +188,16 @@ static void init_command(struct proc *proc, struct applet *applet)
 	proc->p_argv[0] = (char *)applet->name;
 }
 
+static void init_executor_instruction(struct code *code, struct exe *executor,
+				      int opcode, int operand)
+{
+	code_init(code);
+	memset(executor, 0, sizeof(*executor));
+	code->c_code[0] = opcode;
+	code->c_code[1] = operand;
+	code->c_codes = 2;
+}
+
 static void test_three_stage_pipeline(void)
 {
 	struct proc proc[3];
@@ -330,25 +342,66 @@ static void test_executor_bounds(void)
 		CHECK(exe_run_codes(&code, &executor) == EXIT_SUCCESS);
 	CHECK(executor.e_pc == CODES);
 	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
-	executor.e_pc = 0;
+
+	init_executor_instruction(&code, &executor, OP_BLTN_CMD, 0);
 	code.c_codes = 1;
-	code.c_code[0] = OP_BLTN_CMD;
 	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
-	code.c_codes = 2;
-	code.c_code[1] = 999;
+	init_executor_instruction(&code, &executor, OP_BLTN_CMD, 999);
 	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
-	code.c_code[0] = OP_CMD_EXE;
+	init_executor_instruction(&code, &executor, OP_USER_CMD, 999);
 	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
-	code.c_code[0] = OP_JUMP_IF_FALSE;
-	code.c_code[1] = 0;
+
+	init_executor_instruction(&code, &executor, OP_PUSH_SYMBOL, -1);
 	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
-	code.c_code[0] = OP_PUSH_SYMBOL;
+	init_executor_instruction(&code, &executor, OP_PUSH_SYMBOL, 0);
+	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
 	code.c_stab.s_num = 1;
+	memset(code.c_stab.s_str, 'x', SYMCHARS);
+	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
+
+	init_executor_instruction(&code, &executor, OP_CMD_VARG, 0);
+	init_command(&executor.e_proc[0], &echo_applet);
+	executor.e_procs = 1;
+	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
+	code.c_vtab.v_num = 1;
+	memset(code.c_vtab.v_val, 'x', SYMCHARS);
+	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
+
+	init_executor_instruction(&code, &executor, OP_JUMP, 0);
+	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
+	code.c_ltab.l_num = 1;
+	code.c_ltab.l_addr[0] = code.c_codes + 1;
+	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
+
+	init_executor_instruction(&code, &executor, OP_JUMP_IF_FALSE, 0);
+	code.c_ltab.l_num = 1;
+	code.c_ltab.l_addr[0] = 0;
+	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
+	init_executor_instruction(&code, &executor, OP_PUSH_SYMBOL, 0);
+	code.c_stab.s_num = 1;
+	code.c_stab.s_str[0] = 0;
 	executor.e_sp = STACKS;
 	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
-	executor.e_sp = 0;
-	code.c_code[0] = 0xff;
+
+	init_executor_instruction(&code, &executor, OP_CMD_ARG, 0);
+	code.c_stab.s_num = 1;
+	code.c_stab.s_str[0] = 0;
 	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
+	init_executor_instruction(&code, &executor, OP_CMD_EXE, 0);
+	code.c_codes = 1;
+	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
+
+	init_executor_instruction(&code, &executor, OP_PIPE_NEXT, 0);
+	code.c_codes = 1;
+	executor.e_procs = PROCS;
+	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
+
+	init_executor_instruction(&code, &executor, 0xff, 0);
+	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
+	code.c_code[0] = OP_NOP;
+	code.c_codes = 1;
+	CHECK(exe_run_codes(&code, &executor) == EXIT_SUCCESS);
+	CHECK(executor.e_pc == 1);
 }
 
 static int script_line(const char *text)
