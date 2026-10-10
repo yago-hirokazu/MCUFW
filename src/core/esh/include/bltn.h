@@ -13,6 +13,9 @@ extern "C" {
 #if defined(PROTOTYPES)
 
 extern const char C_HELP;
+#ifdef ESH_SCRIPT
+extern int cat(int argc, char **argv);
+#endif
 #if USE_STACKMACH
 extern const char C_TEST;
 extern const char C_EXPR;
@@ -52,6 +55,9 @@ const struct applet builtins[] = {
 	{"break", break_command},
 #endif // #if TODO_BREAK_WITH_ARGUMENT
 #endif // #if USE_STACKMACH
+#ifdef ESH_SCRIPT
+	{"cat", cat},
+#endif
 	{NULL, NULL}
 };
 #endif

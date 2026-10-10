@@ -4,6 +4,7 @@ TARGET = test_exe.exe
 
 # Commands
 CC = gcc
+include ../../target/windows/sched_backend.mk
 ifeq ($(MSYSTEM),MINGW64)
 DEL = rm -f
 COPY = cp
@@ -35,6 +36,7 @@ vpath %.c ../../target/windows/
 else
 vpath %.c ../../target/cygwin/
 endif
+vpath %.S ../../target/windows/
 vpath %.o _output
 
 # C sources
@@ -49,17 +51,23 @@ CSOURCES += echo.c
 CSOURCES += esh_debug.c
 CSOURCES += exe.c
 CSOURCES += expr.c
+CSOURCES += file.c
 CSOURCES += help.c
+CSOURCES += pipe.c
 CSOURCES += par.c
 CSOURCES += run.c
+CSOURCES += sched.c
 CSOURCES += lex.c
 CSOURCES += test.c
 CSOURCES += tok.c
 CSOURCES += tty.c
 
 ## ../../target/windows/
+CSOURCES += $(ESH_SCHED_CSOURCES)
 CSOURCES += stdio_adapt.c
 CSOURCES += tty_adapt.c
+
+ASOURCES := $(ESH_SCHED_ASOURCES)
 
 ## ../../../usr/cmd
 CSOURCES += cmd_sample.c
@@ -74,6 +82,7 @@ CSOURCES += symchar.c
 # Make object file lit from source file list
 _OBJS = $(CSOURCES:.c=.o)
 _OBJS += $(CPPSOURCES:.cpp=.o)
+_OBJS += $(ASOURCES:.S=.o)
 OBJS = $(addprefix $(OUTDIR)/, $(_OBJS))
 
 # Dependencies
@@ -91,6 +100,8 @@ INCLUDES += -I../../../../target/windows/Adapt
 
 CFLAGS += $(INCLUDES)
 CFLAGS += -DUSE_STACKMACH
+CFLAGS += -DESH_STDIO_PIPE
+CFLAGS += $(ESH_SCHED_CPPFLAGS)
 
 # CXXFLAGS
 CXXFLAGS := $(CFLAGS)
@@ -115,6 +126,9 @@ $(OUTDIR)/%.o: %.c
 $(OUTDIR)/%.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c -MMD -MP $< -o $@
 
+$(OUTDIR)/%.o: %.S
+	$(CC) $(CFLAGS) -c -MMD -MP $< -o $@
+
 .PHONY: clean
 clean:
 	$(DEL) *.exe
@@ -126,4 +140,3 @@ CPPFLAGS=$(CFLAGS)
 .PHONY: check-syntax
 check-syntax:
 	$(CC) -o nul $(CPPFLAGS) -S $(CHK_SOURCES)
-

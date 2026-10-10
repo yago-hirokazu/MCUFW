@@ -9,7 +9,7 @@
 
 #if DEBUG_TTY_A
 #define DP(fmt, ...) \
-	printf("[%s|%s()|L%d] " fmt "\n",	\
+	fprintf(stderr, "[%s|%s()|L%d] " fmt "\n",	\
 	       __FILE__,__func__,__LINE__,	\
 	       ##__VA_ARGS__			\
 		)

@@ -51,6 +51,8 @@ struct parse {
 	char p_varid;
 	char p_elses;
 	char p_break;
+	char p_pipeline;
+	char p_pipe_command;
 	struct label
 	{
 		int l_loop;
@@ -60,6 +62,7 @@ struct parse {
 };
 
 char par_make_code(struct token *tok, struct code *code);
+void par_init(void);
 
 
 #ifdef __cplusplus

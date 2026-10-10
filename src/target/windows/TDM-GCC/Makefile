@@ -5,6 +5,7 @@ TARGET = main.exe
 # Commands
 CXX = g++
 CC = gcc
+include ../../../core/esh/target/windows/sched_backend.mk
 DEL = del /q
 COPY = copy
 REN = ren
@@ -21,6 +22,7 @@ vpath %.c ../../../core/usr/cmd
 vpath %.c ../../../core/elib
 vpath %.c ../../../core/esh
 vpath %.c ../../../core/esh/target/windows
+vpath %.S ../../../core/esh/target/windows
 vpath %.o _output
 vpath %.dll ./DLL
 
@@ -39,13 +41,19 @@ CSOURCES += cmd_sample.c
 ## ../../../core/elib
 CSOURCES += getopt.c
 CSOURCES += qbyte.c
+CSOURCES += symchar.c
 
 ## ../../../core/esh
+CSOURCES += $(ESH_SCHED_CSOURCES)
+CSOURCES += break.c cat.c code.c esh_debug.c exe.c lex.c par.c script.c tok.c
 CSOURCES += echo.c
 CSOURCES += esh.c
 CSOURCES += expr.c
+CSOURCES += file.c
 CSOURCES += help.c
+CSOURCES += pipe.c
 CSOURCES += run.c
+CSOURCES += sched.c
 CSOURCES += test.c
 CSOURCES += tty.c
 
@@ -54,12 +62,16 @@ CSOURCES += esh_adapt.c
 CSOURCES += stdio_adapt.c
 CSOURCES += tty_adapt.c
 
+# Assembly sources
+ASOURCES := $(ESH_SCHED_ASOURCES)
+
 # CPP sources
 ## reserved for future use
 
 # Make object file list from source file list
 _OBJS = $(CSOURCES:.c=.o)
 _OBJS += $(CPPSOURCES:.cpp=.o)
+_OBJS += $(ASOURCES:.S=.o)
 OBJS = $(addprefix $(OUTDIR)/, $(_OBJS))
 
 # Dependencies
@@ -78,6 +90,9 @@ INCLUDES += -I../../../core/esh/include
 INCLUDES += -I../../../core/esh/target/windows
 
 CFLAGS += $(INCLUDES)
+CFLAGS += -DESH_STDIO_PIPE
+CFLAGS += -DUSE_STACKMACH -DESH_SCRIPT
+CFLAGS += $(ESH_SCHED_CPPFLAGS)
 # CFLAGS += -DADAFRUIT
 
 # CXXFLAGS
@@ -112,6 +127,11 @@ $(OUTDIR)/%.o: %.c
 
 $(OUTDIR)/%.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c -MMD -MP $< -o $@
+
+$(OUTDIR)/%.o: %.S
+	$(CC) $(CFLAGS) -c -MMD -MP $< -o $@
+
+$(OBJS): Makefile ../../../core/esh/target/windows/sched_backend.mk
 
 .PHONY: clean
 clean:

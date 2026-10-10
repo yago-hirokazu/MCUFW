@@ -12,10 +12,16 @@ extern "C" {
 #include "code.h"
 #include "esh.h"
 #include "esh_adapt.h"
+#include "esh_sched.h"
 #include "tty.h"
+
+#if PROCS != ESH_PIPELINE_MAX
+#error "PROCS must match ESH_PIPELINE_MAX"
+#endif
 
 
 struct proc {
+	struct esh_proc p_exec;		/* Portable execution state */
 	struct applet *p_cmd;		/* Command */
 	char p_argc;			/* # of command arguments */
 	char *p_argv[TTY_NARG];		/* Command arguments */
@@ -24,15 +30,17 @@ struct proc {
 
 struct exe {
 	INT e_stack[STACKS];		/* Stack */
-	char e_pc;			/* Program counter */
-	char e_sp;			/* Stackk pointer */
+	int e_pc;			/* Program counter */
+	int e_sp;			/* Stack pointer */
 	char e_procs;			/* # of procs to be executed */
+	int e_status;			/* Last command or pipeline status */
 	struct proc e_proc[PROCS];	/* Process */
 };
 
 
 extern struct exe exe;
 int exe_run_codes(struct code *code, struct exe *exe);
+int exe_run_pipeline(struct proc *proc, int count);
 
 
 #ifdef __cplusplus

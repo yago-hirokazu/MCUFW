@@ -10,7 +10,7 @@
 
 #define EP(fmt, ...)\
 do {\
-	fprintf(stdout,"error [%s|%s()|L%d] " fmt "\n",\
+	fprintf(stderr,"error [%s|%s()|L%d] " fmt "\n",\
 		__FNAME__,__func__,__LINE__,\
 		##__VA_ARGS__\
 		);\
@@ -20,7 +20,7 @@ do {\
 #if DEBUG_LEX
 #define DP(fmt, ...)\
 do {\
-	fprintf(stdout,"debug [%s|%s()|L%d] " fmt "\n",\
+	fprintf(stderr,"debug [%s|%s()|L%d] " fmt "\n",\
 		__FNAME__,__func__,__LINE__,\
 		##__VA_ARGS__\
 		);\
@@ -70,6 +70,7 @@ static const struct reserved_token kwtab[] = {
 static const struct reserved_token optab[] = {
 	{T_ASSIGN   , "="},
 	{T_SEMICOLON, ";"},
+	{T_PIPE     , "|"},
 };
 
 enum {NKWTAB = sizeof(kwtab) / sizeof(struct reserved_token)};
@@ -95,10 +96,15 @@ int lex_analyze_token(char *str, struct token *token)
 {
 	int ret = LEXONGO;
 	enum lex_state state = lex.l_state;
-	enum token_type *type = &token->t_type;
-	char *sym = &token->t_symbol[0];
+	enum token_type *type;
+	char *sym;
 	char c = 0;
 	char scat[SYMCHARS];
+
+	if (!str || !token || strlen(str) >= SYMCHARS)
+		return LEXERROR;
+	type = &token->t_type;
+	sym = &token->t_symbol[0];
 
 	DP("state=%s, str=%s",lex_state_str[state],str);
 	switch (state) {
@@ -196,6 +202,11 @@ int lex_analyze_token(char *str, struct token *token)
 		if (c == ' ' || c == '\0') {
 			EP("Null symbol",0);
 			goto error;
+		} else if (c == '|' && str[1] == '\0') {
+			DP("PIPE: %c", c);
+			*type = T_PIPE;
+			sym[0] = c;
+			state = LEX_CMD;
 		} else if (c == '$') {
 			DP("VARG: %s",str);
 			strncpy(sym, str+1, SYMCHARS);
@@ -262,6 +273,8 @@ int lex_analyze_token(char *str, struct token *token)
 				strncpy(sym, str, SYMCHARS);
 				DP("sym=%s",sym);
 			} else {
+				if (strlen(sym) + strlen(str) + 1 >= SYMCHARS)
+					goto error;
 				memset(scat, 0, sizeof(scat));
 				strncpy(scat, sym, SYMCHARS);
 				snprintf(sym, SYMCHARS, "%s %s", scat, str);
@@ -284,6 +297,8 @@ int lex_analyze_token(char *str, struct token *token)
 			if (lex.l_scats == 0) {
 				strncpy(sym, str, SYMCHARS);
 			} else {
+				if (strlen(sym) + strlen(str) + 1 >= SYMCHARS)
+					goto error;
 				memset(scat, 0, sizeof(scat));
 				strncpy(scat, sym, SYMCHARS);
 				snprintf(sym, SYMCHARS, "%s %s", scat, str);

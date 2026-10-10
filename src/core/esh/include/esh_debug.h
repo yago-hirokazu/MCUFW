@@ -11,8 +11,12 @@ extern "C" {
 
 #define	DEBUG_TTY	0	/* Enable debug print on tty.c */
 #define	DEBUG_TTY_A	0	/* Enable debug print on tty_adapt.c */
+#ifndef DEBUG_STDIO
 #define	DEBUG_STDIO	0	/* Enable debug print on stdio_adapt.c */
+#endif
+#ifndef DEBUG_SHELL
 #define	DEBUG_SHELL	0	/* Enable debug print on run.c */
+#endif
 #define DEBUG_LEX	0	/* Enable debug print on slex.c */
 #define DEBUG_PAR	0	/* Enable debug print on par.c */
 #define DEBUG_EXE	0	/* Enable debug print on exe.c */

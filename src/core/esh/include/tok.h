@@ -39,6 +39,7 @@ enum	token_type {
 #if TODO_BREAK_WITH_ARGUMENT
 	T_BREAK,        /* break */
 #endif
+	T_PIPE,		/* | */
 	T_EOL,		/* End of line */
 	T_COMMENT,	/* Comment */
 	T_UNKNOWN

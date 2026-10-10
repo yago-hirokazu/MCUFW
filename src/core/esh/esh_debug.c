@@ -29,6 +29,7 @@ char * const token_type_str[] = {
 	"T_ELSE",
 	"T_FI",
 	"T_BREAK",
+	"T_PIPE",
 	"T_EOL",
 	"T_COMMENT",
 	"T_UNKNOWN",
@@ -104,6 +105,7 @@ char * const opcode_str[] = {
 	"OP_PUSH_SYMBOL",
 	"OP_POP_SYMBOL_THEN_ASSIGN",
 	"OP_BREAK_LOOP",
+	"OP_PIPE_NEXT",
 	NULL
 };
 

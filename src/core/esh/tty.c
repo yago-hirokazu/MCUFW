@@ -22,6 +22,9 @@
 #include "qbyte.h"
 #include "tty.h"
 #include "tty_adapt.h"
+#ifdef ESH_SCRIPT
+#include "script.h"
+#endif
 
 
 /**************************************************************************
@@ -75,11 +78,12 @@ static void puth(struct qbyte *line_p, struct tty_history *history_p);
 static void geth(struct tty_history *history_p, struct qbyte *line_p);
 static void reprompt(void);
 static int is_indent(int c, struct qbyte *line_p);
+static int tokenize_meta(char *line);
 #if DEBUG_TTY
 static void outc(char *str);
 static void outh(char *str);
 #define DP(fmt, ...) \
-	printf("[%s|%s()|L%d] " fmt,	\
+	fprintf(stderr, "[%s|%s()|L%d] " fmt,	\
 	       __FNAME__,__func__,__LINE__,	\
 	       ##__VA_ARGS__			\
 		)
@@ -103,7 +107,7 @@ extern void proc_up(void);
 extern void proc_down(void);
 extern void proc_right(void);
 extern void proc_left(void);
-extern char *find_space(char *cp, int endaddr);
+extern char *find_space(char *cp, const char *endaddr);
 extern int is_endofline(char c);
 extern int is_before_space(struct qbyte *line_p);
 extern void nul_to_space(char *cp);
@@ -128,16 +132,30 @@ extern void echo_left(void);
 void ttyinit(void)
 {
 	qbinit(&line, (uint8_t *)&linebuf[0], TTY_NBUF);
+#ifdef ESH_SCRIPT
+	esh_script_init();
+#endif
 }
 
 void ttytask(int c)
 {
+#ifdef ESH_SCRIPT
+	char input[TTY_NBUF];
+#endif
+#ifndef ESH_SCRIPT
 	struct tty_arg *arg_p = &arg;
 	char found_applet;
+#endif
 
 	if (!(DELIM_LF & scan(c, &line)))
 		return;
 
+#ifdef ESH_SCRIPT
+	memcpy(input, linebuf, sizeof(input));
+	puth(&line, &history);
+	if (esh_script_line(input) < 0)
+		fprintf(stderr, "script rejected\n");
+#else
 	arg_p = make_argvect(linebuf, arg_p);
 	if (arg_p == NULL)
 		goto repro;
@@ -147,6 +165,7 @@ void ttytask(int c)
 		puth(&line, &history);
 
 repro:
+#endif
 	DP("goto repro\n");
 	qbreset(&line, 0);
 	memset(&arg, 0, sizeof(struct tty_arg));
@@ -174,9 +193,14 @@ struct tty_arg *tokenize(char *line, struct tty_arg *arg)
 {
 	char *cp = line;
 	int k = 0;
-	int eobaddr = (int)(line + TTY_BBUF);
+	const char *eobaddr;
 
-	if (cp == NULL)
+	if (!line || !arg)
+		return NULL;
+	eobaddr = line + TTY_BBUF;
+	if (!memchr(line, 0, TTY_NBUF))
+		return NULL;
+	if (tokenize_meta(line) < 0)
 		return NULL;
 
 	arg->v[0] = cp;
@@ -207,11 +231,59 @@ struct tty_arg *tokenize(char *line, struct tty_arg *arg)
 #endif
 
 	/* don't put history if it is blank line */
+	if (arg->c == TTY_NARG - 1 &&
+	    !is_endofline(arg->v[arg->c - 1][0]) &&
+	    find_space(arg->v[arg->c - 1], eobaddr))
+		return NULL;
 	if (arg->c == 0)
 		return NULL;
 
 out:
 	return (struct tty_arg *)arg;
+}
+
+static int tokenize_meta(char *line)
+{
+	char split[TTY_NBUF];
+	size_t dst;
+	size_t src;
+	char quote;
+
+	dst = 0;
+	quote = 0;
+	for (src = 0; line[src] != '\0'; src++) {
+		char c = line[src];
+
+		if (c == '\'' || c == '"') {
+			if (!quote)
+				quote = c;
+			else if (quote == c)
+				quote = 0;
+		}
+		if (c == '|' && !quote) {
+			if (dst && split[dst - 1] != ' ') {
+				if (dst >= TTY_BBUF)
+					return -1;
+				split[dst++] = ' ';
+			}
+			if (dst >= TTY_BBUF)
+				return -1;
+			split[dst++] = c;
+			if (line[src + 1] != ' ' &&
+			    line[src + 1] != '\0') {
+				if (dst >= TTY_BBUF)
+					return -1;
+				split[dst++] = ' ';
+			}
+			continue;
+		}
+		if (dst >= TTY_BBUF)
+			return -1;
+		split[dst++] = c;
+	}
+	split[dst] = '\0';
+	memcpy(line, split, dst + 1);
+	return 0;
 }
 
 struct tty_arg *make_argvect(char *line, struct tty_arg *arg)
@@ -377,20 +449,20 @@ static void echo_del(void)
 	echo_left();
 }
 
-char *find_keyc(char *cp, int (*delim)(char c), int endaddr)
+char *find_keyc(char *cp, int (*delim)(char c), const char *endaddr)
 {
 	if (cp == NULL)
 		return NULL;
 	while (!delim(*cp)) {
 #if DEBUG_TTY
-		DP("cp=0x%08X endaddr=0x%08X\n",(int)cp,endaddr);
+		DP("cp=%p endaddr=%p\n", (void *)cp, (const void *)endaddr);
 		if (*cp == '\n') {
 			DP("*cp=0x%02X\n",*cp);
 		} else {
 			DP("*cp=%c\n",*cp);
 		}
 #endif
-		if ((int)cp >= endaddr)
+		if (cp >= endaddr)
 			return NULL;
 		cp++;
 	}
@@ -595,20 +667,20 @@ void proc_left(void)
 	return;
 }
 
-char *find_space(char *cp, int endaddr)
+char *find_space(char *cp, const char *endaddr)
 {
 	if (cp == NULL)
 		return NULL;
 	while (*cp != ' ') {
 #if DEBUG_TTY
-		DP("cp=0x%08X endaddr=0x%08X\n",(int)cp,endaddr);
+		DP("cp=%p endaddr=%p\n", (void *)cp, (const void *)endaddr);
 		if (*cp == '\n') {
 			DP("*cp=0x%02X\n",*cp);
 		} else {
 			DP("*cp=%c\n",*cp);
 		}
 #endif
-		if ((int)cp >= endaddr)
+		if (cp >= endaddr || !*cp)
 			return NULL;
 		cp++;
 	}

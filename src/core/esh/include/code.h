@@ -37,7 +37,8 @@ enum opcode {
 	OP_JUMP,
 	OP_PUSH_SYMBOL,
 	OP_POP_SYMBOL_THEN_ASSIGN,
-	OP_BREAK_LOOP
+	OP_BREAK_LOOP,
+	OP_PIPE_NEXT
 };
 
 struct variable_table {

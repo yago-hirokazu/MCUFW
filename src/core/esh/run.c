@@ -15,11 +15,11 @@
 
 #if DEBUG_SHELL
 #define DP(fmt, ...) do {					\
-		fprintf(stdout, "[%s|%s()|L%d] " fmt "\n",	\
+		fprintf(stderr, "[%s|%s()|L%d] " fmt "\n",	\
 			__FNAME__,__func__,__LINE__,		\
 			##__VA_ARGS__				\
 			);					\
-		ffush(stdout);					\
+		fflush(stdout);				\
 	} while (0);
 #else
 #define DP(fmt, ...)

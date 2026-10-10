@@ -100,6 +100,8 @@ C:\Keil_v543a\ARM\ARMCLANG\bin
 
 ### src/target/windows
 
+PowerShell から `C:\msys64\mingw64\bin\gcc.exe` を直接起動したことです。MSYS2 shell 外では必要なDLL探索順が崩れ、各 `cc1.exe` が `clock_gettime64` を解決できず、エラーが発生します。PowerShell から `C:\msys64\mingw64\bin\gcc.exe` 直接起動はしないで、MSYS2 shell 経由だけで実行します。
+
 1. mingw64 シェルで下記を実行
 
 - cd src/target/windows
@@ -127,45 +129,75 @@ mingw64 シェルで `src/core/esh/test/exe` に移動し、下記を実行し�
 
 - bash ./run_test.sh
 
-## コーディングルール1
 
-### 対象ディレクトリ
+## 共通コーディングルール
+
+1. typedef を使うと型が一目でわからなくなり、プログラムが読みにくくなるため、使わないものとする。
+
+2. ソースファイルは下記の構成とする。`/MCUFW/src/core/esh/tty.c`がモデル。
+- standard include files
+- project-specific include files
+- (exported) global variable definitions
+- local constants (#defines & enum)
+- local types (struct & enum)
+- local (static) variable definitions
+- local (static) function prototypes
+- export function prototypes
+- import function prototypes
+- export function definitions
+- local (static) function definitions
+
+
+3. ヘッダファイルのガードマクロは下記の書式とする
+
+``` c
+#ifndef __NAME_H__
+#define __NAME_H__
+...
+#endif
+```
+
+## ターゲット別コーディングルール
+
+### コーディングルール1 (Windows ターゲット)
+
+#### 対象ディレクトリ
 
 src/core/
 src/target/windows/
 
-### 適用ルール
+#### 適用ルール
 
 docs/coding_style_summary_linux_kernel.md
 
 
-## コーディングルール2
+### コーディングルール2 (STM32 ターゲット)
 
-### 対象ディレクトリ
+#### 対象ディレクトリ
 
 src/target/NUCLEO-U575ZI-Q/
 
-### 適用ルール
+#### 適用ルール
 
 STM32CubeMX が生成した下記対象ディレクトリのプログラムコードには下記のルールを適用する。
 下記の対象ディレクトリ以外のプログラムコードは「コーディングルール1」を適用する。
 
-#### 対象ディレクトリ
+##### 対象ディレクトリ
 
 src/target/NUCLEO-U575ZI-Q/Drivers
 src/target/NUCLEO-U575ZI-Q/Inc
 src/target/NUCLEO-U575ZI-Q/Src
 
-#### 適用ルール
+##### 適用ルール
 
 docs/coding_style_summary_stm32cubefw.md
 
 
-## コーディングルールの観点
+### ターゲット別コーディングルールの観点
 
 1. インデント
 2. 行の長さ
-3. 波括弧と空白
+3. 波括弧と空白q
 4. 名前の付け方
 5. `typedef`
 6. 関数
