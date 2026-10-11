@@ -1,9 +1,9 @@
 # UNIX V7風buffer cacheによるpipe格納方式 実装引継ぎ書
 
-作成日: 2026-10-11  
-対象リポジトリ: `C:\usr\src\MCUFW`  
-作成時ブランチ: `feature/mrunts`  
-作成時HEAD: `0b4790b Refactor script parser cleanup`
+作成日: 2026-10-11
+対象リポジトリ: `C:\usr\src\MCUFW`
+最終更新時ブランチ: `feature/mrunsv`
+最終更新時HEAD: `6e8ac0f add .md files`
 
 ## 1. 次タスクの目的
 
@@ -24,6 +24,9 @@
 ただし、V7が`av_forw`と`av_back`をdevice I/O queue用フィールドへ流用する設計は
 採用しない。将来のblock device I/O queueは`b_io_next`と
 `struct bdev_queue`で明示する。
+
+UNIX V7から採用するportableなsourceとheaderは`src/core/sys/`へ配置する。
+既存`src/core/esh/`にはshell、scheduler、既存pipeとの接続処理だけを残す。
 
 最初の実装範囲には、USB memory、Flash、通常ファイル、directory、mount、
 free-block管理、実I/Oを含めない。Windows上でbuffer cache単体と既存pipeを
@@ -222,16 +225,46 @@ rkintr()       -> 完了requestを外す -> iodone(bp) -> 次を開始
 
 ### 5.1 配置
 
-最初の配置候補:
+`src/core/sys/`には次のsubdirectoryが作成済みである。
 
 ```text
-src/core/esh/include/buf.h
-src/core/esh/bio.c
-src/core/esh/test/bio/
+src/core/sys/
+  conf/
+  dev/
+  h/
+  sys/
 ```
 
-既存file/inode/pipeと同じ層へ置き、変更範囲を限定する。別subsystemからの再利用が
-実際に必要になってから`core/elib`への抽出を検討する。
+V7の配置を基準に、最初の実装では次へ置く。
+
+```text
+src/core/sys/h/buf.h             struct buf、flag、定数、API宣言
+src/core/sys/h/conf.h            struct bdevsw、device table宣言
+src/core/sys/dev/bio.c           buffer cache本体
+src/core/sys/conf/conf.c         buf[]、bfreelist、device table、sentinel
+src/core/sys/test/bio/           buffer cache単体試験
+```
+
+将来V7由来のgeneric file/inode/pipe処理を採用する場合は
+`src/core/sys/sys/`へ配置する。物理device driverのportableなqueue処理は
+`src/core/sys/dev/`、Windows・STM32固有I/Oは各target directoryへ置く。
+
+```text
+src/core/sys/h/       V7 usr/sys/h相当の公開header
+src/core/sys/dev/     V7 usr/sys/dev相当のbuffer・block device処理
+src/core/sys/sys/     V7 usr/sys/sys相当のgeneric kernel処理
+src/core/sys/conf/    fixed tableとdevice configuration
+```
+
+既存の`src/core/esh/pipe.c`と`src/core/esh/include/esh_pipe.h`は最初の移行では
+移動しない。これらは`buf.h`を利用するconsumerとして変更する。source配置は
+V7を踏襲するが、historical sourceを無変更でcopyせず、PDP-11依存部を除いた
+modern Cとして実装する。
+
+各Makefileには`src/core/sys/h`相当のinclude search pathと
+`src/core/sys/dev/bio.c`、`src/core/sys/conf/conf.c`を明示的に追加する。
+source内のincludeは既存MCUFW方式に合わせて`#include "buf.h"`、
+`#include "conf.h"`とし、V7の`../h/`相対pathはcopyしない。
 
 ### 5.2 定数と固定配列
 
@@ -491,22 +524,28 @@ MinGW gccを直接起動しない。
 
 ### Step 1: buffer cache単体
 
-1. `include/buf.h`と`bio.c`を追加
-2. `buffers[]`、`buf[]`、`bfreelist`、`pipe_tab`を追加
-3. `binit()`、list helper、`notavail()`、`getblk()`、`geteblk()`、
+1. `src/core/sys/h/buf.h`と`src/core/sys/h/conf.h`を追加
+2. `src/core/sys/dev/bio.c`を追加
+3. `src/core/sys/conf/conf.c`へ`buf[]`、`bfreelist`、`pipe_tab`、
+   initial device tableを追加
+4. `bio.c`へ`buffers[]`、`binit()`、list helper、`notavail()`、
+   `getblk()`、`geteblk()`、
    `brelse()`、`incore()`、`clrbuf()`を実装
-4. `test/bio/`でlist invariantとLRU順を検査
+5. `src/core/sys/test/bio/`でlist invariantとLRU順を検査
 
-最初からpipe.cへ埋め込まず、list操作を単体試験できるようにする。
+最初から`src/core/esh/pipe.c`へ埋め込まず、`src/core/sys`だけでlist操作を
+単体試験できるようにする。
 
 ### Step 2: pipe allocationへ接続
 
 1. `esh_file_system_init()`から`binit()`を呼ぶ
-2. `esh_pipe_inode_alloc()`でpipe table indexを求める
-3. `getblk(PIPEDEV, index)`でbufferを取得
-4. buffer取得失敗ならinode allocationを完全に巻き戻す
-5. `pi_buf`へbufferを所有させる
-6. discardと最終closeで`brelse()`する
+2. ESH関連Makefileへ`src/core/sys/h`とsys sourceを追加
+3. `esh_pipe.h`から`buf.h`をincludeする
+4. `esh_pipe_inode_alloc()`でpipe table indexを求める
+5. `getblk(PIPEDEV, index)`でbufferを取得
+6. buffer取得失敗ならinode allocationを完全に巻き戻す
+7. `pi_buf`へbufferを所有させる
+8. discardと最終closeで`brelse()`する
 
 ### Step 3: payload移行
 
@@ -537,18 +576,22 @@ MinGW gccを直接起動しない。
 
 pipe移行と分けて次を実装する。
 
-1. `struct bdev_queue`とFIFO helper
-2. `b_io_next`によるpending queue
-3. `dq_active`へのstart遷移
-4. mock completionから`iodone()`
-5. error/retry上限
-6. empty、1件、複数件、完了順、二重enqueue拒否の試験
+1. `src/core/sys/h/buf.h`へ`b_io_next`を定義
+2. `src/core/sys/h/conf.h`へ`struct bdev_queue`を定義
+3. `src/core/sys/dev/`へFIFO helperを実装
+4. `b_io_next`によるpending queue
+5. `dq_active`へのstart遷移
+6. mock completionから`iodone()`
+7. error/retry上限
+8. empty、1件、複数件、完了順、二重enqueue拒否の試験
 
 ### Step 6: 将来の物理block device
 
 - Windows USB: OS I/O adapterをtarget層へ置く
 - STM32外部Flash: read/program/erase state machineをtarget層へ置く
 - STM32内部Flash: erase単位、program alignment、実行中code領域との競合を扱う
+- portableなblock queueと共通driver契約は`src/core/sys/dev/`へ置く
+- device構成とswitch tableは`src/core/sys/conf/`へ置く
 - logical block requestは`struct buf`のままdriver queueへ渡す
 - erase/program分割やwear levelingはFlash translation層内部の別状態として扱う
 - hardware/OS completionは`iodone(bp)`へ収束させる
@@ -596,28 +639,37 @@ fixed pool、将来のstrategy/iodone境界は保つ。
 
 1. pipe payloadが`struct esh_pipe_buffer.pb_data`ではなく`buffers[][]`に存在
 2. payloadを指すheaderが`buf[]`の`struct buf`
-3. 各bufferがb-listへ常時所属
-4. 非busy bufferだけがav-listへ所属
-5. live pipe bufferが`B_BUSY`で保持され、最終closeでav-listへ戻る
-6. `av_forw/av_back`をI/O queueへ流用していない
-7. 生成途中失敗とcloseでresource leak、double releaseなし
-8. buffer cache単体試験が成功
-9. 既存pipe/scheduler/pipeline suiteが両backend、O0/O2で成功
-10. 物理I/O未実装部分がstubまたは未公開で明確
-11. 変更文書に実測した試験結果と未確認事項を記録
+3. V7由来source/headerが`src/core/sys/`に配置されている
+4. `src/core/esh/`にはsys実装を重複して置いていない
+5. 各bufferがb-listへ常時所属
+6. 非busy bufferだけがav-listへ所属
+7. live pipe bufferが`B_BUSY`で保持され、最終closeでav-listへ戻る
+8. `av_forw/av_back`をI/O queueへ流用していない
+9. 生成途中失敗とcloseでresource leak、double releaseなし
+10. buffer cache単体試験が成功
+11. 既存pipe/scheduler/pipeline suiteが両backend、O0/O2で成功
+12. 物理I/O未実装部分がstubまたは未公開で明確
+13. 変更文書に実測した試験結果と未確認事項を記録
 
 ## 12. 作業ツリーの注意
 
-この文書作成時、追跡済みfileに未コミット変更はなかった。多数の既存未追跡fileが
-あるため、`git add .`、一括clean、未追跡file削除を行わない。特に`.agents/`、
-coding style資料、STM32 tree、test生成物、`.bak`、Windows DLL/exeは別作業由来で
-ある。本書だけが今回追加したfileであり、コミットはしていない。
+今回変更した追跡済みfileは本書だけであり、変更はコミットしていない。
+`src/core/sys/conf/`、`dev/`、`h/`、`sys/`は作成済みだが現在は空である。
+Gitは空directoryを追跡しないため、実装taskでsource/headerを追加した時点から
+追跡対象になる。
+
+多数の既存未追跡fileがあるため、`git add .`、一括clean、未追跡file削除を
+行わない。特に`.agents/`、coding style資料、STM32 tree、test生成物、`.bak`、
+Windows DLL/exeは別作業由来である。
 
 ## 13. 新しいタスクへ渡す依頼文
 
 > `C:\usr\src\MCUFW\docs\unix_v7_buffer_cache_pipe_handoff.md`を読み、
 > Step 0からStep 4までを実装してください。UNIX V7由来の`buffers[][]`、
 > `struct buf`、b-list、av-list、`binit/getblk/brelse`のinvariantを維持し、
+> V7から採用するsource/headerは`src/core/sys/`の`conf/`、`dev/`、`h/`、
+> `sys/`へ役割別に配置してください。buffer cacheは`h/buf.h`、`h/conf.h`、
+> `dev/bio.c`、`conf/conf.c`へ分け、`src/core/esh/`には接続変更だけを残してください。
 > 現在のring型pipeの外部挙動、coroutine/thread両backendを変更しないでください。
 > device queueでは`av_forw/av_back`を流用せず、Step 5以降は今回未着手として
 > 残してください。まずAGENTS.md、現在のbranch/HEAD、dirty tree、baseline試験を
