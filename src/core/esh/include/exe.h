@@ -20,7 +20,7 @@ extern "C" {
 #endif
 
 
-struct proc {
+struct exe_proc {
 	struct esh_proc p_exec;		/* Portable execution state */
 	struct applet *p_cmd;		/* Command */
 	char p_argc;			/* # of command arguments */
@@ -34,13 +34,13 @@ struct exe {
 	int e_sp;			/* Stack pointer */
 	char e_procs;			/* # of procs to be executed */
 	int e_status;			/* Last command or pipeline status */
-	struct proc e_proc[PROCS];	/* Process */
+	struct exe_proc e_proc[PROCS];	/* Process */
 };
 
 
 extern struct exe exe;
 int exe_run_codes(struct code *code, struct exe *exe);
-int exe_run_pipeline(struct proc *proc, int count);
+int exe_run_pipeline(struct exe_proc *proc, int count);
 
 
 #ifdef __cplusplus

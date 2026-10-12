@@ -39,7 +39,7 @@ struct proc {
 	int p_status;
 };
 
-/* Wait list ownership belongs to scheduler backend */
+/* Channel storage belongs to waiting object; scheduler manages list */
 struct wait_chan {
 	struct proc *wc_head;
 	struct proc *wc_tail;
@@ -59,6 +59,9 @@ int sched_prepare(struct proc *proc, void (*entry)(void *arg), void *arg);
 void sched_release(struct proc *proc);
 int sched_resume(struct proc *proc);
 void sched_set_current_proc(struct proc *proc);
+#ifdef SCHED_TEST
+void sched_test_fail_next_yield(void);
+#endif
 
 #ifdef __cplusplus
 }

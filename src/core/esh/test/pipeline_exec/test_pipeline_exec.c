@@ -38,7 +38,7 @@ static int early_filter_main(int argc, char **argv);
 static int error_main(int argc, char **argv);
 static int stdio_producer_main(int argc, char **argv);
 static int getchar_consumer_main(int argc, char **argv);
-static void init_command(struct proc *proc, struct applet *applet);
+static void init_command(struct exe_proc *proc, struct applet *applet);
 static void init_executor_instruction(struct code *code, struct exe *executor,
 				      int opcode, int operand);
 static void test_three_stage_pipeline(void);
@@ -213,7 +213,7 @@ static int getchar_consumer_main(int argc, char **argv)
 static struct applet stdio_producer = {"stdio", stdio_producer_main};
 static struct applet getchar_consumer = {"getchar", getchar_consumer_main};
 
-static void init_command(struct proc *proc, struct applet *applet)
+static void init_command(struct exe_proc *proc, struct applet *applet)
 {
 	memset(proc, 0, sizeof(*proc));
 	proc->p_cmd = applet;
@@ -233,7 +233,7 @@ static void init_executor_instruction(struct code *code, struct exe *executor,
 
 static void test_three_stage_pipeline(void)
 {
-	struct proc proc[3];
+	struct exe_proc proc[3];
 	int iteration;
 	int i;
 
@@ -259,7 +259,7 @@ static void test_three_stage_pipeline(void)
 
 static void test_early_filter_exit(void)
 {
-	struct proc proc[3];
+	struct exe_proc proc[3];
 
 	output_count = 0;
 	init_command(&proc[0], &producer);
@@ -276,7 +276,7 @@ static void test_early_filter_exit(void)
 
 static void test_stdio_pipeline(void)
 {
-	struct proc proc[2];
+	struct exe_proc proc[2];
 	char message[] = "hello pipe";
 
 	output_count = 0;
@@ -304,7 +304,7 @@ static void test_stdio_pipeline(void)
 
 static void test_invalid_count(void)
 {
-	struct proc proc[PROCS];
+	struct exe_proc proc[PROCS];
 
 	CHECK(exe_run_pipeline(proc, 1) == -ESH_EINVAL);
 	CHECK(exe_run_pipeline(proc, PROCS + 1) == -ESH_EINVAL);
@@ -314,7 +314,7 @@ static void test_transfer_matrix(void)
 {
 	const size_t sizes[] = {0, 1, ESH_PIPE_BUFFER_SIZE,
 		ESH_PIPE_BUFFER_SIZE + 1, TEST_DATA_SIZE};
-	struct proc proc[PROCS];
+	struct exe_proc proc[PROCS];
 	size_t s;
 	size_t i;
 	int stages;
@@ -553,7 +553,7 @@ static void test_parser_bounds(void)
 static void test_pipe_exhaustion_cleanup(void)
 {
 	struct esh_proc blockers[ESH_PIPE_MAX - 1];
-	struct proc proc[3];
+	struct exe_proc proc[3];
 	size_t j;
 	int fd[2];
 	int i;
@@ -591,7 +591,7 @@ static void blocker_entry(void *arg)
 static void test_backend_exhaustion_cleanup(void)
 {
 	struct esh_proc blockers[ESH_PIPELINE_MAX - 1];
-	struct proc proc[2];
+	struct exe_proc proc[2];
 	int i;
 
 	for (i = 0; i < ESH_PIPELINE_MAX - 1; i++) {

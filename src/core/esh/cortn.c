@@ -78,6 +78,9 @@ int cortn_yield(struct cortn *self, enum cortn_yield_reason reason)
 	case CORTN_YIELD_VOLUNTARY:
 		self->c_state = CORTN_RUNNABLE;
 		break;
+	case CORTN_YIELD_WAIT_LOCK:
+		self->c_state = CORTN_WAIT_LOCK;
+		break;
 	case CORTN_YIELD_WAIT_READ:
 		self->c_state = CORTN_WAIT_READ;
 		break;
@@ -97,7 +100,8 @@ int cortn_wake(struct cortn *self)
 {
 	if (!self)
 		return CORTN_ERR_ARG;
-	if (self->c_state != CORTN_WAIT_READ &&
+	if (self->c_state != CORTN_WAIT_LOCK &&
+	    self->c_state != CORTN_WAIT_READ &&
 	    self->c_state != CORTN_WAIT_WRITE)
 		return CORTN_ERR_STATE;
 	self->c_state = CORTN_RUNNABLE;

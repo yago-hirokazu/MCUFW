@@ -39,10 +39,11 @@ extern char *get_string(char id, struct code *code);
 
 static void expand_quoted_arg(char *dst, char *src, struct code *code);
 static void exe_proc_entry(void *arg);
-static void exe_close_proc_fds(struct proc *proc, int count);
-static void exe_cleanup_pipeline(struct proc *proc, int pipe_count,
+static void exe_close_proc_fds(struct exe_proc *proc, int count);
+static void exe_cleanup_pipeline(struct exe_proc *proc, int pipe_count,
 				 int prepared);
-static int exe_connect_proc(struct proc *writer, struct proc *reader);
+static int exe_connect_proc(struct exe_proc *writer,
+			    struct exe_proc *reader);
 static int exe_execute_commands(struct exe *exe);
 static void exe_reset_commands(struct exe *exe);
 static int exe_instruction_width(int op);
@@ -177,7 +178,7 @@ static int exe_valid_stack(const struct code *code, const struct exe *exe,
 
 static int exe_valid_process(const struct exe *exe, int op)
 {
-	const struct proc *proc;
+	const struct exe_proc *proc;
 
 	switch (op) {
 	case OP_USER_CMD:
@@ -230,7 +231,7 @@ static int exe_valid_instruction(struct code *code, struct exe *exe)
 
 static void exe_proc_entry(void *arg)
 {
-	struct proc *proc;
+	struct exe_proc *proc;
 
 	proc = arg;
 	proc->p_exec.ep_status = proc->p_cmd->main(proc->p_argc,
@@ -240,7 +241,7 @@ static void exe_proc_entry(void *arg)
 	esh_kernel_unlock();
 }
 
-static void exe_close_proc_fds(struct proc *proc, int count)
+static void exe_close_proc_fds(struct exe_proc *proc, int count)
 {
 	int i;
 
@@ -250,7 +251,7 @@ static void exe_close_proc_fds(struct proc *proc, int count)
 	esh_kernel_unlock();
 }
 
-static void exe_cleanup_pipeline(struct proc *proc, int pipe_count,
+static void exe_cleanup_pipeline(struct exe_proc *proc, int pipe_count,
 				 int prepared)
 {
 	int i;
@@ -260,7 +261,7 @@ static void exe_cleanup_pipeline(struct proc *proc, int pipe_count,
 		esh_sched_release(&proc[i].p_exec);
 }
 
-static int exe_connect_proc(struct proc *writer, struct proc *reader)
+static int exe_connect_proc(struct exe_proc *writer, struct exe_proc *reader)
 {
 	struct esh_proc owner;
 	struct esh_file *read_file;
@@ -288,7 +289,7 @@ out:
 	return result < 0 ? result : 0;
 }
 
-int exe_run_pipeline(struct proc *proc, int count)
+int exe_run_pipeline(struct exe_proc *proc, int count)
 {
 	int finished;
 	int pipe_count;
@@ -356,7 +357,7 @@ out:
 
 static int exe_execute_commands(struct exe *exe)
 {
-	struct proc *proc;
+	struct exe_proc *proc;
 	int i;
 
 	if (exe->e_procs <= 0 || exe->e_procs > PROCS)
@@ -391,7 +392,7 @@ int exe_run_codes(struct code *code, struct exe *exe)
 	int pc;
 	int sp;
 	char str[SYMCHARS];
-	struct proc *proc;
+	struct exe_proc *proc;
 
 	if (!exe_valid_instruction(code, exe))
 		return EXIT_FAILURE;

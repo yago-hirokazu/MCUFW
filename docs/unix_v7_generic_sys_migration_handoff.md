@@ -34,7 +34,7 @@
 | 2 | file table、inode table追加 | done | - |
 | 3 | `file.c`のV7名sourceへの分割 | done | - |
 | 4 | V7風`pipe.c`とinode I/O | done | - |
-| 5 | scheduler汎用化 | pending | - |
+| 5 | scheduler汎用化 | done | - |
 | 6 | Windows backend移動 | pending | - |
 | 7 | esh呼出し側の切替と旧実装削除 | pending | - |
 | 8 | 全回帰試験と文書更新 | pending | - |
@@ -1106,6 +1106,65 @@ docs/unix_v7_generic_sys_migration_handoff.mdのStep 5を実行してくださ�
 scheduler本体、型、APIをsys層へ汎用化し、既存callerを必要範囲で追従させて
 ください。Windows backendの物理移動はStep 6へ残してください。
 ```
+
+### Step 5実施結果（2026-10-13）
+
+`src/core/sys/sys/sched.c`へportable scheduler本体を追加し、Step 1で
+用意した`struct proc`、`struct wait_chan`、汎用APIへ移行した。wait listへの
+登録、backend yield、wakeup、releaseの順序は旧実装を維持した。
+
+Step 4から引き継いだinode lock待機のため、`WAIT_LOCK`を
+`PROC_WAIT_LOCK`へ遷移させる経路をschedulerとcoroutine backendへ追加した。
+sleepはkernel lock保持中にwait listへ登録し、backend yieldからlock保持状態で
+戻る。resume結果がwait状態でも、並行wakeupが公開したrunnable状態を上書き
+しない。
+
+releaseはkernel lock保持中にwait listからprocessを切り離し、backend pointerを
+退避してからlock外でbackendを解放する。thread backendのjoinがkernel lock外に
+残るため、fd close後にreleaseするcaller契約を維持できる。
+
+executor側の既存`struct proc`は`struct exe_proc`へ変更した。Step 7までは旧
+file/pipe/scheduler経路を維持し、executor内部の`struct esh_proc`埋込みと旧APIは
+切り替えていない。
+
+Windows backendの物理移動をStep 6へ残すため、現配置の
+`sched_cortn.c`、`sched_thread.c`は`SYS_SCHED`指定時だけ汎用symbolを生成する
+一時compatibility定義を持つ。通常buildでは従来symbolを生成し、既存経路を
+維持する。
+
+新規`src/core/sys/test/sched`では次を確認した。
+
+- coroutine/thread、O0/O2、`-Werror`でschedulerとsys pipeの結合成功
+- `WAIT_LOCK`、複数waiter、待機中release、wake直後releaseの成功
+- test-only yield失敗時のwait list cleanup成功
+- backend slot枯渇と再利用成功
+- pipe blocking transfer、EOF、resource回収成功
+
+既存schedulerとpipeはcoroutine/thread、O0/O2で成功した。sys pipe単体は
+O0/O2で成功した。pipeline executorはcoroutine/thread、O0で成功した。
+coroutine単体もO0/O2、`-Werror`で成功した。
+pipeline試験が従来から出力するparser error診断とcompiler warningは残るが、
+試験結果は`all tests passed`だった。
+
+#### Step 6への引継事項
+
+確定したbackend APIは次のとおり。
+
+- `sched_backend_lock`、`sched_backend_unlock`、
+  `sched_backend_is_locked`
+- `sched_backend_current`、`sched_backend_set_current`
+- `sched_backend_prepare`、`sched_backend_release`
+- `sched_backend_yield`、`sched_backend_wake`、
+  `sched_backend_resume`
+
+backendは非再帰kernel lockを提供する。`sched_backend_yield`はlock保持状態で
+呼ばれ、待機中だけlockを解放し、lockを再取得して戻る。
+`sched_backend_current`は実行中processを各実行contextで返す。wakeは待機中の
+backendを再開可能にし、実際のrun token付与は`sched_resume`が行う。
+
+Step 6ではWindows backendを移動し、`SYS_SCHED`分岐と`esh_`/`ESH_`の一時
+compatibility定義を削除して、汎用symbolを通常定義にする。旧esh backendを
+必要とするbuildはStep 7切替までの間、新配置と汎用APIへ追従させる。
 
 ## 14. Step 6 Windows backend移動
 
