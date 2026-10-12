@@ -31,7 +31,7 @@
 |---|---|---|---|
 | 0 | API名、V7対応範囲、配置の確定 | done | - |
 | 1 | 汎用header追加 | done | - |
-| 2 | file table、inode table追加 | pending | - |
+| 2 | file table、inode table追加 | done | - |
 | 3 | `file.c`のV7名sourceへの分割 | pending | - |
 | 4 | V7風`pipe.c`とinode I/O | pending | - |
 | 5 | scheduler汎用化 | pending | - |
@@ -664,6 +664,57 @@ docs/unix_v7_generic_sys_migration_handoff.mdのStep 2を実行してくださ�
 汎用file tableとinode tableをconf.cへ追加し、旧esh tableはまだ削除しないで
 ください。Step 2の試験結果と所有権を引継ぎ書へ記録してください。
 ```
+
+### Step 2実施結果（2026-10-12）
+
+状態: `done`
+
+`src/core/sys/conf/conf.c`へ次の順でstatic storageを定義した。
+
+1. `struct buf buf[NBUF]`
+2. `struct file file[NFILE]`
+3. `struct inode inode[NINODE]`
+4. `struct buf bfreelist`
+
+V7 `conf/c.c`のtable配置に合わせ、buffer tableの後、buffer free listの前を
+file tableとinode tableの所有場所とした。定義は`conf.c`だけに置き、
+`file.h`と`inode.h`には不完全配列の`extern`宣言だけを残した。
+`NFILE`、`NINODE`、`NOFILE`の定義場所は`param.h`から変更していない。
+
+#### 初期状態と所有権
+
+明示的な初期化処理は追加していない。Cのstatic storage zero初期化により、
+全entryはprogram開始時にzeroとなる。`f_count == 0`を未使用file entry、
+`i_count == 0`を未使用inode entryの判定条件とする。他fieldも未使用時はzeroを
+保つ。`file_system_init`による再初期化は予定どおりStep 3の`fio.c`で実装する。
+
+旧`esh_file_table`と`esh_pipe_table`は変更、削除していない。新旧tableは異なる
+symbolと利用経路を持つため、現段階でも同じbinaryへlinkできる。
+
+#### 試験
+
+`src/core/sys/test/table/`へtable単体試験を追加し、次を確認した。
+
+- `NFILE == 12`、`NINODE == 3`、`NOFILE == 12`のcompile時検査
+- static storage初期状態で全file/inode entryがzeroかつ未使用
+- file tableとinode tableの先頭、末尾を含む全entry走査
+- 全entry使用状態からzeroへ戻した後の再走査
+- `-Werror -pedantic`によるO0/O2 buildと実行
+
+次の最小試験はすべて成功した。
+
+- 新規table単体試験 O0/O2
+- buffer cache O0/O2
+- pipe coroutine O0
+
+#### Step 3への引継事項
+
+- `file_system_init`は`file[]`の全fieldをzeroへ戻す
+- 未使用entryは`f_count == 0`または`i_count == 0`で判定する
+- fd枯渇は`SYS_EMFILE`、global file table枯渇は`SYS_ENFILE`とする
+- inode table枯渇も`SYS_ENFILE`とし、file枯渇とは別の試験で確認する
+- allocation途中失敗ではfd、file、inodeの使用数を開始前へ戻す
+- 旧esh tableと本番経路はStep 3でも削除、切替しない
 
 ## 11. Step 3 file.cのV7名sourceへの分割
 

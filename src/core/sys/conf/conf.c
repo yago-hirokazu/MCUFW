@@ -4,8 +4,12 @@
 
 #include "buf.h"
 #include "conf.h"
+#include "file.h"
+#include "inode.h"
 
 struct buf buf[NBUF];
+struct file file[NFILE];
+struct inode inode[NINODE];
 struct buf bfreelist;
 
 static struct buf pipe_tab;
