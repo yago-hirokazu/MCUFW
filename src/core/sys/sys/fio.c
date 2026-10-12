@@ -71,6 +71,7 @@ struct file *falloc(struct proc *proc, int *fd)
 void closef(struct file *fp)
 {
 	struct inode *ip;
+	unsigned char flag;
 
 	if (!fp || !fp->f_count)
 		return;
@@ -78,7 +79,12 @@ void closef(struct file *fp)
 	if (fp->f_count)
 		return;
 	ip = fp->f_inode;
+	flag = fp->f_flag;
 	memset(fp, 0, sizeof(*fp));
+	if (ip && (flag & FPIPE)) {
+		sched_wakeup(&ip->i_read_chan);
+		sched_wakeup(&ip->i_write_chan);
+	}
 	if (ip)
 		iput(ip);
 }

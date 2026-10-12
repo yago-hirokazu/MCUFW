@@ -13,6 +13,7 @@ enum proc_state {
 	PROC_NEW,
 	PROC_RUNNABLE,
 	PROC_RUNNING,
+	PROC_WAIT_LOCK,
 	PROC_WAIT_READ,
 	PROC_WAIT_WRITE,
 	PROC_FINISHED,
@@ -20,6 +21,7 @@ enum proc_state {
 };
 
 enum wait_reason {
+	WAIT_LOCK,
 	WAIT_READ,
 	WAIT_WRITE
 };

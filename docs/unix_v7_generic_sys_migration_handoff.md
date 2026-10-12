@@ -33,7 +33,7 @@
 | 1 | 汎用header追加 | done | - |
 | 2 | file table、inode table追加 | done | - |
 | 3 | `file.c`のV7名sourceへの分割 | done | - |
-| 4 | V7風`pipe.c`とinode I/O | pending | - |
+| 4 | V7風`pipe.c`とinode I/O | done | - |
 | 5 | scheduler汎用化 | pending | - |
 | 6 | Windows backend移動 | pending | - |
 | 7 | esh呼出し側の切替と旧実装削除 | pending | - |
@@ -926,6 +926,117 @@ docs/unix_v7_generic_sys_migration_handoff.mdのStep 4を実行してくださ�
 V7のpipe.cとrdwri.cを基準に汎用pipe data pathを追加してください。
 V7との差分を明記し、esh本番経路の切替とStep 5以降は行わないでください。
 ```
+
+### Step 4実施結果（2026-10-13）
+
+状態: `done`
+
+V7の責務名と状態遷移に合わせ、`sys/pipe.c`と`sys/rdwri.c`を追加した。
+`pipe_for_proc`と`sys_pipe`がinode、read file、write fileを組み立てる。
+`readp`と`writep`が待機を含むpipe処理、`readi`と`writei`が一つのbuffer内の
+転送を担当する。旧esh pipeと本番経路は変更していない。
+
+#### dataとoffset
+
+- pipe dataは`struct inode.i_buf`が所有する一つのbufferへ置く
+- reader位置はread fileの`f_offset`が所有する
+- writer終端と有効data終端はinodeの`i_size`が所有する
+- readは`f_offset`から`i_size`までを転送する
+- writeは`i_size`から`PIPSIZ`までを転送する
+- readerが`i_size`へ追いついた時だけ`f_offset`と`i_size`を0へ戻す
+- partial readだけでは先頭側の空き領域を再利用しない
+- `PIPSIZ == BSIZE == 256`を上限とし、一つのbufferを越えない
+
+この方式はV7のoffset/size resetを維持する。旧esh実装のring bufferとは異なり、
+partial read直後に先頭領域へwrapしてwriteしない。
+
+#### 状態遷移
+
+| 状態 | read | write |
+|---|---|---|
+| empty、peerあり | `WAIT_READ` | data転送 |
+| empty、writerなし | EOF | - |
+| dataあり | 現在読める分を転送 | 末尾空きへ転送 |
+| full、readerあり | data転送 | `WAIT_WRITE` |
+| readerなし | 残存dataを読み切った後EOF | `SYS_EPIPE` |
+
+backend未接続processで待機が必要な場合、read/writeは`-SYS_EAGAIN`を返す。
+writeがfullになるまで一部転送済みなら、その転送byte数を返す。backend接続時は
+`sched_sleep`から戻った後にinode lockを取り直し、条件を再検査する。
+
+`closef`は最終file参照を閉じる時、inode参照を減らす前にread/write両wait
+channelを起床する。これによりwriter close後のEOFとreader close後のEPIPEを
+待機中peerが再検査できる。fd複製の途中closeでは起床しない。
+
+#### pipe lockとscheduler契約
+
+inodeはlock、read、writeの三つのwait channelを所有する。`plock`は`ILOCK`を
+検査し、競合時に`IWANT`を設定してlock channelで待つ。`prele`は`ILOCK`を
+解除し、`IWANT`があればlock waiterを起床する。
+
+このため`sched.h`へ`PROC_WAIT_LOCK`と`WAIT_LOCK`を追加した。Step 5の
+schedulerは次を守る。
+
+- callerはcondition検査からwait登録までkernel lockを保持する
+- `sched_sleep`はwait list登録とbackend yieldを分離不能にする
+- backend yieldは再開時にkernel lockを保持した状態で戻る
+- `sched_wakeup`は対象channelの全waiterをlistから外してrunnableにする
+- `WAIT_LOCK`、`WAIT_READ`、`WAIT_WRITE`を対応するprocess状態へ変換する
+- close中のwakeupはfile/inode解放完了後にwaiterが実行される順序を保つ
+
+Step 4単体試験では上記interfaceだけを実装するscheduler stubを使用した。
+実schedulerへの移行は予定どおりStep 5で行う。
+
+#### allocationとcleanup
+
+pipe作成は`ialloc`、read側`falloc`、write側`falloc`の順で行う。両file確保後に
+flagとinodeを設定し、組立中参照をendpoint二つの参照へ変換して
+`i_count == 2`とする。
+
+- inode失敗: `SYS_ENFILE`を返す
+- read file失敗: `iput`でinodeとbufferを返す
+- write file失敗: read fdを閉じ、続いて`iput`する
+- fd枯渇とfile枯渇: `falloc`の`SYS_EMFILE`と`SYS_ENFILE`を維持する
+- 成功後の全close: file、inode、bufferをすべて再利用可能にする
+
+#### V7との差分
+
+- trapまたは大域`u`を使わず、`struct proc *`と引数を明示する
+- signalを送らず、reader不在を`-SYS_EPIPE`で通知する
+- 物理block allocation、disk I/O、`bmap`を実装しない
+- 一つのbufferだけを使用し、V7の`PIPSIZ`超過書込みを許可しない
+- coroutine backendではsleepをyield/resumeへ変換する
+- thread backendでも同じ状態遷移と戻り値を使用する
+
+#### 試験
+
+新規`src/core/sys/test/pipe/`で次をO0/O2、`-Werror -pedantic`で確認した。
+
+- pipe作成、flag、file/inode参照数、全close
+- partial read/write、data順序、V7式offset/size reset
+- empty待機、full待機、EOF、EPIPE、zero-length操作
+- sleep後に条件を再検査してread/writeを完了すること
+- lock待機と`WAIT_LOCK`、close時のread/write wakeup
+- fd、file、inode、pipe容量の各枯渇stageとrollback
+- `readi`、`writei`のbuffer境界と`PIPSIZ`上限
+
+次の試験はすべて成功した。
+
+- 新規sys pipe O0/O2
+- file/inode O0/O2
+- header C/C++、通常順/逆順、O0/O2
+- buffer cache O0/O2
+- 既存pipe coroutine/thread O0/O2
+
+#### Step 5への引継事項
+
+- schedulerへ`PROC_WAIT_LOCK`と`WAIT_LOCK`を実装する
+- 三つのwait channelは各inodeが所有し、inode最終解放まで有効とする
+- sleepはkernel lock保持中に登録し、再開時もlock保持状態で戻る
+- wakeup後は`readp`、`writep`、`plock`が必ず条件を再検査する
+- closeはkernel lock保持中に両peer channelを起床してから`iput`する
+- Step 7で旧ring固有のwrap-around期待値をV7 offset方式へ変更する
+- `sys_read`、`sys_write`、`sys_close`を置く`sys2.c`はStep 7切替時に追加する
 
 ## 13. Step 5 scheduler汎用化
 
