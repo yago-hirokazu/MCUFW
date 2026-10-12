@@ -30,6 +30,7 @@ struct esh_pipe_inode *esh_pipe_inode_alloc(void)
 		bp = getblk(PIPEDEV, (unsigned long)i);
 		if (!bp)
 			return NULL;
+		clrbuf(bp);
 		inode->pi_buf = bp;
 		inode->pi_used = 1;
 		return inode;
@@ -46,8 +47,10 @@ void esh_pipe_inode_discard(struct esh_pipe_inode *inode)
 	bp = inode->pi_buf;
 	inode->pi_buf = NULL;
 	memset(inode, 0, sizeof(*inode));
-	if (bp)
+	if (bp) {
+		clrbuf(bp);
 		brelse(bp);
+	}
 }
 
 void esh_pipe_endpoint_open(struct esh_pipe_inode *inode,
@@ -153,7 +156,6 @@ struct esh_io_status esh_pipe_read_nonblock(struct esh_proc *proc, int fd,
 					    void *buf, size_t count)
 {
 	struct esh_pipe_inode *inode;
-	struct esh_pipe_buffer *pipe;
 	struct esh_file *file;
 	unsigned char *out;
 	size_t transferred;
@@ -166,24 +168,23 @@ struct esh_io_status esh_pipe_read_nonblock(struct esh_proc *proc, int fd,
 	if (!file || file->f_direction != ESH_FILE_READ)
 		return esh_io_status(ESH_IO_ERROR, 0, -ESH_EBADF);
 	inode = file->f_inode;
-	pipe = &inode->pi_buffer;
-	if (!pipe->pb_count) {
+	if (!inode->pi_count) {
 		if (!inode->pi_writers)
 			return esh_io_status(ESH_IO_EOF, 0, 0);
 		return esh_io_status(ESH_IO_WAIT_READ, 0, 0);
 	}
 
 	transferred = count;
-	if (transferred > pipe->pb_count)
-		transferred = pipe->pb_count;
+	if (transferred > inode->pi_count)
+		transferred = inode->pi_count;
 	out = buf;
 	for (count = 0; count < transferred; count++) {
-		out[count] = pipe->pb_data[pipe->pb_read];
-		pipe->pb_read++;
-		if (pipe->pb_read == ESH_PIPE_BUFFER_SIZE)
-			pipe->pb_read = 0;
+		out[count] = inode->pi_buf->b_addr[inode->pi_read];
+		inode->pi_read++;
+		if (inode->pi_read == BSIZE)
+			inode->pi_read = 0;
 	}
-	pipe->pb_count -= transferred;
+	inode->pi_count -= transferred;
 	return esh_io_status(ESH_IO_PROGRESS, transferred, 0);
 }
 
@@ -193,7 +194,6 @@ struct esh_io_status esh_pipe_write_nonblock(struct esh_proc *proc, int fd,
 {
 	const unsigned char *in;
 	struct esh_pipe_inode *inode;
-	struct esh_pipe_buffer *pipe;
 	struct esh_file *file;
 	size_t available;
 	size_t transferred;
@@ -208,8 +208,7 @@ struct esh_io_status esh_pipe_write_nonblock(struct esh_proc *proc, int fd,
 	inode = file->f_inode;
 	if (!inode->pi_readers)
 		return esh_io_status(ESH_IO_BROKEN_PIPE, 0, -ESH_EPIPE);
-	pipe = &inode->pi_buffer;
-	available = ESH_PIPE_BUFFER_SIZE - pipe->pb_count;
+	available = BSIZE - inode->pi_count;
 	if (!available)
 		return esh_io_status(ESH_IO_WAIT_WRITE, 0, 0);
 
@@ -218,12 +217,12 @@ struct esh_io_status esh_pipe_write_nonblock(struct esh_proc *proc, int fd,
 		transferred = available;
 	in = buf;
 	for (count = 0; count < transferred; count++) {
-		pipe->pb_data[pipe->pb_write] = in[count];
-		pipe->pb_write++;
-		if (pipe->pb_write == ESH_PIPE_BUFFER_SIZE)
-			pipe->pb_write = 0;
+		inode->pi_buf->b_addr[inode->pi_write] = in[count];
+		inode->pi_write++;
+		if (inode->pi_write == BSIZE)
+			inode->pi_write = 0;
 	}
-	pipe->pb_count += transferred;
+	inode->pi_count += transferred;
 	return esh_io_status(ESH_IO_PROGRESS, transferred, 0);
 }
 

@@ -196,6 +196,7 @@ static void test_create_and_transfer(void)
 {
 	struct esh_proc proc;
 	struct esh_file *file;
+	struct buf *bp;
 	char buf[4];
 	int fd[2];
 
@@ -207,11 +208,20 @@ static void test_create_and_transfer(void)
 	file = esh_fd_get(&proc.ep_fd_table, fd[1]);
 	CHECK(file != NULL);
 	CHECK(file->f_direction == ESH_FILE_WRITE);
+	bp = file->f_inode->pi_buf;
 	CHECK(esh_write(fd[1], "abc", 3) == 3);
+	CHECK(memcmp(bp->b_addr, "abc", 3) == 0);
+	CHECK(file->f_inode->pi_write == 3);
+	CHECK(file->f_inode->pi_count == 3);
 	memset(buf, 0, sizeof(buf));
 	CHECK(esh_read(fd[0], buf, 3) == 3);
 	CHECK(memcmp(buf, "abc", 3) == 0);
+	CHECK(file->f_inode->pi_read == 3);
+	CHECK(file->f_inode->pi_count == 0);
 	teardown(&proc);
+	CHECK(bp->b_addr[0] == 0);
+	CHECK(bp->b_addr[1] == 0);
+	CHECK(bp->b_addr[2] == 0);
 }
 
 static void test_wait_states(void)
@@ -418,19 +428,30 @@ static void test_inode_discard(void)
 	struct buf *bp;
 
 	esh_file_system_init();
+	bp = getblk(PIPEDEV, 0);
+	CHECK(bp != NULL);
+	memset(bp->b_addr, 0xa5, BSIZE);
+	brelse(bp);
 	inode = esh_pipe_inode_alloc();
 	CHECK(inode != NULL);
 	if (!inode)
 		return;
-	bp = inode->pi_buf;
-	CHECK(bp != NULL);
+	CHECK(inode->pi_buf == bp);
+	CHECK(bp->b_addr[0] == 0);
+	CHECK(bp->b_addr[BSIZE - 1] == 0);
+	CHECK(inode->pi_read == 0);
+	CHECK(inode->pi_write == 0);
+	CHECK(inode->pi_count == 0);
 	CHECK(bp->b_flags & B_BUSY);
 	CHECK(bp->b_dev == PIPEDEV);
 	CHECK(bp->b_blkno == 0);
 	CHECK(buffer_in_use() == 1);
+	memset(bp->b_addr, 0x5a, BSIZE);
 	esh_pipe_inode_discard(inode);
 	CHECK(inode->pi_buf == NULL);
 	CHECK(!(bp->b_flags & B_BUSY));
+	CHECK(bp->b_addr[0] == 0);
+	CHECK(bp->b_addr[BSIZE - 1] == 0);
 	CHECK(esh_pipe_in_use() == 0);
 	CHECK(buffer_in_use() == 0);
 }
