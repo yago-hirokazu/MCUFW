@@ -9,10 +9,15 @@ extern "C" {
 
 #include <stddef.h>
 
+#include "buf.h"
 #include "esh_sched.h"
 
 #define ESH_PIPE_MAX		3
 #define ESH_PIPE_BUFFER_SIZE	256
+
+#if NBUF < ESH_PIPE_MAX
+#error "NBUF must be at least ESH_PIPE_MAX"
+#endif
 
 struct esh_pipe_buffer {
 	unsigned char pb_data[ESH_PIPE_BUFFER_SIZE];
@@ -27,6 +32,7 @@ struct esh_pipe_inode {
 	unsigned char pi_refs;		/* Number of live endpoint files */
 	unsigned char pi_readers;	/* Number of read endpoint files */
 	unsigned char pi_writers;	/* Number of write endpoint files */
+	struct buf *pi_buf;
 	struct esh_pipe_buffer pi_buffer;
 	struct esh_wait_chan pi_read_chan;
 	struct esh_wait_chan pi_write_chan;

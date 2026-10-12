@@ -3,6 +3,7 @@
 #include <limits.h>
 #include <string.h>
 
+#include "buf.h"
 #include "esh_errno.h"
 #include "esh_file.h"
 #include "esh_pipe.h"
@@ -11,6 +12,7 @@ static struct esh_file esh_file_table[ESH_FILE_MAX];
 
 void esh_file_system_init(void)
 {
+	binit();
 	memset(esh_file_table, 0, sizeof(esh_file_table));
 	esh_pipe_pool_init();
 }

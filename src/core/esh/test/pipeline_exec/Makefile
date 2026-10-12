@@ -6,7 +6,7 @@ include ../../target/windows/sched_backend.mk
 
 CFLAGS = -mno-ms-bitfields -g
 CFLAGS += -Wall -Wextra
-CFLAGS += -I. -I../../include -I../../../elib
+CFLAGS += -I. -I../../include -I../../../elib -I../../../sys/h
 CFLAGS += -I../../target/windows -I../../../../target/windows/Adapt
 CFLAGS += -DUSE_STACKMACH
 CFLAGS += -DESH_STDIO_PIPE
@@ -20,12 +20,14 @@ CSOURCES += cat.c script.c
 CSOURCES += file.c help.c lex.c par.c pipe.c run.c sched.c test.c
 CSOURCES += tok.c tty.c $(ESH_SCHED_CSOURCES)
 CSOURCES += stdio_adapt.c tty_adapt.c cmd_sample.c qbyte.c symchar.c
+CSOURCES += bio.c conf.c
 ASOURCES = $(ESH_SCHED_ASOURCES)
 
 OBJS = $(addprefix $(OUTDIR)/,$(CSOURCES:.c=.o))
 OBJS += $(addprefix $(OUTDIR)/,$(ASOURCES:.S=.o))
 
 vpath %.c . ../.. ../../../usr/cmd ../../../elib ../../target/windows
+vpath %.c ../../../sys/dev ../../../sys/conf
 vpath %.S ../../target/windows
 
 .PHONY: all clean

@@ -6,7 +6,7 @@ include ../../target/windows/sched_backend.mk
 
 CFLAGS = -mno-ms-bitfields -g $(OPT)
 CFLAGS += -Wall -Wextra -Werror -pedantic
-CFLAGS += -I../../include -I../../target/windows
+CFLAGS += -I../../include -I../../target/windows -I../../../sys/h
 CFLAGS += -DESH_SCHED_TEST
 CFLAGS += $(ESH_SCHED_CPPFLAGS)
 
@@ -16,6 +16,8 @@ OBJS += $(addprefix $(OUTDIR)/,$(ESH_SCHED_ASOURCES:.S=.o))
 OBJS += $(OUTDIR)/file.o
 OBJS += $(OUTDIR)/pipe.o
 OBJS += $(OUTDIR)/sched.o
+OBJS += $(OUTDIR)/bio.o
+OBJS += $(OUTDIR)/conf.o
 
 .PHONY: all clean
 
@@ -46,6 +48,12 @@ $(OUTDIR)/pipe.o: ../../pipe.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OUTDIR)/sched.o: ../../sched.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OUTDIR)/bio.o: ../../../sys/dev/bio.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OUTDIR)/conf.o: ../../../sys/conf/conf.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OUTDIR)/sched_cortn.o: ../../target/windows/sched_cortn.c

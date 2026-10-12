@@ -19,6 +19,7 @@ void esh_pipe_pool_init(void)
 struct esh_pipe_inode *esh_pipe_inode_alloc(void)
 {
 	struct esh_pipe_inode *inode;
+	struct buf *bp;
 	size_t i;
 
 	for (i = 0; i < ESH_PIPE_MAX; i++) {
@@ -26,6 +27,10 @@ struct esh_pipe_inode *esh_pipe_inode_alloc(void)
 		if (inode->pi_used)
 			continue;
 		memset(inode, 0, sizeof(*inode));
+		bp = getblk(PIPEDEV, (unsigned long)i);
+		if (!bp)
+			return NULL;
+		inode->pi_buf = bp;
 		inode->pi_used = 1;
 		return inode;
 	}
@@ -34,9 +39,15 @@ struct esh_pipe_inode *esh_pipe_inode_alloc(void)
 
 void esh_pipe_inode_discard(struct esh_pipe_inode *inode)
 {
+	struct buf *bp;
+
 	if (!inode || inode->pi_refs)
 		return;
+	bp = inode->pi_buf;
+	inode->pi_buf = NULL;
 	memset(inode, 0, sizeof(*inode));
+	if (bp)
+		brelse(bp);
 }
 
 void esh_pipe_endpoint_open(struct esh_pipe_inode *inode,
@@ -69,7 +80,7 @@ void esh_pipe_endpoint_close(struct esh_pipe_inode *inode,
 	}
 	inode->pi_refs--;
 	if (!inode->pi_readers && !inode->pi_writers)
-		memset(inode, 0, sizeof(*inode));
+		esh_pipe_inode_discard(inode);
 }
 
 int esh_pipe_for_proc(struct esh_proc *proc, int fd[2])

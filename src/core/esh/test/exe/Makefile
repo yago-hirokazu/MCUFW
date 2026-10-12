@@ -31,6 +31,8 @@ vpath %.c .
 vpath %.c ../..
 vpath %.c ../../../usr/cmd
 vpath %.c ../../../elib
+vpath %.c ../../../sys/dev
+vpath %.c ../../../sys/conf
 ifeq ($(OS),Windows_NT)
 vpath %.c ../../target/windows/
 else
@@ -61,6 +63,10 @@ CSOURCES += lex.c
 CSOURCES += test.c
 CSOURCES += tok.c
 CSOURCES += tty.c
+
+## ../../../sys
+CSOURCES += bio.c
+CSOURCES += conf.c
 
 ## ../../target/windows/
 CSOURCES += $(ESH_SCHED_CSOURCES)
@@ -95,6 +101,7 @@ CFLAGS += -g -O0
 INCLUDES := -I.
 INCLUDES += -I../../include
 INCLUDES += -I../../../elib
+INCLUDES += -I../../../sys/h
 INCLUDES += -I../../target/windows
 INCLUDES += -I../../../../target/windows/Adapt
 

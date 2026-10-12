@@ -22,6 +22,8 @@ vpath %.c ../../../core/usr/cmd
 vpath %.c ../../../core/elib
 vpath %.c ../../../core/esh
 vpath %.c ../../../core/esh/target/windows
+vpath %.c ../../../core/sys/dev
+vpath %.c ../../../core/sys/conf
 vpath %.S ../../../core/esh/target/windows
 vpath %.o _output
 vpath %.dll ./DLL
@@ -57,6 +59,10 @@ CSOURCES += sched.c
 CSOURCES += test.c
 CSOURCES += tty.c
 
+## ../../../core/sys
+CSOURCES += bio.c
+CSOURCES += conf.c
+
 ## ../../../core/shell/target/windows
 CSOURCES += esh_adapt.c
 CSOURCES += stdio_adapt.c
@@ -88,6 +94,7 @@ INCLUDES += -I../Drivers/adafruit_ft232h/include/windows
 INCLUDES += -I../../../core/elib
 INCLUDES += -I../../../core/esh/include
 INCLUDES += -I../../../core/esh/target/windows
+INCLUDES += -I../../../core/sys/h
 
 CFLAGS += $(INCLUDES)
 CFLAGS += -DESH_STDIO_PIPE
