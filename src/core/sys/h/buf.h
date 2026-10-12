@@ -64,5 +64,6 @@ struct buf *geteblk(void);
 void brelse(struct buf *bp);
 int incore(unsigned int dev, unsigned long blkno);
 void clrbuf(struct buf *bp);
+void iodone(struct buf *bp);
 
 #endif

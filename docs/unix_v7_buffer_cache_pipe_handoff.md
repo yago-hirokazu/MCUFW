@@ -655,7 +655,7 @@ fixed pool、将来のstrategy/iodone境界は保つ。
 
 ### 12.1 実装結果
 
-Step 0からStep 4までを実装した。buffer cache本体を`src/core/sys/`へ置き、
+Step 0からStep 5までを実装した。buffer cache本体を`src/core/sys/`へ置き、
 pipe payloadを`buffers[][]`へ移した。live pipeは`struct buf`を`B_BUSY`のまま
 所有し、最後のendpoint closeで`brelse()`する。
 
@@ -667,11 +667,17 @@ Step 4では次を試験へ追加した。
 - read先行、write先行closeでbufferを一度だけ返すこと
 - 各pipe、scheduler、pipeline試験終了時のfile、pipe、busy buffer数
 
+Step 5では`src/core/sys/dev/bdev.c`へ明示的device queue helperを追加した。
+pending requestは`b_io_next`によるFIFO、実行中requestは`dq_active`で保持する。
+完了はV7由来の`iodone()`へ収束し、error時は指定上限までactive requestを
+retryした後に`B_ERROR`と`b_error`を設定して完了する。
+
 ### 12.2 実測試験
 
 2026-10-12、MSYS2 MINGW64 shell経由で次を実行し、すべて成功した。
 
 - `src/core/sys/test/bio/run_test.sh`: O0、O2
+- `src/core/sys/test/bdev/run_test.sh`: O0、O2
 - `src/core/esh/test/pipe/run_test.sh`: coroutine/thread、O0/O2
 - `src/core/esh/test/sched/run_test.sh`: coroutine/thread、O0/O2
 - `src/core/esh/test/pipeline_exec/run_test.sh`: coroutine/thread、O0/O2
@@ -682,12 +688,17 @@ Step 4では次を試験へ追加した。
 binary/NUL転送も成功した。試験中に既存source由来のcompiler warningは出るが、
 今回追加した試験sourceに新しいwarningはない。
 
+device queue単体試験ではempty、1件、複数件FIFO、完了順、active遷移、
+二重enqueue拒否、非busy buffer拒否、retry上限、error完了、非同期buffer解放を
+確認した。pending/active期間も`av_forw/av_back`はqueue linkに使用していない。
+
 ### 12.3 未確認・未実装
 
 - STM32 targetのKeil buildは未確認
 - TDM-GCC用Makefileのbuildは未確認
-- 物理block deviceのstrategy、実I/O、device queueは未実装
-- device queueはStep 5として独立して実装・試験する
+- 物理block deviceのstrategyと実I/Oは未実装
+- driver interruptとthread間のtarget別critical sectionは未実装
+- retry対象errorの分類は各物理driverで実装する
 
 ### 12.4 作業ツリーの注意
 
@@ -698,10 +709,11 @@ Windows DLL/exeは別作業由来である。
 ## 13. 新しいタスクへ渡す依頼文
 
 > `C:\usr\src\MCUFW\docs\unix_v7_buffer_cache_pipe_handoff.md`を読み、
-> Step 0からStep 4までの実装と試験結果を確認し、Step 5を実装してください。
-> device queueでは`av_forw/av_back`を流用せず、`b_io_next`によるpending queueと
-> `dq_active`によるactive requestを分離してください。mock driverでenqueue、
-> start、completion、error、retry、二重enqueue拒否を試験してください。
-> pipeの外部挙動とb-list/av-list invariantを変更しないでください。
+> Step 0からStep 5までの実装と試験結果を確認し、Step 6の物理block deviceを
+> 設計してください。最初の対象deviceとlogical block契約を明確にし、portableな
+> queue policyは`src/core/sys/dev/`、OS/hardware処理はtarget層へ置いてください。
+> completionは`iodone()`へ収束させ、ISR/thread間のcritical sectionとretry対象
+> errorを明示してください。pipeの外部挙動とb-list/av-list invariantを
+> 変更しないでください。
 > まずAGENTS.md、現在のbranch/HEAD、dirty tree、baseline試験を確認し、既存の
 > 未追跡fileを変更・削除・一括追加しないでください。

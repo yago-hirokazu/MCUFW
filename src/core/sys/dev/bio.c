@@ -36,6 +36,9 @@ void binit(void)
 			memset(dp, 0, sizeof(*dp));
 			b_list_init(dp);
 		}
+		if (bdevsw[i].d_queue)
+			memset(bdevsw[i].d_queue, 0,
+			       sizeof(*bdevsw[i].d_queue));
 	}
 
 	for (i = 0; i < NBUF; i++) {
@@ -130,6 +133,17 @@ void clrbuf(struct buf *bp)
 		return;
 	memset(bp->b_addr, 0, BSIZE);
 	bp->b_resid = 0;
+}
+
+void iodone(struct buf *bp)
+{
+	if (!bp || !(bp->b_flags & B_BUSY))
+		return;
+	bp->b_flags |= B_DONE;
+	if (bp->b_flags & B_ASYNC)
+		brelse(bp);
+	else
+		bp->b_flags &= ~B_WANTED;
 }
 
 static struct buf *getdev(unsigned int dev)
