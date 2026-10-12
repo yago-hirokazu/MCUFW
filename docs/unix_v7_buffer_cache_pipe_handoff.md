@@ -651,12 +651,45 @@ fixed pool、将来のstrategy/iodone境界は保つ。
 12. 物理I/O未実装部分がstubまたは未公開で明確
 13. 変更文書に実測した試験結果と未確認事項を記録
 
-## 12. 作業ツリーの注意
+## 12. 実装・試験結果
 
-今回変更した追跡済みfileは本書だけであり、変更はコミットしていない。
-`src/core/sys/conf/`、`dev/`、`h/`、`sys/`は作成済みだが現在は空である。
-Gitは空directoryを追跡しないため、実装taskでsource/headerを追加した時点から
-追跡対象になる。
+### 12.1 実装結果
+
+Step 0からStep 4までを実装した。buffer cache本体を`src/core/sys/`へ置き、
+pipe payloadを`buffers[][]`へ移した。live pipeは`struct buf`を`B_BUSY`のまま
+所有し、最後のendpoint closeで`brelse()`する。
+
+Step 4では次を試験へ追加した。
+
+- cache hit、cache miss、LRU再関連付け時のb-list/av-list invariant
+- 3本のpipeが異なるbufferを所有すること
+- pipe、buffer、file、fdの各allocation失敗時のrollback
+- read先行、write先行closeでbufferを一度だけ返すこと
+- 各pipe、scheduler、pipeline試験終了時のfile、pipe、busy buffer数
+
+### 12.2 実測試験
+
+2026-10-12、MSYS2 MINGW64 shell経由で次を実行し、すべて成功した。
+
+- `src/core/sys/test/bio/run_test.sh`: O0、O2
+- `src/core/esh/test/pipe/run_test.sh`: coroutine/thread、O0/O2
+- `src/core/esh/test/sched/run_test.sh`: coroutine/thread、O0/O2
+- `src/core/esh/test/pipeline_exec/run_test.sh`: coroutine/thread、O0/O2
+- `src/core/esh/test/exe/run_test.sh`
+- `src/target/windows`: `make -B -j4`
+
+既存suiteで0、1、256、257、2089 byte転送、EOF、EPIPE、早期consumer終了、
+binary/NUL転送も成功した。試験中に既存source由来のcompiler warningは出るが、
+今回追加した試験sourceに新しいwarningはない。
+
+### 12.3 未確認・未実装
+
+- STM32 targetのKeil buildは未確認
+- TDM-GCC用Makefileのbuildは未確認
+- 物理block deviceのstrategy、実I/O、device queueは未実装
+- device queueはStep 5として独立して実装・試験する
+
+### 12.4 作業ツリーの注意
 
 多数の既存未追跡fileがあるため、`git add .`、一括clean、未追跡file削除を
 行わない。特に`.agents/`、coding style資料、STM32 tree、test生成物、`.bak`、
@@ -665,12 +698,10 @@ Windows DLL/exeは別作業由来である。
 ## 13. 新しいタスクへ渡す依頼文
 
 > `C:\usr\src\MCUFW\docs\unix_v7_buffer_cache_pipe_handoff.md`を読み、
-> Step 0からStep 4までを実装してください。UNIX V7由来の`buffers[][]`、
-> `struct buf`、b-list、av-list、`binit/getblk/brelse`のinvariantを維持し、
-> V7から採用するsource/headerは`src/core/sys/`の`conf/`、`dev/`、`h/`、
-> `sys/`へ役割別に配置してください。buffer cacheは`h/buf.h`、`h/conf.h`、
-> `dev/bio.c`、`conf/conf.c`へ分け、`src/core/esh/`には接続変更だけを残してください。
-> 現在のring型pipeの外部挙動、coroutine/thread両backendを変更しないでください。
-> device queueでは`av_forw/av_back`を流用せず、Step 5以降は今回未着手として
-> 残してください。まずAGENTS.md、現在のbranch/HEAD、dirty tree、baseline試験を
-> 確認し、既存未追跡fileを変更・削除・一括追加しないでください。
+> Step 0からStep 4までの実装と試験結果を確認し、Step 5を実装してください。
+> device queueでは`av_forw/av_back`を流用せず、`b_io_next`によるpending queueと
+> `dq_active`によるactive requestを分離してください。mock driverでenqueue、
+> start、completion、error、retry、二重enqueue拒否を試験してください。
+> pipeの外部挙動とb-list/av-list invariantを変更しないでください。
+> まずAGENTS.md、現在のbranch/HEAD、dirty tree、baseline試験を確認し、既存の
+> 未追跡fileを変更・削除・一括追加しないでください。

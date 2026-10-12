@@ -169,10 +169,14 @@ static void test_cache_hit(void)
 	CHECK(getblk(PIPEDEV, 7) == NULL);
 	bp->b_addr[0] = 0x5a;
 	brelse(bp);
+	CHECK(!(bp->b_flags & B_BUSY));
+	CHECK(on_av_list(bp));
 	hit = getblk(PIPEDEV, 7);
 	CHECK(hit == bp);
 	CHECK(hit->b_addr[0] == 0x5a);
+	CHECK(!on_av_list(hit));
 	brelse(hit);
+	CHECK(on_av_list(hit));
 	check_invariants();
 }
 
@@ -206,6 +210,7 @@ static void test_lru(void)
 		held[i] = getblk(PIPEDEV, (unsigned long)i);
 	for (i = 0; i < NBUF; i++)
 		brelse(held[i]);
+	CHECK(bfreelist.av_forw == held[0]);
 	bp = getblk(PIPEDEV, NBUF + 10UL);
 	CHECK(bp == held[0]);
 	brelse(bp);

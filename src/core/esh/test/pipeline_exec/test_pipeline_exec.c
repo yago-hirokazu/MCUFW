@@ -29,6 +29,8 @@ static unsigned char output[TEST_DATA_SIZE + 2];
 static size_t output_count;
 static size_t source_count = TEST_DATA_SIZE;
 
+static size_t busy_buffer_count(void);
+static void check_resources(void);
 static int producer_main(int argc, char **argv);
 static int filter_main(int argc, char **argv);
 static int consumer_main(int argc, char **argv);
@@ -59,18 +61,49 @@ int main(void)
 {
 	esh_file_system_init();
 	test_stdio_pipeline();
+	check_resources();
 	test_three_stage_pipeline();
+	check_resources();
 	test_early_filter_exit();
+	check_resources();
 	test_invalid_count();
+	check_resources();
 	test_pipe_exhaustion_cleanup();
+	check_resources();
 	test_backend_exhaustion_cleanup();
+	check_resources();
 	test_pipeline_bytecode();
+	check_resources();
 	test_transfer_matrix();
+	check_resources();
 	test_executor_bounds();
+	check_resources();
 	test_console_script();
+	check_resources();
 	test_parser_bounds();
+	check_resources();
 	printf("all tests passed\n");
 	return EXIT_SUCCESS;
+}
+
+static size_t busy_buffer_count(void)
+{
+	size_t count;
+	size_t i;
+
+	count = 0;
+	for (i = 0; i < NBUF; i++) {
+		if (buf[i].b_flags & B_BUSY)
+			count++;
+	}
+	return count;
+}
+
+static void check_resources(void)
+{
+	CHECK(esh_file_in_use() == 0);
+	CHECK(esh_pipe_in_use() == 0);
+	CHECK(busy_buffer_count() == 0);
 }
 
 static int producer_main(int argc, char **argv)

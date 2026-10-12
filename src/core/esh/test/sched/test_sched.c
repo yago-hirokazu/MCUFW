@@ -50,6 +50,8 @@ struct yield_failure_arg {
 
 static int failures;
 
+static size_t busy_buffer_count(void);
+static void check_resources(void);
 static void writer_entry(void *arg);
 static void reader_entry(void *arg);
 static int run_scheduler(struct esh_proc *procs, int count);
@@ -79,14 +81,22 @@ extern void esh_sched_test_fail_next_yield(void);
 int main(void)
 {
 	test_blocking_transfer();
+	check_resources();
 	test_broken_pipe_wakeup();
+	check_resources();
 	test_multiple_waiters();
+	check_resources();
 	test_prepare_exhaustion();
+	check_resources();
 	test_release_waiter();
+	check_resources();
 	test_wake_then_release();
+	check_resources();
 	test_yield_failure_cleanup();
+	check_resources();
 #ifdef ESH_SCHED_THREAD
 	test_native_race_and_handles();
+	check_resources();
 #endif
 	if (failures) {
 		printf("%d tests failed\n", failures);
@@ -94,6 +104,26 @@ int main(void)
 	}
 	printf("all tests passed\n");
 	return 0;
+}
+
+static size_t busy_buffer_count(void)
+{
+	size_t count;
+	size_t i;
+
+	count = 0;
+	for (i = 0; i < NBUF; i++) {
+		if (buf[i].b_flags & B_BUSY)
+			count++;
+	}
+	return count;
+}
+
+static void check_resources(void)
+{
+	CHECK(esh_file_in_use() == 0);
+	CHECK(esh_pipe_in_use() == 0);
+	CHECK(busy_buffer_count() == 0);
 }
 
 static void writer_entry(void *arg)

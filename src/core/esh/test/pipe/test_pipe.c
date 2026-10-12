@@ -39,6 +39,7 @@ struct read_arg {
 static int failures;
 
 static size_t buffer_in_use(void);
+static size_t av_list_occurrences(struct buf *target);
 static void setup(struct esh_proc *proc);
 static void teardown(struct esh_proc *proc);
 static int connect_pipe(struct esh_proc *writer, struct esh_proc *reader,
@@ -56,6 +57,7 @@ static void test_reader_close_wakeup(void);
 static void test_writer_close_wakeup(void);
 static void test_fd_reference(void);
 static void test_invalid_operations(void);
+static void test_close_order(void);
 static void test_inode_discard(void);
 static void test_buffer_exhaustion(void);
 static void test_pipe_exhaustion(void);
@@ -73,6 +75,7 @@ int main(void)
 	test_writer_close_wakeup();
 	test_fd_reference();
 	test_invalid_operations();
+	test_close_order();
 	test_inode_discard();
 	test_buffer_exhaustion();
 	test_pipe_exhaustion();
@@ -95,6 +98,23 @@ static size_t buffer_in_use(void)
 	for (i = 0; i < NBUF; i++) {
 		if (buf[i].b_flags & B_BUSY)
 			count++;
+	}
+	return count;
+}
+
+static size_t av_list_occurrences(struct buf *target)
+{
+	struct buf *bp;
+	size_t count;
+	size_t visited;
+
+	count = 0;
+	visited = 0;
+	for (bp = bfreelist.av_forw; bp != &bfreelist && visited < NBUF;
+	     bp = bp->av_forw) {
+		if (bp == target)
+			count++;
+		visited++;
 	}
 	return count;
 }
@@ -405,16 +425,58 @@ static void test_invalid_operations(void)
 	teardown(&proc);
 }
 
-static void test_pipe_exhaustion(void)
+static void test_close_order(void)
 {
 	struct esh_proc proc;
+	struct esh_file *file;
+	struct buf *bp;
+	int fd[2];
+	int first;
+	int second;
+	int order;
+
+	for (order = 0; order < 2; order++) {
+		setup(&proc);
+		CHECK(esh_pipe(fd) == 0);
+		file = esh_fd_get(&proc.ep_fd_table, fd[0]);
+		bp = file->f_inode->pi_buf;
+		first = order ? fd[1] : fd[0];
+		second = order ? fd[0] : fd[1];
+		CHECK(esh_close(first) == 0);
+		CHECK(bp->b_flags & B_BUSY);
+		CHECK(av_list_occurrences(bp) == 0);
+		CHECK(buffer_in_use() == 1);
+		CHECK(esh_pipe_in_use() == 1);
+		CHECK(esh_close(second) == 0);
+		CHECK(!(bp->b_flags & B_BUSY));
+		CHECK(av_list_occurrences(bp) == 1);
+		CHECK(buffer_in_use() == 0);
+		CHECK(esh_pipe_in_use() == 0);
+		CHECK(esh_file_in_use() == 0);
+		teardown(&proc);
+	}
+}
+
+static void test_pipe_exhaustion(void)
+{
+	struct esh_file *file;
+	struct esh_proc proc;
+	struct buf *pipe_buf[ESH_PIPE_MAX];
 	int fd[ESH_PIPE_MAX][2];
 	int extra[2];
+	int j;
 	int i;
 
 	setup(&proc);
-	for (i = 0; i < ESH_PIPE_MAX; i++)
+	for (i = 0; i < ESH_PIPE_MAX; i++) {
 		CHECK(esh_pipe(fd[i]) == 0);
+		file = esh_fd_get(&proc.ep_fd_table, fd[i][0]);
+		pipe_buf[i] = file->f_inode->pi_buf;
+		CHECK(pipe_buf[i]->b_flags & B_BUSY);
+		CHECK(av_list_occurrences(pipe_buf[i]) == 0);
+		for (j = 0; j < i; j++)
+			CHECK(pipe_buf[i] != pipe_buf[j]);
+	}
 	CHECK(esh_pipe(extra) == -ESH_ENFILE);
 	CHECK(esh_pipe_in_use() == ESH_PIPE_MAX);
 	CHECK(esh_file_in_use() == ESH_PIPE_MAX * 2);
@@ -459,10 +521,13 @@ static void test_inode_discard(void)
 static void test_buffer_exhaustion(void)
 {
 	struct esh_pipe_inode *inode;
+	struct esh_proc proc;
 	struct buf *held[NBUF];
+	int fd[2];
 	size_t i;
 
 	esh_file_system_init();
+	esh_proc_init(&proc);
 	for (i = 0; i < NBUF; i++) {
 		held[i] = getblk(PIPEDEV,
 				 (unsigned long)(ESH_PIPE_MAX + i));
@@ -470,7 +535,9 @@ static void test_buffer_exhaustion(void)
 	}
 	CHECK(buffer_in_use() == NBUF);
 	CHECK(esh_pipe_inode_alloc() == NULL);
+	CHECK(esh_pipe_for_proc(&proc, fd) == -ESH_ENFILE);
 	CHECK(esh_pipe_in_use() == 0);
+	CHECK(esh_file_in_use() == 0);
 	for (i = 0; i < NBUF; i++)
 		brelse(held[i]);
 	CHECK(buffer_in_use() == 0);
@@ -484,17 +551,30 @@ static void test_file_exhaustion(void)
 {
 	struct esh_pipe_inode *inode;
 	struct esh_file *files[ESH_FILE_MAX];
+	struct esh_proc proc;
+	int fd[2];
 	int i;
 
 	esh_file_system_init();
+	esh_proc_init(&proc);
 	inode = esh_pipe_inode_alloc();
 	CHECK(inode != NULL);
 	CHECK(buffer_in_use() == 1);
-	for (i = 0; i < ESH_FILE_MAX; i++) {
+	for (i = 0; i < ESH_FILE_MAX - 1; i++) {
 		files[i] = esh_file_alloc(ESH_FILE_READ, inode);
 		CHECK(files[i] != NULL);
 	}
+	CHECK(esh_pipe_for_proc(&proc, fd) == -ESH_ENFILE);
+	CHECK(esh_file_in_use() == ESH_FILE_MAX - 1);
+	CHECK(esh_pipe_in_use() == 1);
+	CHECK(buffer_in_use() == 1);
+	files[ESH_FILE_MAX - 1] = esh_file_alloc(ESH_FILE_READ, inode);
+	CHECK(files[ESH_FILE_MAX - 1] != NULL);
 	CHECK(esh_file_alloc(ESH_FILE_READ, inode) == NULL);
+	CHECK(esh_pipe_for_proc(&proc, fd) == -ESH_ENFILE);
+	CHECK(esh_file_in_use() == ESH_FILE_MAX);
+	CHECK(esh_pipe_in_use() == 1);
+	CHECK(buffer_in_use() == 1);
 	for (i = 0; i < ESH_FILE_MAX; i++)
 		esh_file_put(files[i]);
 	CHECK(esh_file_in_use() == 0);
@@ -518,6 +598,11 @@ static void test_fd_exhaustion_rollback(void)
 	for (i = 0; i < ESH_OPEN_MAX - 1; i++)
 		CHECK(esh_fd_install(&proc.ep_fd_table, file) >= 0);
 	esh_file_put(file);
+	CHECK(esh_pipe(fd) == -ESH_EMFILE);
+	CHECK(esh_file_in_use() == 1);
+	CHECK(esh_pipe_in_use() == 1);
+	CHECK(buffer_in_use() == 1);
+	CHECK(esh_fd_install(&proc.ep_fd_table, file) >= 0);
 	CHECK(esh_pipe(fd) == -ESH_EMFILE);
 	CHECK(esh_file_in_use() == 1);
 	CHECK(esh_pipe_in_use() == 1);
