@@ -11,6 +11,7 @@ static struct buf *getdev(unsigned int dev);
 static void b_list_init(struct buf *head);
 static void b_list_remove(struct buf *bp);
 static void b_list_insert(struct buf *head, struct buf *bp);
+static void av_list_init(struct buf *head);
 static void av_list_remove(struct buf *bp);
 static void av_list_insert_head(struct buf *bp);
 static void av_list_insert_tail(struct buf *bp);
@@ -27,8 +28,7 @@ void binit(void)
 	memset(buf, 0, sizeof(buf));
 	memset(&bfreelist, 0, sizeof(bfreelist));
 	b_list_init(&bfreelist);
-	bfreelist.av_forw = &bfreelist;
-	bfreelist.av_back = &bfreelist;
+	av_list_init(&bfreelist);
 
 	for (i = 0; i < nblkdev; i++) {
 		dp = bdevsw[i].d_tab;
@@ -162,6 +162,12 @@ static void b_list_insert(struct buf *head, struct buf *bp)
 	bp->b_back = head;
 	head->b_forw->b_back = bp;
 	head->b_forw = bp;
+}
+
+static void av_list_init(struct buf *head)
+{
+	head->av_forw = head;
+	head->av_back = head;
 }
 
 static void av_list_remove(struct buf *bp)
