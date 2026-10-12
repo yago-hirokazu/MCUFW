@@ -93,23 +93,20 @@ struct buf *geteblk(void)
 
 void brelse(struct buf *bp)
 {
-	int age;
-
 	if (!bp || !(bp->b_flags & B_BUSY))
 		return;
-	age = bp->b_flags & B_AGE;
 	if (bp->b_flags & B_ERROR) {
 		b_list_remove(bp);
 		b_list_insert(&bfreelist, bp);
 		bp->b_dev = NODEV;
 		bp->b_blkno = 0;
 	}
-	bp->b_flags &= ~(B_WANTED | B_BUSY | B_ASYNC | B_AGE);
-	bp->b_io_next = NULL;
-	if (age)
+	if (bp->b_flags & B_AGE)
 		av_list_insert_head(bp);
 	else
 		av_list_insert_tail(bp);
+	bp->b_flags &= ~(B_WANTED | B_BUSY | B_ASYNC | B_AGE);
+	bp->b_io_next = NULL;
 }
 
 int incore(unsigned int dev, unsigned long blkno)
