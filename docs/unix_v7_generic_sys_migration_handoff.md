@@ -30,7 +30,7 @@
 | Step | 内容 | 状態 | 完了コミット |
 |---|---|---|---|
 | 0 | API名、V7対応範囲、配置の確定 | done | - |
-| 1 | 汎用header追加 | pending | - |
+| 1 | 汎用header追加 | done | - |
 | 2 | file table、inode table追加 | pending | - |
 | 3 | `file.c`のV7名sourceへの分割 | pending | - |
 | 4 | V7風`pipe.c`とinode I/O | pending | - |
@@ -514,6 +514,100 @@ docs/unix_v7_generic_sys_migration_handoff.mdのStep 1を実行してくださ�
 Step 0の確定事項に従って汎用headerを追加し、header単体試験と既存最小試験を
 実行してください。esh呼出し側の切替とStep 2以降は行わないでください。
 ```
+
+### Step 1実施結果（2026-10-12）
+
+状態: `done`
+
+Step 0で確定した次のheaderを追加した。
+
+- `src/core/sys/h/param.h`
+- `src/core/sys/h/sys_error.h`
+- `src/core/sys/h/file.h`
+- `src/core/sys/h/inode.h`
+- `src/core/sys/h/pipe.h`
+- `src/core/sys/h/sched.h`
+- `src/core/sys/h/sched_backend.h`
+
+旧esh headerとcallerは変更していない。新sys headerからesh header、host
+`errno.h`、Windows headerはincludeしていない。compatibility aliasもない。
+
+#### structと所有権
+
+| struct | 主なfield | 所有権、未使用条件 |
+|---|---|---|
+| `struct file` | `f_flag`、`f_count`、`f_inode`、`f_offset` | `file[]`が所有、`f_count == 0`で未使用 |
+| `struct inode` | `i_flag`、`i_count`、`i_buf`、`i_size`、3 wait channel | `inode[]`が所有、`i_count == 0`で未使用 |
+| `struct proc` | `p_state`、`p_ofile[]`、wait link、backend、status | scheduler callerがstorageを所有 |
+| `struct wait_chan` | wait list head、tail | inodeまたはcallerがstorageを所有 |
+| `struct pipe_io_status` | result、転送数、error | 一回分pipe I/Oの値object |
+
+`struct proc.p_ofile[NOFILE]`がprocessごとのfd tableである。fd entryは
+`struct file *`を所有し、install時に`f_count`を増やす。`struct file`は
+`struct inode *`を所有する。`ialloc`直後の`i_count`はpipe組立中の一時参照も
+表せるため、commentをfileまたはconstruction referenceとした。pipe完成後は
+live file objectからの参照数になる。
+
+`struct inode`はV7 filesystem全体を持たず、pipeに必要なbuffer、size、lock、
+明示的なread/write wait channelだけを持つ。`i_mode`、device、inode number、
+owner、block address、timestampは意図的に追加していない。
+
+#### 定数とflag
+
+| 定数 | 値 | 配置理由 |
+|---|---|---|
+| `NOFILE` | 12 | process fd上限、`param.h` |
+| `NFILE` | 12 | global file table上限、`param.h` |
+| `NINODE` | 3 | 同時pipe inode上限、`param.h` |
+| `PIPELINE_MAX` | 4 | scheduler process上限、`param.h` |
+| `PIPSIZ` | `BSIZE`、現在256 | buffer cache一block制約、`pipe.h` |
+| `FREAD/FWRITE/FPIPE` | `0x01/0x02/0x04` | V7 `file.h`と同じbit |
+| `ILOCK/IWANT` | `0x01/0x10` | V7 `inode.h`と同じbit |
+
+`pipe.h`は`NBUF >= NINODE`をcompile時に検査する。errorはStep 0どおり正値の
+`SYS_E*` enumとし、APIは失敗時に負値を返す。
+
+#### header依存とAPI
+
+- `sched.h`は`struct file`をforward declarationし、循環includeを避ける
+- `file.h`は`struct inode`と`struct proc`をforward declarationする
+- `inode.h`はwait channel実体を埋め込むため`sched.h`をincludeする
+- `pipe.h`は`PIPSIZ`とbuffer数検査のため`buf.h`、`param.h`をincludeする
+- `sched_backend.h`だけが`sched.h`へ依存する
+
+V7名の`getf`、`ufalloc`、`falloc`、`closef`、`ialloc`、`iput`、`readp`、
+`writep`、`readi`、`writei`、`plock`、`prele`を宣言した。MCUFW補助として
+`fd_install`、`fd_install_at`、`fd_close`、`close_all`も宣言した。
+`sys_pipe`、`sys_read`、`sys_write`、`sys_close`は`file.h`の公開入口とした。
+
+#### 試験
+
+`src/core/sys/test/header/`を追加し、次を`-Werror -pedantic`で確認した。
+
+- 各header単独compile、C/C++、O0/O2
+- 全headerの通常順、逆順compile、C/C++、O0/O2
+- 定数、flag、fd配列長、offset/size型のcompile時検査
+- 新header内に`esh_`、`ESH_`、`typedef`がないこと
+- buffer cache O0/O2
+- pipe coroutine O0
+
+すべて成功した。
+
+#### 未確定事項
+
+未確定fieldはない。table実体、初期化処理、allocation実装は後続Stepの責務で
+あり、このStepでは宣言だけとした。`struct pipe_io_status`を使用する一回転送
+helperはStep 4で`pipe.c`の`static`関数として実装する。
+
+#### Step 2への引継事項
+
+- `conf/conf.c`へ`struct file file[NFILE]`と
+  `struct inode inode[NINODE]`を一度だけ定義する
+- static storageのzero初期化により`f_count == 0`、`i_count == 0`を保証する
+- `file_system_init`実装はStep 3の`fio.c`まで追加しない
+- fd枯渇は`SYS_EMFILE`、global file/inode枯渇は`SYS_ENFILE`とする
+- fileとinodeの枯渇stageは同じerror値でも試験上は別々に確認する
+- 旧`esh_file_table`、`esh_pipe_table`は変更または削除しない
 
 ## 10. Step 2 file table inode table追加
 
