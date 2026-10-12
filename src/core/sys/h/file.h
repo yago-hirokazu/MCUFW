@@ -38,7 +38,9 @@ int sys_close(int fd);
 void file_system_init(void);
 struct file *getf(struct proc *proc, int fd);
 int ufalloc(struct proc *proc);
+/* Success installs fd-owned reference; failure stores negative error in fd */
 struct file *falloc(struct proc *proc, int *fd);
+/* closef consumes one file reference */
 void closef(struct file *fp);
 int fd_install(struct proc *proc, struct file *fp);
 int fd_install_at(struct proc *proc, int fd, struct file *fp);

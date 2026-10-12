@@ -32,7 +32,7 @@
 | 0 | API名、V7対応範囲、配置の確定 | done | - |
 | 1 | 汎用header追加 | done | - |
 | 2 | file table、inode table追加 | done | - |
-| 3 | `file.c`のV7名sourceへの分割 | pending | - |
+| 3 | `file.c`のV7名sourceへの分割 | done | - |
 | 4 | V7風`pipe.c`とinode I/O | pending | - |
 | 5 | scheduler汎用化 | pending | - |
 | 6 | Windows backend移動 | pending | - |
@@ -784,6 +784,75 @@ docs/unix_v7_generic_sys_migration_handoff.mdのStep 3を実行してくださ�
 現行file.cの責務をV7名のfio.c、alloc.c、iget.cへ実装し、専用単体試験を
 追加してください。旧file.cの削除とesh本番経路の切替は行わないでください。
 ```
+
+### Step 3実施結果（2026-10-12）
+
+状態: `done`
+
+V7の責務名に合わせ、次のsourceを追加した。
+
+| source | 実装した責務 |
+|---|---|
+| `sys/fio.c` | `getf`、`ufalloc`、`falloc`、`closef`、fd補助、初期化 |
+| `sys/alloc.c` | pipe用最小`ialloc`、inode使用数取得 |
+| `sys/iget.c` | 最終参照でbufferを返す`iput` |
+
+V7の大域`u`と暗黙error状態は導入していない。`struct proc *`を明示引数とし、
+整数を返すAPIは失敗時に負の`SYS_E*`を返す。pointerを返す`falloc`は失敗時に
+`NULL`を返し、`fd`出力へ負errorを格納する。`ialloc`は失敗時に`NULL`を返す。
+
+`file_system_init`は、所有中resourceがないという呼出し条件の下で`binit`を
+呼び、`file[]`と`inode[]`をzeroへ戻す。旧`src/core/esh/file.c`、旧table、
+esh本番経路は変更していない。
+
+#### 参照数遷移
+
+- `falloc`成功時に空fdへfileをinstallし、`f_count`を0から1にする
+- `fd_install`と`fd_install_at`はfd複製として`f_count`を1増やす
+- `fd_close`はfdを先に空にし、`closef`で`f_count`を1減らす
+- `f_count`が0になった時だけfileをzeroへ戻して`iput`を呼ぶ
+- `ialloc`はbufferを確保し、組立中参照として`i_count`を1にする
+- `iput`は`i_count`を1減らし、0になった時だけbufferをzero化して返す
+- fd複製と途中closeでは`i_count`を変更しない
+- `close_all`は各非NULL fdを一度ずつ閉じ、重複fdも個別に解放する
+
+#### 失敗時の状態
+
+- fd枯渇: `falloc`は`-SYS_EMFILE`をfd出力へ格納し、fileを変更しない
+- file枯渇: `falloc`は`-SYS_ENFILE`をfd出力へ格納し、fdを変更しない
+- inode枯渇: `ialloc`は`NULL`を返し、既存inodeを変更しない
+- buffer枯渇: `ialloc`はinodeを使用状態にせず`NULL`を返す
+- 参照数上限: fd installは`-SYS_ENFILE`を返し、fdを変更しない
+
+`falloc`はV7と同様にfd検索後にfile tableを検索するが、file枯渇時にはfdへ
+一時pointerを置かない。このため明示的な予約解除は不要であり、開始前の状態が
+保たれる。
+
+#### 試験
+
+`src/core/sys/test/file/`へ専用単体試験を追加した。次を
+`-Werror -pedantic`のO0/O2で確認した。
+
+- `getf`、`ufalloc`、`falloc`の正常系と不正引数
+- fd自動install、指定位置install、fd複製、個別close、全close
+- fd、file、inode、bufferの各枯渇stageと失敗後の使用数
+- file最終closeだけがinode参照を解放すること
+- inode最終参照だけがbufferを返すこと
+- 全close後にfile、inode、bufferを先頭から再利用できること
+
+新規file/inode単体試験 O0/O2、buffer cache O0/O2、既存pipeの
+coroutine/thread O0はすべて成功した。
+
+#### Step 4への引継事項
+
+- `ialloc`が返す`i_count == 1`はpipe組立中参照として扱う
+- read/write両file確保後にinodeを両endpointへ設定し、`i_count`を2にする
+- 各`falloc`はfdへinstall済みなので、失敗cleanupは`fd_close`を使用する
+- 2個目の`falloc`失敗時はread fdを閉じた後、組立中inodeを`iput`する
+- `FREAD|FPIPE`と`FWRITE|FPIPE`、各`f_offset`はpipe作成側で設定する
+- 最終endpoint close時のpeer wakeupはStep 4で`closef`へ接続する
+- pipe作成側はfd枯渇とfile枯渇を`falloc`のfd出力で区別する
+- inodeまたはbuffer確保失敗は`SYS_ENFILE`として公開する
 
 ## 12. Step 4 V7風pipe.cとinode I/O
 

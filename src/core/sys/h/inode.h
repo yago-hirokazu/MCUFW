@@ -29,6 +29,7 @@ struct inode {
 
 extern struct inode inode[];
 
+/* ialloc returns one construction reference; iput consumes one reference */
 struct inode *ialloc(void);
 void iput(struct inode *ip);
 ptrdiff_t readi(struct inode *ip, size_t *offset, void *buf, size_t count);
