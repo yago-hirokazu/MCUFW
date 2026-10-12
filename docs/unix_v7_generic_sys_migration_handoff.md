@@ -29,7 +29,7 @@
 
 | Step | 内容 | 状態 | 完了コミット |
 |---|---|---|---|
-| 0 | API名、V7対応範囲、配置の確定 | pending | - |
+| 0 | API名、V7対応範囲、配置の確定 | done | - |
 | 1 | 汎用header追加 | pending | - |
 | 2 | file table、inode table追加 | pending | - |
 | 3 | `file.c`のV7名sourceへの分割 | pending | - |
@@ -136,7 +136,7 @@ V7の主要な対応は次のとおり。
 | inode I/O | `readi`、`writei` |
 | pipe lock | `plock`、`prele` |
 
-## 6. 最終配置案
+## 6. 最終配置（Step 0確定）
 
 Step 0で確定するが、開始時の推奨配置は次のとおり。
 
@@ -154,22 +154,28 @@ src/core/sys/
 │       ├── sched_cortn.c
 │       └── sched_thread.c
 ├── h/
+│   ├── cortn.h
 │   ├── file.h
 │   ├── inode.h
+│   ├── param.h
 │   ├── pipe.h
 │   ├── sched.h
-│   └── sched_backend.h
+│   ├── sched_backend.h
+│   └── sys_error.h
 └── sys/
     ├── alloc.c
+    ├── cortn.c
     ├── fio.c
     ├── iget.c
     ├── pipe.c
     ├── rdwri.c
-    └── sched.c
+    ├── sched.c
+    └── sys2.c
 ```
 
-`sys2.c`を追加するかは、host CRTの`read`、`write`、`close`、`pipe`との
-名前衝突をStep 0で確認して決める。
+Step 0で`sys2.c`、`param.h`、`sys_error.h`、汎用coroutine実装の配置を
+上記のとおり確定した。Windows固有backend 6ファイルは
+`src/core/sys/dev/windows/`へ置く。
 
 ## 7. 全Step共通の設計条件
 
@@ -276,6 +282,175 @@ API名、UNIX V7対応範囲、配置を確定し、結果を引継ぎ書へ記�
 実装は名前衝突確認に必要な最小範囲に留め、Step 1以降を開始しないでください。
 ```
 
+### Step 0実施結果（2026-10-12）
+
+状態: `done`
+
+source動作は変更していない。確認用sourceは一時作成後に削除した。以下を
+Step 1以降の確定事項とする。
+
+#### V7から採用する範囲
+
+| V7要素 | MCUFWでの採用範囲 | 意図的差分 |
+|---|---|---|
+| `struct file` | `f_flag`、`f_count`、`f_inode`、`f_offset` | `off_t`でなく`size_t` |
+| `struct inode` | pipe用flag、参照数、size、buffer、wait channel | device、mode、owner、block addressは持たない |
+| `file[NFILE]`、`inode[NINODE]` | `conf/conf.c`が固定長tableを所有 | 動的確保なし |
+| `getf`、`ufalloc`、`falloc`、`closef` | V7と同じ責務名を使用 | 大域`u`でなく`struct proc *`を明示 |
+| `pipe`、`readp`、`writep` | `pipe.c`へ配置 | public入口だけ`sys_pipe` |
+| `readi`、`writei` | `rdwri.c`へ配置 | buffer cache上のpipeだけを対象 |
+| `plock`、`prele` | `pipe.c`へ配置 | explicit wait channelを使用 |
+| `read`、`write`、`close` | `sys2.c`へ配置 | symbol名は`sys_read`等 |
+| `sleep`、`wakeup` | `sched.c`へ配置 | `sched_sleep`、`sched_wakeup` |
+
+directory、pathname、mount、permission、special device、signal、trap、MMU、
+disk block mappingは対象外とする。V7 `u.u_*`に相当する暗黙状態は導入しない。
+current processの取得だけをbackend interfaceへ残し、file allocation helperは
+`struct proc *`を明示引数で受け取る。
+
+#### 型と所有関係
+
+`struct proc`をscheduler所有の汎用process型とし、次を保持する。
+
+- `struct file *p_ofile[NOFILE]`
+- process state、wait channel link、backend pointer、終了status
+
+現行`struct esh_fd_table`は独立型として移行せず、V7の`u.u_ofile[]`に相当する
+配列を`struct proc`へ埋め込む。現行executorの`struct proc`はStep 5で
+`struct exe_proc`へ変更する。これにより`struct proc` tagの二重定義を避ける。
+
+`struct file`は一つのopen pipe endpointを表す。`f_count`はfdからfileへの参照、
+`struct inode`の`i_count`はlive file objectからinodeへの参照を数える。fd複製では
+`f_count`だけを増やす。最後の`closef`でのみ`i_count`を減らす。
+
+offsetとsizeは非負で`PIPSIZ`以下に制限されるため、host依存の`off_t`を
+導入せず`size_t`を使う。転送byte数または負errorを返す入口は従来どおり
+`ptrdiff_t`を使う。新しい`typedef`は追加しない。
+
+#### 確定symbol表
+
+| 現行symbol | 汎用sys symbol | 公開区分、配置 |
+|---|---|---|
+| `struct esh_file` | `struct file` | 公開定義、`h/file.h` |
+| `struct esh_pipe_inode` | `struct inode` | sys内部型、`h/inode.h` |
+| `struct esh_proc` | `struct proc` | 公開型、`h/sched.h` |
+| executor `struct proc` | `struct exe_proc` | esh内部型、`esh/include/exe.h` |
+| `struct esh_wait_chan` | `struct wait_chan` | sys内部型、`h/sched.h` |
+| `ESH_FD_STDIN/STDOUT/STDERR` | `FD_STDIN/STDOUT/STDERR` | `h/file.h` |
+| `ESH_OPEN_MAX` | `NOFILE` | `h/param.h`、値12 |
+| `ESH_FILE_MAX` | `NFILE` | `h/param.h`、値12 |
+| `ESH_PIPE_MAX` | `NINODE` | `h/param.h`、値3 |
+| `ESH_PIPE_BUFFER_SIZE` | `PIPSIZ` | `h/pipe.h`、値`BSIZE` |
+| `ESH_PIPELINE_MAX` | `PIPELINE_MAX` | `h/param.h`、値4 |
+| `ESH_FILE_READ/WRITE` | `FREAD/FWRITE` | `h/file.h`、bit flag |
+| なし | `FPIPE` | `h/file.h`、bit flag |
+| `ESH_E*` | `SYS_E*` | `h/sys_error.h` |
+| `esh_file_system_init` | `file_system_init` | 公開、`fio.c` |
+| `esh_fd_get` | `getf` | sys内部、`fio.c` |
+| fd空き検索 | `ufalloc` | sys内部、`fio.c` |
+| `esh_file_alloc`とfd確保 | `falloc` | sys内部、`fio.c` |
+| `esh_file_put` | `closef` | sys内部、`fio.c` |
+| `esh_fd_install_at` | `fd_install_at` | 移行補助、`fio.c` |
+| `esh_close_all` | `close_all` | 公開、`fio.c` |
+| `esh_pipe_inode_alloc` | `ialloc` | sys内部、`alloc.c` |
+| `esh_pipe_inode_discard` | `iput` | sys内部、`iget.c` |
+| `esh_pipe_for_proc` | `pipe_for_proc` | sys内部、`pipe.c` |
+| `esh_pipe` | `sys_pipe` | 公開、`pipe.c` |
+| pipe一回read/write helper | `pipe_read_once`/`pipe_write_once` | `pipe.c`の`static` |
+| pipe read/write | `readp`/`writep` | sys内部、`pipe.c` |
+| inode read/write | `readi`/`writei` | sys内部、`rdwri.c` |
+| pipe lock/unlock | `plock`/`prele` | sys内部、`pipe.c` |
+| `esh_read` | `sys_read` | 公開、`sys2.c` |
+| `esh_write` | `sys_write` | 公開、`sys2.c` |
+| `esh_close` | `sys_close` | 公開、`sys2.c` |
+| `esh_kernel_*` | `kernel_*` | 公開、`sched.c` |
+| `esh_sleep`/`esh_wakeup` | `sched_sleep`/`sched_wakeup` | sys内部、`sched.c` |
+| `esh_current_proc` | `current_proc` | 公開、`sched.c` |
+| `esh_proc_*` | `proc_*` | 公開、`sched.c` |
+| `esh_sched_*` | `sched_*` | 公開、`sched.c` |
+| `esh_sched_backend_*` | `sched_backend_*` | private backend契約 |
+| `ESH_PROC_*` | `PROC_*` | `h/sched.h` |
+| `ESH_WAIT_*` | `WAIT_*` | `h/sched.h` |
+
+`SYS_EBADF`、`SYS_EMFILE`、`SYS_ENFILE`、`SYS_ENOMEM`、`SYS_EINVAL`、
+`SYS_EPIPE`、`SYS_EAGAIN`、`SYS_ENOSYS`は正値の汎用enumとし、関数は失敗時に
+その負値を返す。host `errno`へ値を合わせず、sys coreから`<errno.h>`を
+includeしない。
+
+#### header公開範囲
+
+| header | 区分 | 内容 |
+|---|---|---|
+| `h/param.h` | 公開 | `NOFILE`、`NFILE`、`NINODE`、`PIPELINE_MAX` |
+| `h/sys_error.h` | 公開 | host非依存の`SYS_E*` |
+| `h/file.h` | 公開 | `struct file`、flag、`sys_*`、file lifecycle API |
+| `h/sched.h` | 公開 | `struct proc`、process state、scheduler API |
+| `h/inode.h` | sys private | pipe用最小`struct inode`、inode lifecycle |
+| `h/pipe.h` | sys private | `PIPSIZ`、`readp`、`writep`、lock契約 |
+| `h/sched_backend.h` | backend private | target backend契約 |
+| `h/cortn.h` | backend private | coroutine engineと単体試験用契約 |
+
+「公開」はesh等のsys外callerが使用可能という意味であり、安定ABIは意味しない。
+`file[]`、`inode[]`は各headerで不完全配列の`extern`宣言だけを置き、実体は
+`conf/conf.c`だけに置く。sys private headerをeshから直接includeしない。
+
+#### source配置と移行時期
+
+- `sys/sys2.c`を追加し、`sys_read`、`sys_write`、`sys_close`を置く
+- `sys_pipe`はV7と同じく`sys/pipe.c`へ置く
+- `h/param.h`と`h/sys_error.h`はStep 1で他headerと同時に追加する
+- `cortn.c`は`sys/sys/cortn.c`、`cortn.h`は`sys/h/cortn.h`へStep 6で移す
+- Windows固有6ファイルは予定どおりStep 6で`sys/dev/windows`へ移す
+
+`cortn.c`と`cortn.h`にはesh依存がなく、sys schedulerのcoroutine backendが
+使用する。これらをeshへ残すとsys層からesh層への逆依存になるため、Step 6の
+backend移動と同時に移す。
+
+#### MinGW衝突確認
+
+MSYS2 MINGW64 GCCでheaderをincludeした最小programをcompile/linkした。
+
+| 名前 | 結果 | 判断 |
+|---|---|---|
+| `read` | `<io.h>`の`int read(..., unsigned int)`と型衝突 | `sys_read` |
+| `write` | `<io.h>`の`int write(..., unsigned int)`と型衝突 | `sys_write` |
+| `close` | 同じ型で定義でき、実行物が自前`close`をexport | silent overrideを避け`sys_close` |
+| `pipe` | MinGWは`_pipe`だけを宣言し、現状はlink可能 | 他hostとの一貫性から`sys_pipe` |
+| `sleep` | `<unistd.h>`の`unsigned int sleep(unsigned int)`と型衝突 | `sched_sleep` |
+| `EBADF`等 | `<errno.h>`のmacro展開でenum名が構文error | `SYS_E*` |
+| `struct proc` | 同一翻訳単位でtag再定義error | executor側を`struct exe_proc`へ変更 |
+
+MinGWの`off_t`はbuild optionにより`off32_t`または`off64_t`となるため採用しない。
+`pipe`が現在衝突しないことはWindows固有の結果であり、bare-metalを含む共通API名を
+hostごとに変える理由にはしない。
+
+#### compatibility方針
+
+汎用sys headerへ`esh_*` aliasやmacro wrapperは追加しない。Step 5では旧esh
+file/pipe callerを新scheduler名へ必要範囲で追従させ、Step 7でfile/pipe入口を
+一括切替する。一時的compatibility定義は現時点で不要であり、追加する場合は
+Step 7で必ず削除する。
+
+#### 開始時試験
+
+次の既存試験が成功した。
+
+- buffer cache O0/O2
+- pipe coroutine/thread O0/O2
+- scheduler coroutine/thread O0/O2
+- pipeline executor coroutine/thread O0/O2
+- parser `run_test1.sh`、`run_test2.sh`
+- executor `run_test.sh`
+
+#### Step 1への引継事項
+
+- 上記7 headerを追加し、`param.h`と`sys_error.h`もStep 1対象に含める
+- `struct proc.p_ofile[NOFILE]`をfd tableとし、別の`struct fd_table`を作らない
+- file/inode offsetには`size_t`を使用し、`off_t`を追加しない
+- sys headerにhost `errno`、Windows header、esh headerをincludeしない
+- `cortn.c`、`cortn.h`の物理移動はStep 6まで行わない
+- compatibility aliasは作らない
+
 ## 9. Step 1 汎用header追加
 
 ### 目的
@@ -290,6 +465,8 @@ API名、UNIX V7対応範囲、配置を確定し、結果を引継ぎ書へ記�
 
 ### 対象
 
+- `src/core/sys/h/param.h`
+- `src/core/sys/h/sys_error.h`
 - `src/core/sys/h/file.h`
 - `src/core/sys/h/inode.h`
 - `src/core/sys/h/pipe.h`
@@ -298,13 +475,14 @@ API名、UNIX V7対応範囲、配置を確定し、結果を引継ぎ書へ記�
 
 ### 実装内容
 
-1. `file.h`へ`struct file`、file flag、`extern struct file file[]`を定義
-2. `inode.h`へpipeに必要な最小`struct inode`とflagを定義
-3. `pipe.h`へMCUFW固有の容量、I/O状態、internal prototypeを定義
-4. `sched.h`へprocess、wait channel、scheduler APIを定義
-5. `sched_backend.h`へtarget backend契約を定義
-6. include依存を循環させず、forward declarationを優先
-7. header単体compile testを追加
+1. `param.h`へ固定容量、`sys_error.h`へhost非依存errorを定義
+2. `file.h`へ`struct file`、file flag、`extern struct file file[]`を定義
+3. `inode.h`へpipeに必要な最小`struct inode`とflagを定義
+4. `pipe.h`へMCUFW固有の容量、I/O状態、internal prototypeを定義
+5. `sched.h`へprocess、wait channel、scheduler APIを定義
+6. `sched_backend.h`へtarget backend契約を定義
+7. include依存を循環させず、forward declarationを優先
+8. header単体compile testを追加
 
 `inode.h`へV7のfilesystem全体をコピーしない。pipe動作に必要なfieldと、将来の
 拡張に必要な明確な最小subsetだけを定義する。
