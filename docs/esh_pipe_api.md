@@ -1,97 +1,116 @@
-# esh pipe API・データモデル
+# sys pipe API・データモデル
 
-更新日: 2026-10-03
+更新日: 2026-10-13
 
 ## 対象範囲
 
-本書は `esh_pipe_coroutine_summary.md` の Milestone 1 で固定した仕様を示す。
-実装対象はanonymous pipeだけとし、通常ファイル、パス探索、物理ストレージ、
-リダイレクト、background job、signalは含めない。
+本書は`src/core/sys`のanonymous pipe APIと、eshからの利用方法を示す。
+通常ファイル、path探索、物理storage、リダイレクト、background job、signalは
+含めない。
 
-UNIX V7の `file`、pipe inode、processごとのfd tableという関係を保つ。ただし、
-V7のディスク上の一時ファイルは使用せず、pipe inodeが固定長ring bufferを直接
-所有する。
+UNIX V7の`file`、pipe inode、processごとのfd tableという関係を保つ。pipe
+dataはmemory-only buffer cache上の1 blockへ格納し、物理deviceへは送らない。
 
 ## 資源上限
 
 | 資源 | 上限 | 定義 |
 |---|---:|---|
-| 同時process・pipeline段数 | 4 | `ESH_PIPELINE_MAX` |
-| process当たりfd | 12 | `ESH_OPEN_MAX` |
-| global file entry | 12 | `ESH_FILE_MAX` |
-| pipe inode | 3 | `ESH_PIPE_MAX` |
-| pipe buffer | 256 byte/pipe | `ESH_PIPE_BUFFER_SIZE` |
+| 同時process・pipeline段数 | 4 | `PIPELINE_MAX` |
+| process当たりfd | 12 | `NOFILE` |
+| global file entry | 12 | `NFILE` |
+| pipe inode | 3 | `NINODE` |
+| buffer cache entry | 3 | `NBUF` |
+| pipe data | 256 byte/pipe | `PIPSIZ` = `BSIZE` |
 
-4段pipelineに必要なpipeは最大3本である。全poolはcore側の固定長配列とし、
-動的メモリ確保を必須にしない。`PROCS` と `ESH_PIPELINE_MAX` の不一致は
-コンパイルエラーにする。
+4段pipelineに必要なpipeは最大3本である。全tableとpoolは固定長配列とし、
+portable sys層では動的memory確保を使用しない。`NBUF < NINODE`はcompile
+errorにする。
 
 ## 所有権
 
 ```text
-struct esh_proc
-  -> struct esh_fd_table
-       -> struct esh_file
-            -> struct esh_pipe_inode
-                 -> struct esh_pipe_buffer
-                 -> read/write wait channel
+struct proc
+  -> p_ofile[NOFILE]
+       -> struct file
+            -> struct inode
+                 -> struct buf
+                 -> lock/read/write wait channel
 ```
 
-- fd entryはfile entryを1回参照する
-- file entryはreadまたはwriteの一方向だけを表す
-- file参照数が0になった時点で対応endpointを閉じる
-- endpoint close時にinodeのreaderまたはwriter数を減らす
-- readerとwriterがともに0になった時点でinodeとbufferをpoolへ戻す
-- process終了時はfd番号順に全fdを閉じる
-- `esh_pipe()` 失敗時はwrite file、read file、inode、fdの逆順で戻す
-- closeは反対側のwaiterを起こし、EOFまたはbroken pipeを再判定させる
+- `p_ofile[]` entryはfile entryを1回参照する
+- file entryは`FREAD|FPIPE`または`FWRITE|FPIPE`のendpointを表す
+- `f_count`が0になると対応endpointを閉じる
+- read/write fileは同じinodeを参照し、`i_count`で生存endpointを数える
+- `i_count`が0になるとinodeとbufferをpoolへ戻す
+- process終了時は`close_all()`がfd番号順に全fdを閉じる
+- `pipe_for_proc()`失敗時は確保済みfile、fd、inodeを巻き戻す
+- endpoint closeはread/write channelを起こし、EOFまたはEPIPEを再判定させる
 
-## API結果
+## 公開API
 
-- `esh_pipe()`、`esh_close()`は成功時0、失敗時は負の`ESH_E*`を返す
-- `esh_read()`、`esh_write()`は転送byte数、EOFの0、または負の`ESH_E*`を返す
-- `count == 0` はfdやpeer状態を検査せず0を返す
+`file.h`はcurrent processへ作用する次のAPIを公開する。
+
+- `sys_pipe()`：read fdとwrite fdを作成する
+- `sys_read()`：fdから読み取る
+- `sys_write()`：fdへ書き込む
+- `sys_close()`：fdを閉じる
+
+sys層内部とesh executorは、明示的な`struct proc *`を受け取る
+`pipe_for_proc()`、`getf()`、`fd_install_at()`、`fd_close()`、`close_all()`も
+使用する。
+
+- 作成とcloseは成功時0、失敗時は負の`SYS_E*`を返す
+- read/writeは転送byte数、EOFの0、または負の`SYS_E*`を返す
+- `count == 0`はfd、buffer、peer状態を検査せず0を返す
 - global `errno`は使用しない
-- `esh_read()`は取得可能なデータを返し、空かつwriterありの場合だけ待機する
-- `esh_write()`は空きへ書ける分を転送する。残量があれば空きを待って継続し、
-  正常時は要求全体の転送byte数を返す
-- 最終writer close後はbufferを読み切ってからEOFを返す
-- reader不在時のwriteは`-ESH_EPIPE`を返す。signalは発生させない
+- readは取得可能なdataを返し、空かつwriterありの場合だけ待機する
+- writeは空きへ書ける分を転送し、残量があれば待機して要求全体を完了する
+- 最終writer close後は残存dataを読み切ってからEOFを返す
+- reader不在時のwriteは`-SYS_EPIPE`を返し、signalは発生させない
 
-内部pipe処理は`ESH_IO_*`で進行、read待ち、write待ち、EOF、broken pipe、
-その他のエラーを区別する。公開APIが待機と再試行を隠蔽する。
+内部pipe処理は`PIPE_IO_*`で進行、read待ち、write待ち、EOF、broken pipe、
+errorを区別する。`sys_read()`と`sys_write()`が待機と再試行を隠す。
+
+## Pipe data位置
+
+V7と同様、read endpointの`f_offset`とinodeの`i_size`を単調に進める。
+write位置は現在の`i_size`である。未読dataをring末尾から先頭へ回り込ませない。
+
+readerが`i_size`まで読み切った時点でread offsetと`i_size`を0へ戻し、1 block
+全体を再利用する。このため、未読dataが残る間は先頭側に空きがあっても再利用
+しない。これは旧esh ring bufferから意図的に変更したV7型の意味である。
 
 ## Processとwait channel
 
-`struct esh_proc`はfd table、実行状態、待機先、終了statusを所有する。既存の
-executor用`struct proc`は`struct esh_proc`を埋め込み、コマンド引数などの
-shell固有情報とportable scheduler状態を分離する。
+`struct proc`はfd table、実行状態、待機先、backend、終了statusを所有する。
+esh executor用processはこれを`p_exec`として埋め込み、command引数等のshell
+固有情報とportable scheduler状態を分離する。
 
-wait channelの待機リストはscheduler backendが所有する。pipe inodeはread用と
-write用のchannelを別々に所有する。pipe状態検査、wait登録、kernel lock解放を
-不可分にし、再開後は必ず条件を再検査する。
+wait listはportable schedulerが管理し、backendはcontext切替とkernel lockを
+実装する。pipe inodeはlock、read、write用channelを別々に所有する。状態検査、
+wait登録、backend待機をkernel lockの下で行い、再開後は条件を再検査する。
 
-pipeline全体の終了statusは最後のcommandのstatusとする。途中のcommandの
-エラーは資源回収には影響させるが、この規則を変更しない。
+pipeline全体の終了statusは最後のcommandのstatusとする。途中commandのerrorは
+資源回収には影響させるが、この規則を変更しない。
 
 ## 標準I/O
 
 - fd 0、1、2をstdin、stdout、stderrとする
 - pipelineはstdoutと次段stdinだけを接続する
-- stderrとdebug logはconsoleへ出し、pipeデータへ混入させない
-- pipe対応commandの入力基本APIは`esh_read()`とする
-- 既存`scanf`はconsole入力だけを互換範囲とし、初期pipe対応には含めない
+- stderrとdebug logはconsoleへ出し、pipe dataへ混入させない
+- pipe対応commandは`sys_read()`またはmapped `getchar()`を使用する
+- `scanf`はconsole入力だけを互換範囲とし、pipe stdinには使用しない
 
-## Coroutine引き継ぎ条件
+## V7との差分
 
-Windows版coroutine stack容量は64 KiBとする。16 KiBではCRT formattingの
-結合試験中にcontext returnで問題が発生したため、64 KiBへ拡大した。
-この値はWindows coroutine backend専用である。MCU stack容量はMilestone 10の
-移植時に決定し、本書では規定しない。
+- trapとglobal user area `u`を使わず、current processまたは明示引数を使う
+- disk block、device strategy、MMU user copyを使わない
+- inodeはdirectoryやmodeを持たず、pipeに必要なstateだけを持つ
+- buffer cache entryはmemory-onlyで、pipe当たり1 blockに固定する
+- V7 signal相当の`SIGPIPE`を送らず、`-SYS_EPIPE`だけを返す
+- coroutine/thread backendを選択でき、両者で同じpipe結果を返す
+- dynamic allocationを使わず、上限をcompile時定数で固定する
 
-stack両端にguard patternを置き、yieldと終了時に破壊を検査し、使用量
-watermarkを取得できるようにする。
-
-Microsoft x64 ABIの非volatile整数レジスタ、`XMM6`～`XMM15`、x87 control word、
-`MXCSR`を保存・復元する。Windows上でFPU/SIMD利用を制限する方式は採用しない。
-具体的なcontext構造と切替APIはMilestone 2で確定する。
+Windows coroutine stackは64 KiBとする。guard patternとwatermarkを持ち、
+Microsoft x64 ABIの非volatile stateを保存する。MCU stack容量はSTM32移植時に
+別途決定する。

@@ -29,15 +29,15 @@
 
 | Step | 内容 | 状態 | 完了コミット |
 |---|---|---|---|
-| 0 | API名、V7対応範囲、配置の確定 | done | - |
-| 1 | 汎用header追加 | done | - |
-| 2 | file table、inode table追加 | done | - |
-| 3 | `file.c`のV7名sourceへの分割 | done | - |
-| 4 | V7風`pipe.c`とinode I/O | done | - |
-| 5 | scheduler汎用化 | done | - |
-| 6 | Windows backend移動 | done | - |
-| 7 | esh呼出し側の切替と旧実装削除 | pending | - |
-| 8 | 全回帰試験と文書更新 | pending | - |
+| 0 | API名、V7対応範囲、配置の確定 | done | `f5f6925` |
+| 1 | 汎用header追加 | done | `2fe2b53` |
+| 2 | file table、inode table追加 | done | `4f8dd3c` |
+| 3 | `file.c`のV7名sourceへの分割 | done | `5858392` |
+| 4 | V7風`pipe.c`とinode I/O | done | `17e4824` |
+| 5 | scheduler汎用化 | done | `2f46a2b` |
+| 6 | Windows backend移動 | done | `e8516c4` |
+| 7 | esh呼出し側の切替と旧実装削除 | done | `7c6a1f9` |
+| 8 | 全回帰試験と文書更新 | done | `uncommitted` |
 
 状態は`pending`、`active`、`done`、`blocked`のいずれかを使用する。
 各Step開始時に`active`、完了時に`done`へ更新する。仕様判断が必要で安全に
@@ -1387,7 +1387,7 @@ sourceを削除してください。全関連試験を実行し、Step 8の文�
 
 開始HEAD: `e8516c4`
 
-完了HEAD: `uncommitted`
+完了HEAD: `7c6a1f9`
 
 executor、Windows stdio、Windows targetを汎用sys file/pipe/schedulerへ
 切り替えた。`struct exe_proc.p_exec`は`struct proc`を直接保持し、fd tableは
@@ -1505,6 +1505,97 @@ pipelineには従来のhelp、lex、par、test由来warningと意図されたpar
 - 全Stepが`done`または理由付き`blocked`
 - V7から採用した要素と意図的差分が文書化済み
 - Windows-firstの移行が完了し、STM32移植は未着手のまま
+
+### Step 8実施結果（2026-10-13）
+
+状態: `done`
+
+開始HEAD: `7c6a1f9`
+
+完了HEAD: `uncommitted`
+
+#### 文書更新
+
+次の文書を現行の型名、path、V7型offset方式、buffer cache構成へ更新した。
+
+- `docs/esh_pipe_api.md`
+- `docs/esh_pipe_core.md`
+- `docs/esh_pipe_sched.md`
+- `docs/esh_pipe_thread.md`
+- `docs/esh_pipe_stdio.md`
+- `docs/esh_pipe_regression.md`
+- `docs/cortn_windows.md`
+- 本引継ぎ書のStep状態と完了記録
+
+#### V7から採用した要素
+
+- processごとの`p_ofile[]`、global file table、共有inode
+- `FREAD`、`FWRITE`、`FPIPE`とendpointごとのfile offset
+- `falloc`、`getf`、`closef`、`readp`、`writep`、`readi`、`writei`
+- inode `ILOCK`、`IWANT`、`plock`、`prele`
+- pipe dataの単調offsetと全data読取後のoffset/size reset
+- wait channel、sleep/wakeup、再開後の条件再検査
+- close後のEOF/EPIPE再判定とresource参照数管理
+
+#### 意図的なV7との差分
+
+- trap、global user area `u`、MMU user copyを使わない
+- disk inode、directory、mount、block mapping、physical storageを持たない
+- pipeはmemory-only buffer cacheの1 blockだけを使用する
+- fixed table/poolを使用し、portable sys層でdynamic allocationしない
+- `SIGPIPE`を送らず、reader不在を`-SYS_EPIPE`で返す
+- schedulerをportable本体とcoroutine/thread backendへ分離する
+- priority、signal、timeout、swapping、preemptionを実装しない
+
+#### 静的確認
+
+- `src/core/sys`の`esh_`、`ESH_`: 0件
+- tracked sourceの旧header名、旧source/backend path参照: 0件
+- source/header変更: 0件、新規`typedef`: 0件
+- `git diff --check`: 成功
+- 変更は文書8件だけで、試験生成物と既存未追跡fileはdiff対象外
+
+#### 回帰試験
+
+次をすべて成功した。
+
+- sys header C/C++、include順序反転 O0/O2、`-Werror`
+- sys table O0/O2、`-Werror`
+- buffer cache O0/O2、`-Werror`
+- block device O0/O2、`-Werror`
+- file/inode O0/O2、`-Werror`
+- sys pipe O0/O2、`-Werror`
+- coroutine O0/O2、`-Werror`
+- pipe coroutine/thread O0/O2、`-Werror`
+- scheduler coroutine/thread O0/O2、`-Werror`
+- pipeline executor coroutine/thread O0/O2
+- parser `run_test1.sh`、`run_test2.sh`
+- executor test 10件
+- cquote build・実行
+- Windows target coroutine/thread build
+
+Windows対話確認は両backendで次を成功した。
+
+- `sam1`
+- `sam2 1 10 100`
+- `sam3 -a -b string`
+- `echo hello|cat`
+- `echo four|cat|cat|cat`
+- `k=3`後の`echo "$k"|cat`
+
+#### Warningと残課題
+
+sys、pipe、scheduler、coroutineのstrict suiteにwarningはない。pipelineの広い
+buildには移行前から次のwarningが残る。
+
+- `help.c`: 未使用parameter
+- `lex.c`: 未使用static関数、format/string切詰め
+- `par.c`: `char`型array subscript
+- `test.c`: 未使用static関数
+
+移行による新規warningはない。lexer/parserのerror-path試験が意図された診断を
+出すが、全suiteは成功した。Windows-first移行は完了した。STM32、Cortex-M、
+RTOS移植には着手していない。
 
 ### 新規タスク開始文
 
