@@ -1381,6 +1381,65 @@ sourceを削除してください。全関連試験を実行し、Step 8の文�
 ください。
 ```
 
+### Step 7実施結果（2026-10-13）
+
+状態: `done`
+
+開始HEAD: `e8516c4`
+
+完了HEAD: `uncommitted`
+
+executor、Windows stdio、Windows targetを汎用sys file/pipe/schedulerへ
+切り替えた。`struct exe_proc.p_exec`は`struct proc`を直接保持し、fd tableは
+`p_ofile[]`へ統合した。pipeline作成は`pipe_for_proc`、`getf`、
+`fd_install_at`、`fd_close`、`close_all`を使用する。組立てとcleanupはkernel
+lock内、backend release/joinはfd close後かつlock外の順序を維持した。
+
+`src/core/sys/sys/sys2.c`を追加し、V7 `sys2.c`の`rdwr`と`close`に対応する
+`sys_read`、`sys_write`、`sys_close`を実装した。hostのtrap、大域`u`、user空間
+copyは使わず、`current_proc()`から明示的な`struct proc`を得る。file flagを
+検査後、pipe endpointを`readp`または`writep`へ渡す。
+
+Windows stdio adapterは`current_proc`、`getf`、`sys_read`、`sys_write`を使う。
+Windows `eshinit`は最初のpipeline実行前にbuffer、file、inode tableを
+初期化するため`file_system_init`を呼ぶ。
+
+次の旧esh専用実装を削除した。
+
+- `include/esh_file.h`、`include/esh_pipe.h`
+- `include/esh_sched.h`、`include/esh_sched_backend.h`
+- `file.c`、`pipe.c`、`sched.c`
+- `target/windows/sched_compat.mk`
+- `target/windows/sched_cortn_compat.c`
+- `target/windows/sched_thread_compat.c`
+
+Windows target、executor test、pipe test、scheduler test、pipeline testは
+`SCHED_CSOURCES`、`SCHED_CPPFLAGS`とsys sourceを直接使用する。旧
+`SCHED_COMPAT_*`参照は残っていない。esh scheduler testはsys schedulerの
+試験sourceを両backendで共有する。tracked cscope listは存在しないため更新対象は
+なく、既存の未追跡`cscope.files`と`cscope.out`は変更していない。
+
+旧ring buffer固有試験はV7式offset試験へ置き換えた。partial read後も
+`i_size == PIPSIZ`なら先頭空きへwrapせず、未読dataをすべて消費して
+`f_offset`と`i_size`が0へ戻るまでwriteは待機する。新しいpipe結合試験で
+public API、部分転送、EOF、EPIPE、reader/writer close wakeup、resource回収を
+coroutine/thread双方で確認した。
+
+次の試験とbuildが成功した。
+
+- file/inode単体 O0/O2、`-Werror`
+- sys pipe単体 O0/O2、`-Werror`
+- pipe coroutine/thread O0/O2、`-Werror`
+- scheduler coroutine/thread O0/O2、`-Werror`
+- pipeline executor coroutine/thread O0/O2
+- executor test 10件
+- parser `run_test1.sh`、`run_test2.sh`
+- Windows target coroutine/thread build
+
+pipelineには従来のhelp、lex、par、test由来warningと意図されたparser error
+診断が残る。移行による新規warningはない。Windows対話試験と関連文書全体の
+現行名への更新は予定どおりStep 8へ残す。
+
 ## 16. Step 8 全回帰試験と文書更新
 
 ### 目的

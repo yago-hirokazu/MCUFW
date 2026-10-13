@@ -12,16 +12,17 @@ extern "C" {
 #include "code.h"
 #include "esh.h"
 #include "esh_adapt.h"
-#include "esh_sched.h"
+#include "param.h"
+#include "sched.h"
 #include "tty.h"
 
-#if PROCS != ESH_PIPELINE_MAX
-#error "PROCS must match ESH_PIPELINE_MAX"
+#if PROCS != PIPELINE_MAX
+#error "PROCS must match PIPELINE_MAX"
 #endif
 
 
 struct exe_proc {
-	struct esh_proc p_exec;		/* Portable execution state */
+	struct proc p_exec;		/* Portable execution state */
 	struct applet *p_cmd;		/* Command */
 	char p_argc;			/* # of command arguments */
 	char *p_argv[TTY_NARG];		/* Command arguments */

@@ -6,7 +6,6 @@ TARGET = main.exe
 CXX = g++
 CC = gcc
 include ../../../core/sys/dev/windows/sched_backend.mk
-include ../../../core/esh/target/windows/sched_compat.mk
 DEL = del /q
 COPY = copy
 REN = ren
@@ -26,6 +25,7 @@ vpath %.c ../../../core/esh/target/windows
 vpath %.c ../../../core/sys/dev
 vpath %.c ../../../core/sys/dev/windows
 vpath %.c ../../../core/sys/conf
+vpath %.c ../../../core/sys/sys
 vpath %.S ../../../core/sys/dev/windows
 vpath %.o _output
 vpath %.dll ./DLL
@@ -48,20 +48,18 @@ CSOURCES += qbyte.c
 CSOURCES += symchar.c
 
 ## ../../../core/esh
-CSOURCES += $(SCHED_COMPAT_CSOURCES)
 CSOURCES += break.c cat.c code.c esh_debug.c exe.c lex.c par.c script.c tok.c
 CSOURCES += echo.c
 CSOURCES += esh.c
 CSOURCES += expr.c
-CSOURCES += file.c
 CSOURCES += help.c
-CSOURCES += pipe.c
 CSOURCES += run.c
-CSOURCES += sched.c
 CSOURCES += test.c
 CSOURCES += tty.c
 
 ## ../../../core/sys
+CSOURCES += $(SCHED_CSOURCES)
+CSOURCES += alloc.c fio.c iget.c pipe.c rdwri.c sched.c sys2.c
 CSOURCES += bio.c
 CSOURCES += conf.c
 
@@ -102,7 +100,7 @@ INCLUDES += -I../../../core/sys/dev/windows
 CFLAGS += $(INCLUDES)
 CFLAGS += -DESH_STDIO_PIPE
 CFLAGS += -DUSE_STACKMACH -DESH_SCRIPT
-CFLAGS += $(SCHED_COMPAT_CPPFLAGS)
+CFLAGS += $(SCHED_CPPFLAGS)
 # CFLAGS += -DADAFRUIT
 
 # CXXFLAGS
@@ -142,7 +140,6 @@ $(OUTDIR)/%.o: %.S
 	$(CC) $(CFLAGS) -c -MMD -MP $< -o $@
 
 $(OBJS): Makefile ../../../core/sys/dev/windows/sched_backend.mk
-$(OBJS): ../../../core/esh/target/windows/sched_compat.mk
 
 .PHONY: clean
 clean:

@@ -3,19 +3,22 @@ OUTDIR = _output
 CC = gcc
 OPT ?= -O0
 include ../../../sys/dev/windows/sched_backend.mk
-include ../../target/windows/sched_compat.mk
 
 CFLAGS = -mno-ms-bitfields -g $(OPT)
-CFLAGS += -Wall -Wextra -Werror -pedantic
+CFLAGS += -Wall -Wextra -Werror -pedantic -std=c11
 CFLAGS += -I../../include -I../../../sys/dev/windows -I../../../sys/h
-CFLAGS += $(SCHED_COMPAT_CPPFLAGS)
+CFLAGS += $(SCHED_CPPFLAGS)
 
 OBJS = $(OUTDIR)/test_pipe.o
-OBJS += $(addprefix $(OUTDIR)/,$(SCHED_COMPAT_CSOURCES:.c=.o))
+OBJS += $(addprefix $(OUTDIR)/,$(SCHED_CSOURCES:.c=.o))
 OBJS += $(addprefix $(OUTDIR)/,$(SCHED_ASOURCES:.S=.o))
-OBJS += $(OUTDIR)/file.o
+OBJS += $(OUTDIR)/alloc.o
+OBJS += $(OUTDIR)/fio.o
+OBJS += $(OUTDIR)/iget.o
 OBJS += $(OUTDIR)/pipe.o
+OBJS += $(OUTDIR)/rdwri.o
 OBJS += $(OUTDIR)/sched.o
+OBJS += $(OUTDIR)/sys2.o
 OBJS += $(OUTDIR)/bio.o
 OBJS += $(OUTDIR)/conf.o
 
@@ -41,13 +44,25 @@ $(OUTDIR)/cortn_context.o: ../../../sys/dev/windows/cortn_context.c
 $(OUTDIR)/cortn_switch.o: ../../../sys/dev/windows/cortn_switch.S
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OUTDIR)/file.o: ../../file.c
+$(OUTDIR)/alloc.o: ../../../sys/sys/alloc.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OUTDIR)/pipe.o: ../../pipe.c
+$(OUTDIR)/fio.o: ../../../sys/sys/fio.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OUTDIR)/sched.o: ../../sched.c
+$(OUTDIR)/iget.o: ../../../sys/sys/iget.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OUTDIR)/pipe.o: ../../../sys/sys/pipe.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OUTDIR)/rdwri.o: ../../../sys/sys/rdwri.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OUTDIR)/sched.o: ../../../sys/sys/sched.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OUTDIR)/sys2.o: ../../../sys/sys/sys2.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OUTDIR)/bio.o: ../../../sys/dev/bio.c
@@ -56,10 +71,10 @@ $(OUTDIR)/bio.o: ../../../sys/dev/bio.c
 $(OUTDIR)/conf.o: ../../../sys/conf/conf.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OUTDIR)/sched_cortn_compat.o: ../../target/windows/sched_cortn_compat.c
+$(OUTDIR)/sched_cortn.o: ../../../sys/dev/windows/sched_cortn.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OUTDIR)/sched_thread_compat.o: ../../target/windows/sched_thread_compat.c
+$(OUTDIR)/sched_thread.o: ../../../sys/dev/windows/sched_thread.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

@@ -3,10 +3,10 @@
 
 #include "esh.h"
 #include "esh_debug.h"
-#include "esh_errno.h"
-#include "esh_file.h"
-#include "esh_pipe.h"
 #include "exe.h"
+#include "file.h"
+#include "pipe.h"
+#include "sys_error.h"
 #include "test.h"
 
 
@@ -234,21 +234,21 @@ static void exe_proc_entry(void *arg)
 	struct exe_proc *proc;
 
 	proc = arg;
-	proc->p_exec.ep_status = proc->p_cmd->main(proc->p_argc,
-						     proc->p_argv);
-	esh_kernel_lock();
-	esh_close_all(&proc->p_exec.ep_fd_table);
-	esh_kernel_unlock();
+	proc->p_exec.p_status = proc->p_cmd->main(proc->p_argc,
+						    proc->p_argv);
+	kernel_lock();
+	close_all(&proc->p_exec);
+	kernel_unlock();
 }
 
 static void exe_close_proc_fds(struct exe_proc *proc, int count)
 {
 	int i;
 
-	esh_kernel_lock();
+	kernel_lock();
 	for (i = 0; i < count; i++)
-		esh_close_all(&proc[i].p_exec.ep_fd_table);
-	esh_kernel_unlock();
+		close_all(&proc[i].p_exec);
+	kernel_unlock();
 }
 
 static void exe_cleanup_pipeline(struct exe_proc *proc, int pipe_count,
@@ -258,34 +258,33 @@ static void exe_cleanup_pipeline(struct exe_proc *proc, int pipe_count,
 
 	exe_close_proc_fds(proc, pipe_count + 1);
 	for (i = 0; i < prepared; i++)
-		esh_sched_release(&proc[i].p_exec);
+		sched_release(&proc[i].p_exec);
 }
 
 static int exe_connect_proc(struct exe_proc *writer, struct exe_proc *reader)
 {
-	struct esh_proc owner;
-	struct esh_file *read_file;
-	struct esh_file *write_file;
+	struct proc owner;
+	struct file *read_file;
+	struct file *write_file;
 	int fd[2];
 	int result;
 
-	esh_proc_init(&owner);
-	result = esh_pipe_for_proc(&owner, fd);
-	if (result < 0)
-		return result;
-	read_file = esh_fd_get(&owner.ep_fd_table, fd[0]);
-	write_file = esh_fd_get(&owner.ep_fd_table, fd[1]);
-	result = esh_fd_install_at(&writer->p_exec.ep_fd_table,
-				   ESH_FD_STDOUT, write_file);
+	proc_init(&owner);
+	kernel_lock();
+	result = pipe_for_proc(&owner, fd);
 	if (result < 0)
 		goto out;
-	result = esh_fd_install_at(&reader->p_exec.ep_fd_table,
-				   ESH_FD_STDIN, read_file);
+	read_file = getf(&owner, fd[0]);
+	write_file = getf(&owner, fd[1]);
+	result = fd_install_at(&writer->p_exec, FD_STDOUT, write_file);
 	if (result < 0)
-		esh_fd_close(&writer->p_exec.ep_fd_table,
-			     ESH_FD_STDOUT);
+		goto out;
+	result = fd_install_at(&reader->p_exec, FD_STDIN, read_file);
+	if (result < 0)
+		fd_close(&writer->p_exec, FD_STDOUT);
 out:
-	esh_close_all(&owner.ep_fd_table);
+	close_all(&owner);
+	kernel_unlock();
 	return result < 0 ? result : 0;
 }
 
@@ -299,15 +298,15 @@ int exe_run_pipeline(struct exe_proc *proc, int count)
 	int i;
 
 	if (!proc || count < 2 || count > PROCS)
-		return -ESH_EINVAL;
+		return -SYS_EINVAL;
 	for (i = 0; i < count; i++) {
 		if (!proc[i].p_cmd || !proc[i].p_cmd->main ||
 		    !proc[i].p_cmd->name || proc[i].p_argc < 1 ||
 		    proc[i].p_argc > TTY_NARG || !proc[i].p_argv[0])
-			return -ESH_EINVAL;
+			return -SYS_EINVAL;
 	}
 	for (i = 0; i < count; i++) {
-		esh_proc_init(&proc[i].p_exec);
+		proc_init(&proc[i].p_exec);
 	}
 	pipe_count = 0;
 	prepared = 0;
@@ -318,32 +317,32 @@ int exe_run_pipeline(struct exe_proc *proc, int count)
 		pipe_count++;
 	}
 	for (i = 0; i < count; i++) {
-		result = esh_sched_prepare(&proc[i].p_exec, exe_proc_entry,
-					   &proc[i]);
+		result = sched_prepare(&proc[i].p_exec, exe_proc_entry,
+				       &proc[i]);
 		if (result < 0)
 			goto out;
 		prepared++;
 	}
 
-	result = -ESH_EINVAL;
+	result = -SYS_EINVAL;
 	for (;;) {
 		finished = 0;
 		progress = 0;
 		for (i = 0; i < count; i++) {
-			if (proc[i].p_exec.ep_state == ESH_PROC_FINISHED) {
+			if (proc[i].p_exec.p_state == PROC_FINISHED) {
 				finished++;
 				continue;
 			}
-			if (proc[i].p_exec.ep_state == ESH_PROC_ERROR)
+			if (proc[i].p_exec.p_state == PROC_ERROR)
 				goto out;
-			if (proc[i].p_exec.ep_state != ESH_PROC_RUNNABLE)
+			if (proc[i].p_exec.p_state != PROC_RUNNABLE)
 				continue;
-			if (esh_sched_resume(&proc[i].p_exec) < 0)
+			if (sched_resume(&proc[i].p_exec) < 0)
 				goto out;
 			progress = 1;
 		}
 		if (finished == count) {
-			result = proc[count - 1].p_exec.ep_status;
+			result = proc[count - 1].p_exec.p_status;
 			break;
 		}
 		if (!progress)
@@ -361,10 +360,10 @@ static int exe_execute_commands(struct exe *exe)
 	int i;
 
 	if (exe->e_procs <= 0 || exe->e_procs > PROCS)
-		return -ESH_EINVAL;
+		return -SYS_EINVAL;
 	for (i = 0; i < exe->e_procs; i++)
 		if (!exe->e_proc[i].p_cmd || !exe->e_proc[i].p_cmd->main)
-			return -ESH_EINVAL;
+			return -SYS_EINVAL;
 	if (exe->e_procs > 1)
 		return exe_run_pipeline(exe->e_proc, exe->e_procs);
 	proc = &exe->e_proc[0];

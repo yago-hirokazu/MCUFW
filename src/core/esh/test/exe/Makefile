@@ -5,7 +5,6 @@ TARGET = test_exe.exe
 # Commands
 CC = gcc
 include ../../../sys/dev/windows/sched_backend.mk
-include ../../target/windows/sched_compat.mk
 ifeq ($(MSYSTEM),MINGW64)
 DEL = rm -f
 COPY = cp
@@ -34,6 +33,7 @@ vpath %.c ../../../usr/cmd
 vpath %.c ../../../elib
 vpath %.c ../../../sys/dev
 vpath %.c ../../../sys/conf
+vpath %.c ../../../sys/sys
 vpath %.c ../../../sys/dev/windows
 ifeq ($(OS),Windows_NT)
 vpath %.c ../../target/windows/
@@ -55,23 +55,27 @@ CSOURCES += echo.c
 CSOURCES += esh_debug.c
 CSOURCES += exe.c
 CSOURCES += expr.c
-CSOURCES += file.c
 CSOURCES += help.c
-CSOURCES += pipe.c
 CSOURCES += par.c
 CSOURCES += run.c
-CSOURCES += sched.c
 CSOURCES += lex.c
 CSOURCES += test.c
 CSOURCES += tok.c
 CSOURCES += tty.c
 
 ## ../../../sys
+CSOURCES += alloc.c
 CSOURCES += bio.c
 CSOURCES += conf.c
+CSOURCES += fio.c
+CSOURCES += iget.c
+CSOURCES += pipe.c
+CSOURCES += rdwri.c
+CSOURCES += sched.c
+CSOURCES += sys2.c
 
 ## ../../target/windows/
-CSOURCES += $(SCHED_COMPAT_CSOURCES)
+CSOURCES += $(SCHED_CSOURCES)
 CSOURCES += stdio_adapt.c
 CSOURCES += tty_adapt.c
 
@@ -111,7 +115,7 @@ INCLUDES += -I../../../../target/windows/Adapt
 CFLAGS += $(INCLUDES)
 CFLAGS += -DUSE_STACKMACH
 CFLAGS += -DESH_STDIO_PIPE
-CFLAGS += $(SCHED_COMPAT_CPPFLAGS)
+CFLAGS += $(SCHED_CPPFLAGS)
 
 # CXXFLAGS
 CXXFLAGS := $(CFLAGS)

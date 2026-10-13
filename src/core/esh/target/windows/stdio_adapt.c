@@ -5,13 +5,14 @@
 #include "esh_debug.h"
 
 #ifdef ESH_STDIO_PIPE
-#include "esh_sched.h"
+#include "file.h"
+#include "sched.h"
 
 static int win_pipe_fd(int fd)
 {
-	struct esh_proc *proc = esh_current_proc();
+	struct proc *proc = current_proc();
 
-	return proc && esh_fd_get(&proc->ep_fd_table, fd);
+	return proc && getf(proc, fd);
 }
 #else
 static int win_pipe_fd(int fd)
@@ -32,7 +33,7 @@ int win_getchar(void)
 #if DEBUG_STDIO
 		fprintf(stderr, "stdio: pipe read\n");
 #endif
-		return esh_read(0, &byte, 1) == 1 ? byte : EOF;
+		return sys_read(0, &byte, 1) == 1 ? byte : EOF;
 	}
 #endif
 	ch = _getch();
@@ -47,7 +48,7 @@ int win_putchar(int c)
 	unsigned char byte = (unsigned char)c;
 
 	if (win_pipe_fd(1))
-		return esh_write(1, &byte, 1) == 1 ? byte : EOF;
+		return sys_write(1, &byte, 1) == 1 ? byte : EOF;
 #endif
 	return _putch(c);
 }
@@ -73,7 +74,7 @@ static int win_vfprintf(FILE *stream, const char *fmt, va_list args)
 		if (!buffer)
 			return EOF;
 		vsnprintf(buffer, (size_t)length + 1, fmt, args);
-		count = esh_write(1, buffer, (size_t)length);
+		count = sys_write(1, buffer, (size_t)length);
 		free(buffer);
 		return count == length ? length : EOF;
 	}

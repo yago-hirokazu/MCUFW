@@ -6,15 +6,18 @@
 #include <string.h>
 
 #include "esh_errno.h"
-#include "esh_file.h"
-#include "esh_pipe.h"
 #include "exe.h"
+#include "file.h"
 #include "lex.h"
+#include "param.h"
 #include "par.h"
+#include "pipe.h"
+#include "sched.h"
 #include "script.h"
 #include "stdio_adapt.h"
+#include "sys_error.h"
 
-#define TEST_DATA_SIZE	(ESH_PIPE_BUFFER_SIZE * 8 + 41)
+#define TEST_DATA_SIZE	(PIPSIZ * 8 + 41)
 
 #define CHECK(condition) do { \
 	if (!(condition)) { \
@@ -59,7 +62,7 @@ extern int echo(int argc, char **argv);
 
 int main(void)
 {
-	esh_file_system_init();
+	file_system_init();
 	test_stdio_pipeline();
 	check_resources();
 	test_three_stage_pipeline();
@@ -101,8 +104,8 @@ static size_t busy_buffer_count(void)
 
 static void check_resources(void)
 {
-	CHECK(esh_file_in_use() == 0);
-	CHECK(esh_pipe_in_use() == 0);
+	CHECK(file_in_use() == 0);
+	CHECK(pipe_in_use() == 0);
 	CHECK(busy_buffer_count() == 0);
 }
 
@@ -112,8 +115,8 @@ static int producer_main(int argc, char **argv)
 
 	(void)argc;
 	(void)argv;
-	CHECK(esh_write(ESH_FD_STDOUT, NULL, 0) == 0);
-	count = esh_write(ESH_FD_STDOUT, source, source_count);
+	CHECK(sys_write(FD_STDOUT, NULL, 0) == 0);
+	count = sys_write(FD_STDOUT, source, source_count);
 	if (count < 0)
 		return (int)count;
 	return count == (ptrdiff_t)source_count ? 11 : -ESH_EINVAL;
@@ -129,12 +132,12 @@ static int filter_main(int argc, char **argv)
 	(void)argc;
 	(void)argv;
 	for (;;) {
-		count = esh_read(ESH_FD_STDIN, buffer, sizeof(buffer));
+		count = sys_read(FD_STDIN, buffer, sizeof(buffer));
 		if (count <= 0)
 			break;
 		for (i = 0; i < count; i++)
 			buffer[i] = (unsigned char)toupper(buffer[i]);
-		written = esh_write(ESH_FD_STDOUT, buffer, (size_t)count);
+		written = sys_write(FD_STDOUT, buffer, (size_t)count);
 		if (written != count)
 			return written < 0 ? (int)written : -ESH_EINVAL;
 	}
@@ -147,9 +150,9 @@ static int consumer_main(int argc, char **argv)
 
 	(void)argc;
 	(void)argv;
-	CHECK(esh_read(ESH_FD_STDIN, NULL, 0) == 0);
+	CHECK(sys_read(FD_STDIN, NULL, 0) == 0);
 	for (;;) {
-		count = esh_read(ESH_FD_STDIN, output + output_count,
+		count = sys_read(FD_STDIN, output + output_count,
 				 sizeof(output) - output_count);
 		if (count <= 0)
 			break;
@@ -164,7 +167,7 @@ static int early_filter_main(int argc, char **argv)
 
 	(void)argc;
 	(void)argv;
-	if (esh_read(ESH_FD_STDIN, &byte, 1) != 1)
+	if (sys_read(FD_STDIN, &byte, 1) != 1)
 		return -ESH_EINVAL;
 	return 23;
 }
@@ -246,14 +249,14 @@ static void test_three_stage_pipeline(void)
 		init_command(&proc[1], &filter);
 		init_command(&proc[2], &consumer);
 		CHECK(exe_run_pipeline(proc, 3) == 37);
-		CHECK(proc[0].p_exec.ep_status == 11);
-		CHECK(proc[1].p_exec.ep_status == 22);
-		CHECK(proc[2].p_exec.ep_status == 37);
+		CHECK(proc[0].p_exec.p_status == 11);
+		CHECK(proc[1].p_exec.p_status == 22);
+		CHECK(proc[2].p_exec.p_status == 37);
 		CHECK(output_count == sizeof(source));
 		for (i = 0; i < TEST_DATA_SIZE; i++)
 			CHECK(output[i] == (unsigned char)toupper(source[i]));
-		CHECK(esh_file_in_use() == 0);
-		CHECK(esh_pipe_in_use() == 0);
+		CHECK(file_in_use() == 0);
+		CHECK(pipe_in_use() == 0);
 	}
 }
 
@@ -266,12 +269,12 @@ static void test_early_filter_exit(void)
 	init_command(&proc[1], &early_filter);
 	init_command(&proc[2], &consumer);
 	CHECK(exe_run_pipeline(proc, 3) == 37);
-	CHECK(proc[0].p_exec.ep_status == -ESH_EPIPE);
-	CHECK(proc[1].p_exec.ep_status == 23);
-	CHECK(proc[2].p_exec.ep_status == 37);
+	CHECK(proc[0].p_exec.p_status == -SYS_EPIPE);
+	CHECK(proc[1].p_exec.p_status == 23);
+	CHECK(proc[2].p_exec.p_status == 37);
 	CHECK(output_count == 0);
-	CHECK(esh_file_in_use() == 0);
-	CHECK(esh_pipe_in_use() == 0);
+	CHECK(file_in_use() == 0);
+	CHECK(pipe_in_use() == 0);
 }
 
 static void test_stdio_pipeline(void)
@@ -298,8 +301,8 @@ static void test_stdio_pipeline(void)
 	CHECK(!memcmp(output, source, TEST_DATA_SIZE - 1));
 	CHECK(output[TEST_DATA_SIZE - 1] == '!');
 	CHECK(output[TEST_DATA_SIZE] == '?');
-	CHECK(esh_file_in_use() == 0);
-	CHECK(esh_pipe_in_use() == 0);
+	CHECK(file_in_use() == 0);
+	CHECK(pipe_in_use() == 0);
 }
 
 static void test_invalid_count(void)
@@ -312,8 +315,8 @@ static void test_invalid_count(void)
 
 static void test_transfer_matrix(void)
 {
-	const size_t sizes[] = {0, 1, ESH_PIPE_BUFFER_SIZE,
-		ESH_PIPE_BUFFER_SIZE + 1, TEST_DATA_SIZE};
+	const size_t sizes[] = {0, 1, PIPSIZ, PIPSIZ + 1,
+		TEST_DATA_SIZE};
 	struct exe_proc proc[PROCS];
 	size_t s;
 	size_t i;
@@ -337,8 +340,8 @@ static void test_transfer_matrix(void)
 				for (i = 0; i < source_count; i++)
 					CHECK(output[i] == (stages == 2 ?
 					      source[i] : toupper(source[i])));
-				CHECK(esh_file_in_use() == 0);
-				CHECK(esh_pipe_in_use() == 0);
+				CHECK(file_in_use() == 0);
+				CHECK(pipe_in_use() == 0);
 			}
 		}
 	}
@@ -346,16 +349,16 @@ static void test_transfer_matrix(void)
 	init_command(&proc[0], &producer);
 	init_command(&proc[1], &error_applet);
 	CHECK(exe_run_pipeline(proc, 2) == -ESH_EINVAL);
-	CHECK(proc[0].p_exec.ep_status == -ESH_EPIPE);
+	CHECK(proc[0].p_exec.p_status == -SYS_EPIPE);
 	init_command(&proc[0], &producer);
 	init_command(&proc[1], &error_applet);
 	init_command(&proc[2], &consumer);
 	output_count = 0;
 	CHECK(exe_run_pipeline(proc, 3) == 37);
-	CHECK(proc[0].p_exec.ep_status == -ESH_EPIPE);
+	CHECK(proc[0].p_exec.p_status == -SYS_EPIPE);
 	CHECK(output_count == 0);
-	CHECK(esh_file_in_use() == 0);
-	CHECK(esh_pipe_in_use() == 0);
+	CHECK(file_in_use() == 0);
+	CHECK(pipe_in_use() == 0);
 }
 
 static void test_executor_bounds(void)
@@ -484,8 +487,8 @@ static void test_console_script(void)
 	CHECK(script_line("done \n") == 1);
 	CHECK(script_line("done \n") >= 0);
 	CHECK(script_line("test $k -eq 7 \n") == 0);
-	CHECK(esh_file_in_use() == 0);
-	CHECK(esh_pipe_in_use() == 0);
+	CHECK(file_in_use() == 0);
+	CHECK(pipe_in_use() == 0);
 }
 
 static void test_parser_bounds(void)
@@ -552,34 +555,34 @@ static void test_parser_bounds(void)
 
 static void test_pipe_exhaustion_cleanup(void)
 {
-	struct esh_proc blockers[ESH_PIPE_MAX - 1];
+	struct proc blockers[NINODE - 1];
 	struct exe_proc proc[3];
 	size_t j;
 	int fd[2];
 	int i;
 
-	for (i = 0; i < ESH_PIPE_MAX - 1; i++) {
-		esh_proc_init(&blockers[i]);
-		CHECK(esh_pipe_for_proc(&blockers[i], fd) == 0);
+	for (i = 0; i < NINODE - 1; i++) {
+		proc_init(&blockers[i]);
+		CHECK(pipe_for_proc(&blockers[i], fd) == 0);
 	}
 	init_command(&proc[0], &producer);
 	init_command(&proc[1], &filter);
 	init_command(&proc[2], &consumer);
-	CHECK(exe_run_pipeline(proc, 3) == -ESH_ENFILE);
-	CHECK(esh_pipe_in_use() == ESH_PIPE_MAX - 1);
-	CHECK(esh_file_in_use() == (ESH_PIPE_MAX - 1) * 2);
-	for (i = 0; i < ESH_PIPE_MAX - 1; i++)
-		esh_close_all(&blockers[i].ep_fd_table);
-	CHECK(esh_pipe_in_use() == 0);
-	CHECK(esh_file_in_use() == 0);
+	CHECK(exe_run_pipeline(proc, 3) == -SYS_ENFILE);
+	CHECK(pipe_in_use() == NINODE - 1);
+	CHECK(file_in_use() == (NINODE - 1) * 2);
+	for (i = 0; i < NINODE - 1; i++)
+		close_all(&blockers[i]);
+	CHECK(pipe_in_use() == 0);
+	CHECK(file_in_use() == 0);
 
 	output_count = 0;
 	CHECK(exe_run_pipeline(proc, 3) == 37);
 	CHECK(output_count == source_count);
 	for (j = 0; j < source_count; j++)
 		CHECK(output[j] == (unsigned char)toupper(source[j]));
-	CHECK(esh_pipe_in_use() == 0);
-	CHECK(esh_file_in_use() == 0);
+	CHECK(pipe_in_use() == 0);
+	CHECK(file_in_use() == 0);
 }
 
 static void blocker_entry(void *arg)
@@ -590,29 +593,28 @@ static void blocker_entry(void *arg)
 
 static void test_backend_exhaustion_cleanup(void)
 {
-	struct esh_proc blockers[ESH_PIPELINE_MAX - 1];
+	struct proc blockers[PIPELINE_MAX - 1];
 	struct exe_proc proc[2];
 	int i;
 
-	for (i = 0; i < ESH_PIPELINE_MAX - 1; i++) {
-		esh_proc_init(&blockers[i]);
-		CHECK(esh_sched_prepare(&blockers[i], blocker_entry,
-					NULL) == 0);
+	for (i = 0; i < PIPELINE_MAX - 1; i++) {
+		proc_init(&blockers[i]);
+		CHECK(sched_prepare(&blockers[i], blocker_entry, NULL) == 0);
 	}
 	init_command(&proc[0], &producer);
 	init_command(&proc[1], &consumer);
-	CHECK(exe_run_pipeline(proc, 2) == -ESH_ENOMEM);
-	CHECK(esh_file_in_use() == 0);
-	CHECK(esh_pipe_in_use() == 0);
-	for (i = 0; i < ESH_PIPELINE_MAX - 1; i++)
-		esh_sched_release(&blockers[i]);
+	CHECK(exe_run_pipeline(proc, 2) == -SYS_ENOMEM);
+	CHECK(file_in_use() == 0);
+	CHECK(pipe_in_use() == 0);
+	for (i = 0; i < PIPELINE_MAX - 1; i++)
+		sched_release(&blockers[i]);
 
 	output_count = 0;
 	CHECK(exe_run_pipeline(proc, 2) == 37);
 	CHECK(output_count == sizeof(source));
 	CHECK(!memcmp(source, output, sizeof(source)));
-	CHECK(esh_file_in_use() == 0);
-	CHECK(esh_pipe_in_use() == 0);
+	CHECK(file_in_use() == 0);
+	CHECK(pipe_in_use() == 0);
 }
 
 static void test_pipeline_bytecode(void)
@@ -645,6 +647,6 @@ static void test_pipeline_bytecode(void)
 		CHECK(exe_run_codes(&code, &executor) == EXIT_SUCCESS);
 	CHECK(executor.e_status == EXIT_SUCCESS);
 	CHECK(executor.e_procs == 0);
-	CHECK(esh_file_in_use() == 0);
-	CHECK(esh_pipe_in_use() == 0);
+	CHECK(file_in_use() == 0);
+	CHECK(pipe_in_use() == 0);
 }
