@@ -4,7 +4,7 @@ TARGET = test_exe.exe
 
 # Commands
 CC = gcc
-include ../../target/windows/sched_backend.mk
+include ../../../sys/dev/windows/sched_backend.mk
 ifeq ($(MSYSTEM),MINGW64)
 DEL = rm -f
 COPY = cp
@@ -31,12 +31,16 @@ vpath %.c .
 vpath %.c ../..
 vpath %.c ../../../usr/cmd
 vpath %.c ../../../elib
+vpath %.c ../../../sys/dev
+vpath %.c ../../../sys/conf
+vpath %.c ../../../sys/sys
+vpath %.c ../../../sys/dev/windows
 ifeq ($(OS),Windows_NT)
 vpath %.c ../../target/windows/
 else
 vpath %.c ../../target/cygwin/
 endif
-vpath %.S ../../target/windows/
+vpath %.S ../../../sys/dev/windows/
 vpath %.o _output
 
 # C sources
@@ -51,23 +55,31 @@ CSOURCES += echo.c
 CSOURCES += esh_debug.c
 CSOURCES += exe.c
 CSOURCES += expr.c
-CSOURCES += file.c
 CSOURCES += help.c
-CSOURCES += pipe.c
 CSOURCES += par.c
 CSOURCES += run.c
-CSOURCES += sched.c
 CSOURCES += lex.c
 CSOURCES += test.c
 CSOURCES += tok.c
 CSOURCES += tty.c
 
+## ../../../sys
+CSOURCES += alloc.c
+CSOURCES += bio.c
+CSOURCES += conf.c
+CSOURCES += fio.c
+CSOURCES += iget.c
+CSOURCES += pipe.c
+CSOURCES += rdwri.c
+CSOURCES += sched.c
+CSOURCES += sys2.c
+
 ## ../../target/windows/
-CSOURCES += $(ESH_SCHED_CSOURCES)
+CSOURCES += $(SCHED_CSOURCES)
 CSOURCES += stdio_adapt.c
 CSOURCES += tty_adapt.c
 
-ASOURCES := $(ESH_SCHED_ASOURCES)
+ASOURCES := $(SCHED_ASOURCES)
 
 ## ../../../usr/cmd
 CSOURCES += cmd_sample.c
@@ -95,13 +107,15 @@ CFLAGS += -g -O0
 INCLUDES := -I.
 INCLUDES += -I../../include
 INCLUDES += -I../../../elib
+INCLUDES += -I../../../sys/h
+INCLUDES += -I../../../sys/dev/windows
 INCLUDES += -I../../target/windows
 INCLUDES += -I../../../../target/windows/Adapt
 
 CFLAGS += $(INCLUDES)
 CFLAGS += -DUSE_STACKMACH
 CFLAGS += -DESH_STDIO_PIPE
-CFLAGS += $(ESH_SCHED_CPPFLAGS)
+CFLAGS += $(SCHED_CPPFLAGS)
 
 # CXXFLAGS
 CXXFLAGS := $(CFLAGS)

@@ -1,99 +1,84 @@
-# Milestone 8: Windows thread backend
+# Windows thread scheduler backend
 
-## Backend selection
+更新日: 2026-10-13
 
-All scheduler-enabled Windows Makefiles include
-`src/core/esh/target/windows/sched_backend.mk`.
-Default `ESH_SCHED_BACKEND=cortn` retains coroutine behavior.
-`ESH_SCHED_BACKEND=thread` selects native thread implementation;
-thread builds do not link coroutine code or context-switch assembly.
+## Backend選択
 
-Run builds inside MSYS2 MINGW64 shell. Rebuild when switching backend:
+schedulerを使うWindows Makefileは
+`src/core/sys/dev/windows/sched_backend.mk`をincludeする。defaultの
+`SCHED_BACKEND=cortn`はcoroutineを使い、`SCHED_BACKEND=thread`はnative
+Windows threadを使う。thread buildはcoroutine codeとcontext switch assemblyを
+linkしない。
+
+buildはMSYS2 MINGW64 shell内で実行する。
 
 ```sh
 cd src/target/windows
-make -B ESH_SCHED_BACKEND=thread main.exe
+make -B SCHED_BACKEND=thread main.exe
 ./main.exe
-make -B ESH_SCHED_BACKEND=cortn main.exe
+make -B SCHED_BACKEND=cortn main.exe
 ```
 
-Separate OUTDIR and TARGET values can preserve both build variants.
-Test scripts build both backends at O0 and O2 in separate directories.
+backendごとに`OUTDIR`と`TARGET`を分ければ両buildを保持できる。回帰scriptは
+coroutine/threadをO0/O2の別directoryへbuildする。
 
-## Execution and ownership
+## 実行と所有権
 
-- Fixed four-slot pool owns native thread handles
-- `_beginthreadex` creates CRT-compatible threads; Windows owns stacks
-- Prepared threads wait before calling command entry
-- Existing executor grants one runnable process execution token at time
-- Resume waits until chosen command blocks on I/O or returns
-- Wakeup marks process runnable; executor grants next execution token
-- This preserves existing round-robin contract without executor changes;
-  applets are not automatically run simultaneously
-- TLS stores current process and kernel-lock ownership for each thread
-- Worker sets its own current process before calling applet
-- Entry return publishes FINISHED; release joins thread, closes handle,
-  and clears slot before reuse
-- Releasing unstarted thread skips entry; releasing waiter requests
-  cooperative unwind. No TerminateThread or forced stack destruction
-- Scheduler removes released process from wait list
+- 固定4 slotのpoolがnative thread handleを所有する
+- `_beginthreadex`でCRT互換threadを作る
+- 準備済みthreadはcommand entryを呼ぶ前に実行tokenを待つ
+- executorは一度に1 processへ実行tokenを与える
+- resumeは選択processがI/O待ちになるかreturnするまで待つ
+- wakeupはprocessをrunnableにし、executorが次のtokenを与える
+- TLSがthreadごとのcurrent processとkernel lock所有状態を保持する
+- workerはapplet呼出し前に自身をcurrent processへ設定する
+- entry returnは`PROC_FINISHED`を通知する
+- releaseはthreadをjoinし、handleを閉じ、slotを再利用可能にする
+- 未開始threadのreleaseはentryを呼ばずに終了させる
+- 待機中threadのreleaseは協調的なunwindを要求する
+- schedulerはrelease対象processをwait listから外す
 
-Pipeline controller remains single-threaded. Nested pipelines, concurrent
-controllers, asynchronous background execution, and cancellation of
-CPU-only commands are outside current scheduler contract.
+pipeline controllerは単一threadのままである。nested pipeline、複数controller、
+background実行、CPU-only commandの強制cancelはscheduler契約外である。
 
-## Lock and wait contract
+## Lockとwait契約
 
-Single Windows SRW exclusive lock protects pipe state and wait lists.
-Lock is non-recursive; lock ownership diagnostic is thread-local.
+1個のWindows SRW exclusive lockがpipe state、inode lock、参照数、wait listを
+保護する。lockは非再帰で、所有診断はTLSに保持する。
 
-`esh_sleep` registers waiter while holding kernel lock and calls backend
-yield without unlocking. Backend yield enters and returns with lock held.
-Native wait uses `SleepConditionVariableSRW` to release lock and enter
-wait atomically, then reacquires lock before returning.
-Coroutine yield explicitly unlocks, switches context, and relocks.
+`sched_sleep()`はkernel lock保持中にwaiterを登録し、backend yieldを呼ぶ。
+backend yieldはlock保持状態で呼ばれ、lock保持状態で戻る。native waitは
+`SleepConditionVariableSRW`でlock解放とwait開始を不可分にし、wake後にlockを
+再取得する。coroutine yieldは明示的にunlock、context switch、relockする。
 
-Condition-variable notifications never replace predicates. Worker waits
-in loop for execution token or stop request. A wakeup before native wait
-remains visible as runnable state. Core preserves runnable state if
-wakeup races with resume's wait-state report. Pipe loops recheck I/O
-conditions after wakeup, including EOF and broken pipe.
+condition notificationはpredicateの代わりではない。workerは実行tokenまたは
+stop requestをloopで待つ。native wait直前のwakeupもrunnable stateとして残る。
+pipeとinode lockはwake後に条件を再検査する。
 
-Release waits outside kernel lock so worker can unwind I/O and close fds.
-All threads must finish before resetting file/pipe pools.
+releaseとjoinはkernel lock外で行う。workerがI/Oをunwindしてfdを閉じるために
+同じlockを必要とするからである。file/inode/buffer tableを初期化する前に全thread
+を終了させる。
 
-## Tests
+## 試験
 
 ```sh
-cd src/core/esh/test/sched
+cd src/core/sys/test/sched
 bash ./run_test.sh
-cd ../pipe
+cd ../../../esh/test/pipe
 bash ./run_test.sh
 cd ../pipeline_exec
 bash ./run_test.sh
 ```
 
-Shared tests verify blocking transfer, EOF, broken pipe, spurious wakeup,
-multiple waiters, pool exhaustion, wait-list cleanup, 2/3-stage pipelines,
-stdio routing, partial preparation rollback, and repeated resource reuse.
-Scheduler and pipe suites use -Wall -Wextra -Werror -pedantic.
+schedulerとpipe suiteはblocking transfer、EOF、EPIPE、spurious wakeup、複数
+waiter、pool枯渇、wait-list cleanup、close wakeup、resource再利用を確認する。
+pipeline suiteは2/3/4段、stdio routing、部分準備失敗のrollbackを確認する。
 
-Native scheduler test adds 100 external-waker races. It checks TLS before
-and after sleep, worker thread identity, atomic check/register/wait path,
-and unchanged process handle count after all native handles close.
+native scheduler試験はexternal waker raceを100回実行し、sleep前後のTLS、worker
+thread identity、check/register/waitの不可分性、終了後のhandle数を確認する。
 
-## Verification (2026-10-03)
+## V7との差分
 
-- Scheduler, pipe, pipeline suites: cortn/thread at O0/O2 all pass
-- Native race/TLS/handle tests: 100 iterations pass at each optimization
-- Thread O2 with DEBUG_STDIO=1: consumer data remains unchanged
-- Partial pipeline preparation failure: rollback and next execution pass
-- Executor cases 1 through 10: golden output matches for both backends
-- Parser run_test1.sh and run_test2.sh: test pass
-- Quote test: successful build and execution
-- Windows thread target: successful build and link through MSYS2
-- Interactive sam1, sam2 1 10 100, sam3 -a -b string: expected output
-- Whitespace and 80-column checks on changed C/header sources: pass
-
-No warnings in strict scheduler/pipe builds. Existing warnings in unrelated
-shell/parser/tty modules remain in wider integration builds.
+V7のsleep/wakeupと条件再検査を維持するが、kernel process switchは使わない。
+native thread backendでもexecutorが実行tokenを直列に与えるため、appletは自動的
+には並列実行されない。priority、signal、timeout、強制終了は実装しない。

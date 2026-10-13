@@ -5,7 +5,7 @@ OPT ?= -O0
 
 CFLAGS = -mno-ms-bitfields -g $(OPT)
 CFLAGS += -Wall -Wextra -Werror -pedantic
-CFLAGS += -I../../include -I../../target/windows
+CFLAGS += -I../../include -I../../../sys/dev/windows
 
 OBJS = $(OUTDIR)/test_cortn.o
 OBJS += $(OUTDIR)/cortn.o
@@ -28,10 +28,10 @@ $(OUTDIR)/test_cortn.o: test_cortn.c
 $(OUTDIR)/cortn.o: ../../cortn.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OUTDIR)/cortn_context.o: ../../target/windows/cortn_context.c
+$(OUTDIR)/cortn_context.o: ../../../sys/dev/windows/cortn_context.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OUTDIR)/cortn_switch.o: ../../target/windows/cortn_switch.S
+$(OUTDIR)/cortn_switch.o: ../../../sys/dev/windows/cortn_switch.S
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

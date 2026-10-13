@@ -1,137 +1,141 @@
-# Milestone 9: 回帰試験と堅牢化
+# sys pipe移行回帰試験
 
-## Windows 対話入力
+更新日: 2026-10-13
 
-Windows Makefile は `USE_STACKMACH`、`ESH_SCRIPT` を有効にする。
-入力を lexer、parser、executor に渡し、既存の pipeline 実行部を利用する。
-他のターゲットでは `ESH_SCRIPT` を定義しない限り従来の直接実行を維持する。
-既存 builtin の番号は変更していない。末尾に `cat` を追加した。
+## Windows対話入力
 
-MSYS2 MINGW64 shell で実行する。PowerShell から gcc を直接起動しない。
+Windows Makefileは`USE_STACKMACH`、`ESH_SCRIPT`、`ESH_STDIO_PIPE`を有効にする。
+入力をlexer、parser、executorへ渡し、sys pipeを使うpipeline実行部を利用する。
+既存builtin番号は変更せず、末尾にstream転送専用`cat`を追加している。
+
+MSYS2 MINGW64 shellでbuildと実行を行う。PowerShellからgccを直接起動しない。
 
 ```sh
 cd src/target/windows
-make -B ESH_SCHED_BACKEND=cortn
+make -B SCHED_BACKEND=cortn
 ./main.exe
 ```
 
-thread backend は `ESH_SCHED_BACKEND=thread` で切り替える。
-対話例:
+thread backendは`SCHED_BACKEND=thread`で選ぶ。確認入力は次のとおり。
 
 ```sh
+sam1
+sam2 1 10 100
+sam3 -a -b string
 echo hello|cat
 echo four|cat|cat|cat
 k=3
 echo "$k"|cat
 ```
 
-`cat` は引数なしのストリーム転送専用で、ファイル名は扱わない。
-先頭の `cat` は console 入力を待つ。末尾の `cat` は console へ出力する。
-`if`、`while` は複数行を蓄積し、最外側のブロックが閉じてから実行する。
-変数は完了した入力間で保持する。エラーでは未実行のコードを破棄する。
+`cat`は引数なしのstream転送専用で、ファイル名は扱わない。先頭`cat`はconsole
+入力を待ち、末尾`cat`はconsoleへ出力する。`if`と`while`は複数行を蓄積し、
+最外側blockが閉じてから実行する。変数は完了した入力間で保持する。
 
-## API と所有権
+## APIと所有権
 
-`esh_script_init()` は単一 console セッションを初期化する。
-`esh_script_line()` は NUL 終端された `TTY_NBUF` バイトの呼出元バッファを
-変更する。行末 token が必要で、上限超過・欠落を切り詰めて実行しない。
-戻り値は負値が拒否、未完ブロックは 1、完了時は最後の executor status。
-完了 status の 1 と未完の 1 は区別しない。公開非同期 API ではない。
+`esh_script_init()`は単一console sessionを初期化する。`esh_script_line()`はNUL
+終端された`TTY_NBUF` byteの呼出元bufferを変更する。行末tokenが必要で、上限
+超過または欠落時は実行しない。負値は拒否、1は未完blockまたは完了status 1、
+その他は最後のexecutor statusである。公開非同期APIではない。
 
-lexer、parser、console セッションは singleton で、再入・並列利用は禁止。
-parser が `PARINVLD` を返したコードは実行せず、`par_init()` と `code_init()`
-で再初期化する。失敗直前まで追加された命令・記号はロールバックしない。
-console はエラー時も変数テーブルを保持するため、解析途中で登録した未設定の
-変数が残ることがある。
+lexer、parser、console sessionはsingletonで、再入・並列利用は禁止する。
+parserが`PARINVLD`を返したcodeは実行せず、`par_init()`と`code_init()`で再初期化
+する。consoleはerror時も変数tableを保持する。
 
-kernel lock は非再帰の単一 lock。pipe 条件と待機リストを保護する。
-I/O 待機は lock 内で登録し、backend が解放・待機・再取得を行う。
-終了時は fd を close した後、lock 外で backend を release/join する。
-controller は一つだけとし、全 process の終了前に pool を初期化しない。
-詳細は `esh_pipe_thread.md` と `esh_pipe_stdio.md` を参照する。
+sys層では`struct proc.p_ofile[]`が`struct file`を参照し、read/write endpointが
+共有`struct inode`とmemory-only `struct buf`を参照する。kernel lockはpipe条件、
+inode lock、参照数、wait listを保護する。process終了時はfdをcloseしてから
+lock外でbackendをreleaseまたはjoinする。
 
-## 境界検査
+詳細は`esh_pipe_api.md`、`esh_pipe_core.md`、`esh_pipe_sched.md`、
+`esh_pipe_thread.md`、`esh_pipe_stdio.md`を参照する。
 
-- executor の pc/sp を int にし、128 命令到達時の符号付き char 折返しを解消
-- NULL、pc、命令長、不明 opcode、applet ID、記号 ID、label、stack を検査
-- OP_NOP は pc を進め、同じ命令で停止し続けない
-- parser のコード、文字列、変数、label、ネスト、条件・ループ管理領域を検査
-- lexer の長すぎる記号・引用文字列を拒否
-- tokenizer の未終端入力・token 上限を拒否し、64-bit pointer の切詰めを解消
-- break のループ添字を検査
-- pipeline の全 applet を確認してから process 状態を初期化
+## Pipe意味の回帰点
+
+- `sys_pipe()`はcurrent processへread/write fdを作る
+- `sys_read()`は現在取得可能なdataを返し、空ならwriter有無を再判定する
+- `sys_write()`は要求全体を完了するまで部分転送と待機を繰り返す
+- 最終writer close後は残存dataを読み切ってからEOFを返す
+- reader不在では`-SYS_EPIPE`を返し、signalを送らない
+- closeはread/write waiterを起こす
+- data位置はV7型offset方式で、未読dataをringとして回り込ませない
+- 全data読取後に`f_offset`と`i_size`を0へ戻してbufferを再利用する
+- coroutine/threadで同じ転送結果、EOF、EPIPE、終了statusを返す
 
 ## 回帰試験
 
 ```sh
-cd src/core/esh/test/pipeline_exec
+cd src/core/sys/test/bio
+bash ./run_test.sh
+cd ../file
 bash ./run_test.sh
 cd ../pipe
 bash ./run_test.sh
 cd ../sched
+bash ./run_test.sh
+
+cd ../../../esh/test/cortn
+bash ./run_test.sh
+cd ../pipe
+bash ./run_test.sh
+cd ../sched
+bash ./run_test.sh
+cd ../pipeline_exec
 bash ./run_test.sh
 cd ../par
 bash ./run_test1.sh
 bash ./run_test2.sh
 cd ../exe
 bash ./run_test.sh
+cd ../cquote
+make -B
+./test_cquote.exe
 ```
 
-pipeline、pipe、scheduler は cortn/thread × O0/O2 を試験する。
-pipeline の転送量は 0、1、256、257、2089 byte、段数は 2、3、4。
-各組合せを 10 回反復し、NUL を含む binary データ、順序、変換結果、
-file/pipe の使用数ゼロを確認する。2089 byte は 256-byte ring を数回周回する。
-producer 先行終了、consumer 早期終了、中間 filter のエラー、zero-length I/O、
-pipe 枯渇、backend 部分準備失敗、回収後の再実行も確認する。
-fd/file 枯渇は pipe 単体試験、process/stack pool 枯渇と handle 回収は scheduler
-試験で確認する。coroutine stack guard は cortn 単体試験で確認する。
+bio、file/inode、sys pipe、coroutineはO0/O2を試験する。file/inode、sys pipe、
+coroutine、esh pipe、schedulerは`-Wall -Wextra -Werror -pedantic`を使用する。
+esh pipe、scheduler、pipelineはcoroutine/threadをO0/O2で試験する。
 
-console 自動試験は 4 段、while/if、変数と引用変数、数値 command substitution、
-`break 2`、構文エラー・ネスト超過後の復帰を含む。
-境界試験はコード容量ちょうど、命令途中切れ、不正 ID/opcode、stack の上限、
-記号・変数・label の枯渇、NULL・未終端入力を含む。
+pipelineは0、1、256、257、2089 byteと2/3/4段を確認する。各組合せを反復し、
+NULを含むbinary data、順序、変換結果、file/inode使用数0を確認する。2089 byteは
+V7型256-byte blockのfull/read/resetを複数回繰り返す。
+
+producer先行終了、consumer早期終了、中間filter error、zero-length I/O、pipe
+枯渇、backend部分準備失敗、rollback後の再実行も確認する。fd/file枯渇はpipe
+単体、process/stack pool枯渇とhandle回収はscheduler、stack guardはcoroutine
+単体で確認する。
+
+console自動試験は4段、while/if、変数と引用変数、数値command substitution、
+`break 2`、構文error・nest超過後の復帰を含む。境界試験はcode容量、命令途中
+切れ、不正ID/opcode、stack上限、symbol・変数・label枯渇、NULL、未終端入力を
+含む。
 
 ## 既知の制約
 
-- 同時 pipeline は一つ、最大 4 段。nested pipeline/background 実行は未対応
-- command substitution は従来どおり数値戻り値の代入で、stdout capture ではない
-- while の status は最後の条件評価など既存 executor の規則を維持する
-- console の行・token・記号・コード容量は固定。長い script の動的拡張はしない
-- 対話入力は既存 scanner の文字制限と引用符処理に従う
-- CPU-only コマンドの強制キャンセル、signal、通常ファイルは未対応
-- getchar は read エラーと EOF をともに EOF として返す。cat も区別しない
-- stdio の対応範囲と pipeline 中の scanf 制限は `esh_pipe_stdio.md` のとおり
+- 同時pipelineは1個、最大4段。nested pipelineとbackground実行は未対応
+- command substitutionは数値戻り値代入で、stdout captureではない
+- consoleの行・token・symbol・code容量は固定し、動的拡張しない
+- CPU-only commandの強制cancel、signal、通常ファイルは未対応
+- mapped `getchar()`はread errorとEOFをともにEOFとして返す
+- pipe stdinへ`scanf`を使用できない
+- STM32/Cortex-M/RTOS移植は未着手
+
+## 既存warning
+
+strictなsys、pipe、scheduler、coroutine suiteにはwarningがない。pipeline、
+executor、Windows targetの広いbuildには移行前から次が残る。
+
+- `help.c`: 未使用`argc`、`argv`
+- `lex.c`: 未使用static関数、`snprintf`/`strncpy`切詰め警告
+- `par.c`: `char`型array subscript
+- `test.c`: 未使用static関数
+
+これらはgeneric sys移行による新規warningではない。試験中に出るlexer/parser
+error表示はerror pathを確認する意図された診断で、suiteは成功する。
 
 ## Sanitizer
 
-2026-10-03 の MSYS2 MinGW64 GCC 16.1.0 で、thread backend に
-`-fsanitize=address,undefined` を付けて compile/link を試行した。
-リンク時に `-lasan` と `-lubsan` が見つからず、実行試験はできなかった。
-sanitizer による不正アクセス・リーク検証済みとはしない。
-利用可能な host では同じ suite を次の設定で実行する:
-
-```sh
-cd src/core/esh/test/pipeline_exec
-make -B ESH_SCHED_BACKEND=thread OUTDIR=_output_san TARGET=test_san.exe \
-  OPTFLAGS='-O1 -fsanitize=address,undefined' \
-  LDFLAGS='-lwinmm -fsanitize=address,undefined'
-./test_san.exe
-```
-
-coroutine の手動 stack 切替は sanitizer 専用の fiber 対応を実装していない。
-sanitizer 対象には thread backend を使用する。
-
-## 確認結果 (2026-10-03)
-
-- pipeline、pipe、scheduler: cortn/thread × O0/O2 成功
-- coroutine 単体: O0/O2 成功、stack guard を確認
-- executor: 既存 1〜10 の golden 出力が両 backend で一致
-- parser: 既存 2 suite の golden 出力が一致
-- cquote: 既存試験の build・実行成功
-- 引数付き break、引用変数: 既存追加試験と console 自動試験成功
-- Windows 対話: 両 backend で sam1/sam2/sam3、2/4 段、引用変数成功
-- 新規 warning なし。従来の warning は残るが、pointer 切詰めと
-  non-void 関数の return 欠落は解消。pipe/scheduler/cortn は Werror で成功
-- sanitizer: runtime library 不在で実行不可
-
-未対応の Cortex-M/RTOS 移植は Milestone 10 の対象とする。
+2026-10-03のMSYS2 MinGW64環境では`-lasan`と`-lubsan`がなく、sanitizer実行は
+できなかった。coroutineの手動stack切替にはsanitizer fiber対応も未実装である。
+利用可能なhostでsanitizerを使う場合はthread backendを対象にする。
