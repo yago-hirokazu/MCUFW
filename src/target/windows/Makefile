@@ -5,7 +5,8 @@ TARGET = main.exe
 # Commands
 CXX = g++
 CC = gcc
-include ../../core/esh/target/windows/sched_backend.mk
+include ../../core/sys/dev/windows/sched_backend.mk
+include ../../core/esh/target/windows/sched_compat.mk
 ifeq ($(MSYSTEM),MINGW64)
 DEL = rm -f
 COPY = cp
@@ -36,8 +37,9 @@ vpath %.c ../../core/elib
 vpath %.c ../../core/esh
 vpath %.c ../../core/esh/target/windows
 vpath %.c ../../core/sys/dev
+vpath %.c ../../core/sys/dev/windows
 vpath %.c ../../core/sys/conf
-vpath %.S ../../core/esh/target/windows
+vpath %.S ../../core/sys/dev/windows
 vpath %.o ./_output
 vpath %.dll ./DLL
 
@@ -59,7 +61,7 @@ CSOURCES += qbyte.c
 CSOURCES += symchar.c
 
 ## ../../core/esh
-CSOURCES += $(ESH_SCHED_CSOURCES)
+CSOURCES += $(SCHED_COMPAT_CSOURCES)
 CSOURCES += break.c cat.c code.c esh_debug.c exe.c lex.c par.c script.c tok.c
 CSOURCES += echo.c
 CSOURCES += esh.c
@@ -82,7 +84,7 @@ CSOURCES += stdio_adapt.c
 CSOURCES += tty_adapt.c
 
 # Assembly sources
-ASOURCES := $(ESH_SCHED_ASOURCES)
+ASOURCES := $(SCHED_ASOURCES)
 
 # CPP sources
 ## reserved for future use
@@ -108,11 +110,12 @@ INCLUDES += -I../../core/elib
 INCLUDES += -I../../core/esh/include
 INCLUDES += -I../../core/esh/target/windows
 INCLUDES += -I../../core/sys/h
+INCLUDES += -I../../core/sys/dev/windows
 
 CFLAGS += $(INCLUDES)
 CFLAGS += -DESH_STDIO_PIPE
 CFLAGS += -DUSE_STACKMACH -DESH_SCRIPT
-CFLAGS += $(ESH_SCHED_CPPFLAGS)
+CFLAGS += $(SCHED_COMPAT_CPPFLAGS)
 
 # CXXFLAGS
 CXXFLAGS := $(CFLAGS)
@@ -150,7 +153,8 @@ $(OUTDIR)/%.o: %.cpp
 $(OUTDIR)/%.o: %.S
 	$(CC) $(CFLAGS) -c -MMD -MP $< -o $@
 
-$(OBJS): Makefile ../../core/esh/target/windows/sched_backend.mk
+$(OBJS): Makefile ../../core/sys/dev/windows/sched_backend.mk
+$(OBJS): ../../core/esh/target/windows/sched_compat.mk
 
 .PHONY: clean
 clean:

@@ -2,16 +2,17 @@ TARGET = test_pipe.exe
 OUTDIR = _output
 CC = gcc
 OPT ?= -O0
-include ../../target/windows/sched_backend.mk
+include ../../../sys/dev/windows/sched_backend.mk
+include ../../target/windows/sched_compat.mk
 
 CFLAGS = -mno-ms-bitfields -g $(OPT)
 CFLAGS += -Wall -Wextra -Werror -pedantic
-CFLAGS += -I../../include -I../../target/windows -I../../../sys/h
-CFLAGS += $(ESH_SCHED_CPPFLAGS)
+CFLAGS += -I../../include -I../../../sys/dev/windows -I../../../sys/h
+CFLAGS += $(SCHED_COMPAT_CPPFLAGS)
 
 OBJS = $(OUTDIR)/test_pipe.o
-OBJS += $(addprefix $(OUTDIR)/,$(ESH_SCHED_CSOURCES:.c=.o))
-OBJS += $(addprefix $(OUTDIR)/,$(ESH_SCHED_ASOURCES:.S=.o))
+OBJS += $(addprefix $(OUTDIR)/,$(SCHED_COMPAT_CSOURCES:.c=.o))
+OBJS += $(addprefix $(OUTDIR)/,$(SCHED_ASOURCES:.S=.o))
 OBJS += $(OUTDIR)/file.o
 OBJS += $(OUTDIR)/pipe.o
 OBJS += $(OUTDIR)/sched.o
@@ -34,10 +35,10 @@ $(OUTDIR)/test_pipe.o: test_pipe.c
 $(OUTDIR)/cortn.o: ../../cortn.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OUTDIR)/cortn_context.o: ../../target/windows/cortn_context.c
+$(OUTDIR)/cortn_context.o: ../../../sys/dev/windows/cortn_context.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OUTDIR)/cortn_switch.o: ../../target/windows/cortn_switch.S
+$(OUTDIR)/cortn_switch.o: ../../../sys/dev/windows/cortn_switch.S
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OUTDIR)/file.o: ../../file.c
@@ -55,10 +56,10 @@ $(OUTDIR)/bio.o: ../../../sys/dev/bio.c
 $(OUTDIR)/conf.o: ../../../sys/conf/conf.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OUTDIR)/sched_cortn.o: ../../target/windows/sched_cortn.c
+$(OUTDIR)/sched_cortn_compat.o: ../../target/windows/sched_cortn_compat.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OUTDIR)/sched_thread.o: ../../target/windows/sched_thread.c
+$(OUTDIR)/sched_thread_compat.o: ../../target/windows/sched_thread_compat.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

@@ -11,11 +11,11 @@ MSYS2 MINGW64 shell で実行する。PowerShell から gcc を直接起動し�
 
 ```sh
 cd src/target/windows
-make -B ESH_SCHED_BACKEND=cortn
+make -B SCHED_BACKEND=cortn
 ./main.exe
 ```
 
-thread backend は `ESH_SCHED_BACKEND=thread` で切り替える。
+thread backend は `SCHED_BACKEND=thread` で切り替える。
 対話例:
 
 ```sh
@@ -112,7 +112,7 @@ sanitizer による不正アクセス・リーク検証済みとはしない。
 
 ```sh
 cd src/core/esh/test/pipeline_exec
-make -B ESH_SCHED_BACKEND=thread OUTDIR=_output_san TARGET=test_san.exe \
+make -B SCHED_BACKEND=thread OUTDIR=_output_san TARGET=test_san.exe \
   OPTFLAGS='-O1 -fsanitize=address,undefined' \
   LDFLAGS='-lwinmm -fsanitize=address,undefined'
 ./test_san.exe

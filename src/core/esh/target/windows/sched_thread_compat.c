@@ -1,4 +1,4 @@
-/* sched_thread.c */
+/* sched_thread_compat.c */
 
 #ifndef _WIN32_WINNT
 #define _WIN32_WINNT 0x0600
@@ -8,38 +8,8 @@
 #include <string.h>
 #include <windows.h>
 
-#ifdef SYS_SCHED
-#include "sched_backend.h"
-#include "sys_error.h"
-
-#define esh_proc		proc
-#define esh_wait_reason		wait_reason
-#define esh_proc_state		proc_state
-#define ep_backend		p_backend
-#define ep_state		p_state
-#define ESH_PIPELINE_MAX	PIPELINE_MAX
-#define ESH_WAIT_READ		WAIT_READ
-#define ESH_WAIT_WRITE		WAIT_WRITE
-#define ESH_PROC_FINISHED	PROC_FINISHED
-#define ESH_PROC_ERROR		PROC_ERROR
-#define ESH_EINVAL		SYS_EINVAL
-#define esh_kernel_lock		kernel_lock
-#define esh_kernel_unlock	kernel_unlock
-#define esh_sched_set_current_proc	sched_set_current_proc
-#define esh_sched_backend_current	sched_backend_current
-#define esh_sched_backend_set_current	sched_backend_set_current
-#define esh_sched_backend_lock	sched_backend_lock
-#define esh_sched_backend_unlock	sched_backend_unlock
-#define esh_sched_backend_is_locked	sched_backend_is_locked
-#define esh_sched_backend_prepare	sched_backend_prepare
-#define esh_sched_backend_release	sched_backend_release
-#define esh_sched_backend_yield	sched_backend_yield
-#define esh_sched_backend_wake	sched_backend_wake
-#define esh_sched_backend_resume	sched_backend_resume
-#else
 #include "esh_errno.h"
 #include "esh_sched_backend.h"
-#endif
 
 struct esh_thread_slot {
 	HANDLE ts_thread;
@@ -151,11 +121,7 @@ int esh_sched_backend_yield(struct esh_proc *proc,
 {
 	struct esh_thread_slot *slot = proc->ep_backend;
 
-	if (reason != ESH_WAIT_READ && reason != ESH_WAIT_WRITE
-#ifdef SYS_SCHED
-	    && reason != WAIT_LOCK
-#endif
-	   )
+	if (reason != ESH_WAIT_READ && reason != ESH_WAIT_WRITE)
 		return -ESH_EINVAL;
 	slot->ts_run = 0;
 	WakeAllConditionVariable(&slot->ts_report_cv);

@@ -63,11 +63,12 @@ Milestone 9 は 18 ファイル、788 行追加・105 行削除。
 | Pipe core | `file.c`, `pipe.c`, `include/esh_file.h`, `include/esh_pipe.h` | Fd、参照数、ring、EOF/EPIPE |
 | Scheduler | `sched.c`, `include/esh_sched.h`, `include/esh_sched_backend.h` | Process と wait/wakeup 契約 |
 | Coroutine | `cortn.c`, Windows `cortn_context.c`, `cortn_switch.S`, `sched_cortn.c` | Context、stack、backend |
-| Thread | Windows `sched_thread.c` | TLS、SRW lock、CV、thread handle |
+| Thread | sys Windows `sched_thread.c` | TLS、SRW lock、CV、thread handle |
 | Stdio | Windows `stdio_adapt.c`, `include/bltn.h`, `echo.c`, `cat.c` | 既存 applet の入出力経路 |
-| Build | Windows `sched_backend.mk`、各 Makefile | Backend 選択と条件付き接続 |
+| Build | sys Windows `sched_backend.mk`、各 Makefile | Backend 選択と条件付き接続 |
 
-Windows 固有ファイルは `src/core/esh/target/windows/` にある。
+Scheduler Windows固有ファイルは`src/core/sys/dev/windows/`にある。
+esh adapterは`src/core/esh/target/windows/`に残る。
 `struct proc` は shell 引数を所有し、`struct esh_proc` を埋め込む。
 
 - 最大 4 段ネスト、pipe 3 本、256 byte/pipe、fd 12/process、file entry 12
@@ -77,7 +78,7 @@ Windows 固有ファイルは `src/core/esh/target/windows/` にある。
 - 最終 writer close 後、残データを読み切って EOF
 - Zero-length read/write は fd/peer の検査なしに 0
 - Stdout と次段 stdin だけを接続。stderr/debug は console
-- Default は `ESH_SCHED_BACKEND=cortn`、切替値は `thread`
+- Default は `SCHED_BACKEND=cortn`、切替値は `thread`
 - Thread backend も controller が一つずつ実行を許可する。
   Native thread 化は applet の自動並列実行を意味しない
 - Coroutine stack は Windows では現在 64 KiB × 4。

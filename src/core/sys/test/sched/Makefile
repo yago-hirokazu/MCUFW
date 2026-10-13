@@ -2,26 +2,18 @@ TARGET ?= test_sched.exe
 OUTDIR ?= _output
 CC = gcc
 OPT ?= -O0
-BACKEND ?= cortn
+include ../../dev/windows/sched_backend.mk
 
 CFLAGS = -mno-ms-bitfields -g $(OPT)
 CFLAGS += -Wall -Wextra -Werror -pedantic -std=c11
 CFLAGS += -I../../h
-CFLAGS += -I../../../esh/include -I../../../esh/target/windows
-CFLAGS += -DSYS_SCHED -DSCHED_TEST
-
-ifeq ($(BACKEND),cortn)
-BACKEND_OBJS = $(OUTDIR)/cortn.o $(OUTDIR)/cortn_context.o
-BACKEND_OBJS += $(OUTDIR)/cortn_switch.o $(OUTDIR)/sched_cortn.o
-else ifeq ($(BACKEND),thread)
-BACKEND_OBJS = $(OUTDIR)/sched_thread.o
-else
-$(error Unknown BACKEND: $(BACKEND))
-endif
+CFLAGS += -I../../../esh/include -I../../dev/windows
+CFLAGS += -DSCHED_TEST $(SCHED_CPPFLAGS)
 
 OBJS = $(OUTDIR)/test_sched.o
 OBJS += $(OUTDIR)/sched.o
-OBJS += $(BACKEND_OBJS)
+OBJS += $(addprefix $(OUTDIR)/,$(SCHED_CSOURCES:.c=.o))
+OBJS += $(addprefix $(OUTDIR)/,$(SCHED_ASOURCES:.S=.o))
 OBJS += $(OUTDIR)/pipe.o
 OBJS += $(OUTDIR)/rdwri.o
 OBJS += $(OUTDIR)/fio.o
@@ -49,16 +41,16 @@ $(OUTDIR)/sched.o: ../../sys/sched.c
 $(OUTDIR)/cortn.o: ../../../esh/cortn.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OUTDIR)/cortn_context.o: ../../../esh/target/windows/cortn_context.c
+$(OUTDIR)/cortn_context.o: ../../dev/windows/cortn_context.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OUTDIR)/cortn_switch.o: ../../../esh/target/windows/cortn_switch.S
+$(OUTDIR)/cortn_switch.o: ../../dev/windows/cortn_switch.S
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OUTDIR)/sched_cortn.o: ../../../esh/target/windows/sched_cortn.c
+$(OUTDIR)/sched_cortn.o: ../../dev/windows/sched_cortn.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OUTDIR)/sched_thread.o: ../../../esh/target/windows/sched_thread.c
+$(OUTDIR)/sched_thread.o: ../../dev/windows/sched_thread.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OUTDIR)/pipe.o: ../../sys/pipe.c

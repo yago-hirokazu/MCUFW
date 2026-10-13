@@ -3,18 +3,18 @@
 ## Backend selection
 
 All scheduler-enabled Windows Makefiles include
-`src/core/esh/target/windows/sched_backend.mk`.
-Default `ESH_SCHED_BACKEND=cortn` retains coroutine behavior.
-`ESH_SCHED_BACKEND=thread` selects native thread implementation;
+`src/core/sys/dev/windows/sched_backend.mk`.
+Default `SCHED_BACKEND=cortn` retains coroutine behavior.
+`SCHED_BACKEND=thread` selects native thread implementation;
 thread builds do not link coroutine code or context-switch assembly.
 
 Run builds inside MSYS2 MINGW64 shell. Rebuild when switching backend:
 
 ```sh
 cd src/target/windows
-make -B ESH_SCHED_BACKEND=thread main.exe
+make -B SCHED_BACKEND=thread main.exe
 ./main.exe
-make -B ESH_SCHED_BACKEND=cortn main.exe
+make -B SCHED_BACKEND=cortn main.exe
 ```
 
 Separate OUTDIR and TARGET values can preserve both build variants.

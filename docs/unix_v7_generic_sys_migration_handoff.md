@@ -35,7 +35,7 @@
 | 3 | `file.c`のV7名sourceへの分割 | done | - |
 | 4 | V7風`pipe.c`とinode I/O | done | - |
 | 5 | scheduler汎用化 | done | - |
-| 6 | Windows backend移動 | pending | - |
+| 6 | Windows backend移動 | done | - |
 | 7 | esh呼出し側の切替と旧実装削除 | pending | - |
 | 8 | 全回帰試験と文書更新 | pending | - |
 
@@ -1233,6 +1233,74 @@ docs/unix_v7_generic_sys_migration_handoff.mdのStep 6を実行してくださ�
 build pathとbackend symbolを更新してください。Step 7のfile/pipe切替は行わないで
 ください。
 ```
+
+### Step 6実施結果（2026-10-13）
+
+指定された次の6ファイルを`src/core/sys/dev/windows/`へ移動した。
+
+- `cortn_context.c`
+- `cortn_context.h`
+- `cortn_switch.S`
+- `sched_backend.mk`
+- `sched_cortn.c`
+- `sched_thread.c`
+
+移動後のscheduler backendは`struct proc`、`PROC_*`、`WAIT_*`、
+`sched_backend_*`、`SYS_EINVAL`を直接使用する。Step 5で設けた
+`SYS_SCHED`分岐とbackend内の`esh_`/`ESH_` compatibility定義は削除した。
+`src/core/sys`内の`esh_`、`ESH_`検索結果は0件である。
+
+build変数は`SCHED_BACKEND`、`SCHED_CSOURCES`、`SCHED_ASOURCES`、
+`SCHED_CPPFLAGS`へ変更した。次のbuild fileを新pathへ追従させた。
+
+- `src/core/sys/test/sched/Makefile`
+- `src/core/esh/test/cortn/Makefile`
+- `src/core/esh/test/sched/Makefile`
+- `src/core/esh/test/pipe/Makefile`
+- `src/core/esh/test/pipeline_exec/Makefile`
+- `src/core/esh/test/exe/Makefile`
+- `src/target/windows/Makefile`
+- `src/target/windows/TDM-GCC/Makefile`
+- scheduler、pipe、pipeline testの`run_test.sh`
+
+Step 7まで旧esh schedulerを動かすため、Windows依存の一時互換実装を
+`src/core/esh/target/windows/`へ分離した。
+
+- `sched_compat.mk`
+- `sched_cortn_compat.c`
+- `sched_thread_compat.c`
+
+汎用backend sourceは一時互換symbolを含まない。旧esh buildだけが
+`SCHED_COMPAT_CSOURCES`と`SCHED_COMPAT_CPPFLAGS`を使い、context switchと
+assemblyは新配置の実装を共有する。
+
+`cortn.c`と`cortn.h`はtarget非依存のcoroutine本体であり、Step 6の指定移動
+対象ではないため`src/core/esh/`に残した。`cortn_context.h`は新しいsys Windows
+include pathから参照する。
+
+次の試験とbuildが成功した。
+
+- coroutine単体 O0/O2、`-Werror`
+- 汎用scheduler coroutine/thread O0/O2、`-Werror`
+- 既存scheduler coroutine/thread O0/O2、`-Werror`
+- 既存pipe coroutine/thread O0/O2、`-Werror`
+- pipeline executor coroutine/thread O0
+- Windows target coroutine/thread build
+
+`cortn_context.c`の`CORTN_OFFSET_CHECK`はO0/O2 compileで成功し、assemblyの
+offset定義は変更していない。pipelineの既存warningと意図されたparser error
+診断は残るが、試験結果は`all tests passed`だった。
+
+#### Step 7への引継事項
+
+- esh callerをsys schedulerへ切り替えた後、`sched_compat.mk`、
+  `sched_cortn_compat.c`、`sched_thread_compat.c`を削除する
+- 旧esh buildの`SCHED_COMPAT_*`参照を`SCHED_CSOURCES`、
+  `SCHED_CPPFLAGS`へ切り替える
+- `src/core/esh/target/windows/`にはesh adapterだけを残す
+- `cortn.c`と`cortn.h`は今回移動していない
+- source treeのMakefile、mk、test scriptに旧6ファイルのpath参照はない
+- source treeのMakefile、mk、test scriptに`ESH_SCHED_*`変数はない
 
 ## 15. Step 7 esh呼出し側切替と旧実装削除
 
