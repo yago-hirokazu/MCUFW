@@ -31,7 +31,7 @@ Stepの範囲だけを扱い、後続Stepを先取りしない。各Step完了�
 | Step | 内容 | 状態 | 完了コミット |
 |---|---|---|---|
 | 0 | 変更前状態と基準試験結果の記録 | done | uncommitted |
-| 1 | coroutine source/headerの物理移動 | pending | - |
+| 1 | coroutine source/headerの物理移動 | done | uncommitted |
 | 2 | build定義とinclude pathの新配置対応 | pending | - |
 | 3 | `file_system_init()`から`binit()`を分離し`finit()`へ改名 | pending | - |
 | 4 | production codeと試験の初期化呼出し更新 | pending | - |
@@ -342,11 +342,42 @@ src/core/esh/include/cortn.h
 
 ### 結果
 
-`pending`
+- 実施日: 2026-10-14
+- 開始時HEAD: `e55990d Record coroutine relocation baseline`
+- 次の2ファイルを指定先へ移動
+  - `src/core/esh/cortn.c`
+    -> `src/core/sys/dev/windows/cortn.c`
+  - `src/core/esh/include/cortn.h`
+    -> `src/core/sys/dev/windows/cortn.h`
+- 移動先に同名fileが存在しないことを移動前に確認
+- 移動後、旧pathにfileが存在しないことを確認
+- file sizeは移動前後で一致
+  - `cortn.c`: 4247 bytes
+  - `cortn.h`: 1524 bytes
+- SHA-256は移動前後で一致
+  - `cortn.c`:
+    `C984FA75A5566637786C0C50CDD51BC35B98A611BF08BA747DED1F6BF3FE0265`
+  - `cortn.h`:
+    `C393FC69A5DAA53EE8990528B25350154E56E35415154A1D710A7944C6BD7A0F`
+- HEAD上の旧fileと移動先fileのGit blob IDも一致
+  - `cortn.c`: `2159a09913a5e34982c95aa404c4d059fbf2db1c`
+  - `cortn.h`: `5fa35219e6c9262792633b6eb7409fe31bd5300d`
+- source/header内容、API、定数、comment、formatに変更なし
+- Makefile、include path、`finit()`関連fileに変更なし
+- Step 1単独のbuild/testは計画どおり未実施
 
 ### 次Stepへの引継事項
 
-`pending`
+- 旧pathを直接指定する次の4個のMakefileはStep 2まで一時的に失敗する
+  - `src/core/esh/test/cortn/Makefile`
+  - `src/core/esh/test/sched/Makefile`
+  - `src/core/esh/test/pipe/Makefile`
+  - `src/core/sys/test/sched/Makefile`
+- Step 2で上記4個のsource pathを新配置へ変更する
+- `sys/dev/windows`を既に`vpath`へ含むbuild経路も新しい`cortn.c`を選ぶことを
+  clean buildで確認する
+- coroutine headerは`src/core/sys/dev/windows/cortn.h`から解決する
+- 配置変更に便乗したcoroutine実装変更を行わない
 
 ## 9. Step 2 build定義とinclude pathの新配置対応
 
