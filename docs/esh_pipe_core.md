@@ -1,6 +1,6 @@
 # sys file・fd・pipeコア
 
-更新日: 2026-10-13
+更新日: 2026-10-15
 
 ## 役割
 
@@ -29,8 +29,16 @@ process向けread/write/close入口を担当する。`bio.c`は固定長buffer c
 - buffer cache entry: `NBUF` = 3
 - pipe data: `PIPSIZ` = `BSIZE` = 256 byte
 
-`file_system_init()`はbuffer cache、file table、inode tableを初期化する。所有中の
-file、inode、buffer、実行中processがある状態では呼び出さない。
+`binit()`はbuffer cache、`finit()`はfile tableとinode tableを初期化する。
+完全初期化は次の順で明示的に呼び出す。
+
+```c
+binit();
+finit();
+```
+
+`finit()`は`binit()`を内部で呼ばない。所有中のfile、inode、buffer、実行中
+processがある状態では完全初期化しない。
 
 ## 所有権
 

@@ -1,6 +1,6 @@
 # Windows stackful coroutine
 
-更新日: 2026-10-13
+更新日: 2026-10-15
 
 ## 役割
 
@@ -13,7 +13,13 @@ backendは`src/core/sys/dev/windows/sched_cortn.c`にある。
 
 ## Coroutine API
 
-coroutine engine本体は`src/core/esh/cortn.c`と`include/cortn.h`に残している。
+coroutine engine本体と公開headerはWindows固有context実装と同じdirectoryに置く。
+
+- `src/core/sys/dev/windows/cortn.c`
+- `src/core/sys/dev/windows/cortn.h`
+- `src/core/sys/dev/windows/cortn_context.c`
+- `src/core/sys/dev/windows/cortn_context.h`
+- `src/core/sys/dev/windows/cortn_switch.S`
 
 - `cortn_init()`：利用者所有stackとentry関数を登録する
 - `cortn_resume()`：RUNNABLE coroutineを再開する
@@ -24,6 +30,19 @@ coroutine engine本体は`src/core/esh/cortn.c`と`include/cortn.h`に残して�
 
 entry関数がreturnすると`CORTN_FINISHED`へ遷移する。FINISHEDまたはERROR状態の
 coroutineは再開できない。scheduler backendがcoroutine状態を`PROC_*`へ写す。
+
+## Scheduler backend選択
+
+`src/core/sys/dev/windows/sched_backend.mk`がWindows scheduler backendを選ぶ。
+defaultの`SCHED_BACKEND=cortn`は次をbuildする。
+
+- `cortn.c`
+- `cortn_context.c`
+- `cortn_switch.S`
+- `sched_cortn.c`
+
+`SCHED_BACKEND=thread`は`sched_thread.c`だけをbackend sourceとしてbuildし、
+`SCHED_THREAD`を定義する。thread backendはcoroutine objectをlinkしない。
 
 ## Windows x64 context
 

@@ -3,16 +3,14 @@
 #include <limits.h>
 #include <string.h>
 
-#include "buf.h"
 #include "file.h"
 #include "inode.h"
 #include "param.h"
 #include "sched.h"
 #include "sys_error.h"
 
-void file_system_init(void)
+void finit(void)
 {
-	binit();
 	memset(file, 0, NFILE * sizeof(file[0]));
 	memset(inode, 0, NINODE * sizeof(inode[0]));
 }

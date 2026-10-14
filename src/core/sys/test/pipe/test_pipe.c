@@ -146,7 +146,8 @@ static void test_zero_length_and_validation(void)
 	char data;
 	int fd[2];
 
-	file_system_init();
+	binit();
+	finit();
 	init_proc(&proc);
 	sched_stub_reset(&proc);
 	CHECK(readp(NULL, NULL, NULL, 0) == 0);
@@ -174,7 +175,8 @@ static void test_create_and_data_path(void)
 	char data[4];
 	int fd[2];
 
-	file_system_init();
+	binit();
+	finit();
 	init_proc(&proc);
 	sched_stub_reset(&proc);
 	CHECK(sys_pipe(fd) == 0);
@@ -222,7 +224,8 @@ static void test_full_and_offset_reset(void)
 	int fd[2];
 	int i;
 
-	file_system_init();
+	binit();
+	finit();
 	init_proc(&proc);
 	sched_stub_reset(&proc);
 	CHECK(sys_pipe(fd) == 0);
@@ -252,7 +255,8 @@ static void test_eof_epipe_and_close_wakeup(void)
 	char data;
 	int fd[2];
 
-	file_system_init();
+	binit();
+	finit();
 	init_proc(&proc);
 	sched_stub_reset(&proc);
 	CHECK(sys_pipe(fd) == 0);
@@ -264,7 +268,8 @@ static void test_eof_epipe_and_close_wakeup(void)
 	CHECK(call_close(&proc, fd[0]) == 0);
 	CHECK(pipe_in_use() == 0);
 
-	file_system_init();
+	binit();
+	finit();
 	init_proc(&proc);
 	sched_stub_reset(&proc);
 	CHECK(sys_pipe(fd) == 0);
@@ -282,7 +287,8 @@ static void test_wait_rechecks(void)
 	char byte;
 	int fd[2];
 
-	file_system_init();
+	binit();
+	finit();
 	init_proc(&proc);
 	proc.p_backend = &proc;
 	sched_stub_reset(&proc);
@@ -316,7 +322,8 @@ static void test_pipe_lock(void)
 	struct inode *ip;
 	int fd[2];
 
-	file_system_init();
+	binit();
+	finit();
 	init_proc(&proc);
 	proc.p_backend = &proc;
 	sched_stub_reset(&proc);
@@ -342,7 +349,8 @@ static void test_rdwri_bounds(void)
 	struct inode *ip;
 	size_t offset;
 
-	file_system_init();
+	binit();
+	finit();
 	sched_stub_reset(NULL);
 	memset(input, 0xa5, sizeof(input));
 	ip = ialloc();
@@ -371,7 +379,8 @@ static void test_resource_rollback(void)
 	int item;
 	int i;
 
-	file_system_init();
+	binit();
+	finit();
 	init_proc(&caller);
 	sched_stub_reset(&caller);
 	for (i = 0; i < NOFILE - 1; i++)
@@ -381,7 +390,8 @@ static void test_resource_rollback(void)
 	CHECK(inode_in_use() == 0);
 	call_close_all(&caller);
 
-	file_system_init();
+	binit();
+	finit();
 	init_proc(&caller);
 	sched_stub_reset(&caller);
 	for (i = 0; i < NOFILE; i++)
@@ -391,7 +401,8 @@ static void test_resource_rollback(void)
 	CHECK(inode_in_use() == 0);
 	call_close_all(&caller);
 
-	file_system_init();
+	binit();
+	finit();
 	init_proc(&caller);
 	init_proc(&owner);
 	sched_stub_reset(&caller);
@@ -402,7 +413,8 @@ static void test_resource_rollback(void)
 	CHECK(inode_in_use() == 0);
 	call_close_all(&owner);
 
-	file_system_init();
+	binit();
+	finit();
 	init_proc(&caller);
 	init_proc(&owner);
 	sched_stub_reset(&caller);
@@ -414,7 +426,8 @@ static void test_resource_rollback(void)
 	CHECK(caller.p_ofile[0] == NULL);
 	call_close_all(&owner);
 
-	file_system_init();
+	binit();
+	finit();
 	init_proc(&caller);
 	sched_stub_reset(&caller);
 	for (i = 0; i < NINODE; i++) {
@@ -427,7 +440,8 @@ static void test_resource_rollback(void)
 	for (i = 0; i < NINODE; i++)
 		iput(ips[i]);
 
-	file_system_init();
+	binit();
+	finit();
 	init_proc(&caller);
 	sched_stub_reset(&caller);
 	for (i = 0; i < NINODE; i++)

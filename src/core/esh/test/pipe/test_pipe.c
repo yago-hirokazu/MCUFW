@@ -181,7 +181,8 @@ static void test_public_api(void)
 	char data[4];
 	int fd[2];
 
-	file_system_init();
+	binit();
+	finit();
 	proc_init(&proc);
 	sched_set_current_proc(&proc);
 	CHECK(sys_pipe(fd) == 0);
@@ -221,7 +222,8 @@ static void test_v7_offset(void)
 	int fd[2];
 
 	memset(data, 0x5a, sizeof(data));
-	file_system_init();
+	binit();
+	finit();
 	proc_init(&proc);
 	sched_set_current_proc(&proc);
 	CHECK(sys_pipe(fd) == 0);
@@ -245,7 +247,8 @@ static void test_peer_close(void)
 	unsigned char byte;
 	int fd[2];
 
-	file_system_init();
+	binit();
+	finit();
 	proc_init(&proc);
 	sched_set_current_proc(&proc);
 	CHECK(sys_pipe(fd) == 0);
@@ -275,7 +278,8 @@ static void test_blocking_transfer(void)
 	for (i = 0; i < TEST_DATA_SIZE; i++)
 		source[i] = (unsigned char)(i * 37);
 	memset(result, 0, sizeof(result));
-	file_system_init();
+	binit();
+	finit();
 	proc_init(&procs[0]);
 	proc_init(&procs[1]);
 	CHECK(connect_pipe(&procs[0], &procs[1], &write_fd, &read_fd) == 0);
@@ -311,7 +315,8 @@ static void test_reader_close_wakeup(void)
 	int write_fd;
 	int read_fd;
 
-	file_system_init();
+	binit();
+	finit();
 	proc_init(&procs[0]);
 	proc_init(&procs[1]);
 	CHECK(connect_pipe(&procs[0], &procs[1], &write_fd, &read_fd) == 0);
@@ -342,7 +347,8 @@ static void test_writer_close_wakeup(void)
 	int read_fd;
 
 	memset(data, 0x3c, sizeof(data));
-	file_system_init();
+	binit();
+	finit();
 	proc_init(&procs[0]);
 	proc_init(&procs[1]);
 	CHECK(connect_pipe(&procs[0], &procs[1], &write_fd, &read_fd) == 0);

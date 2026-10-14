@@ -7,7 +7,7 @@ include ../../dev/windows/sched_backend.mk
 CFLAGS = -mno-ms-bitfields -g $(OPT)
 CFLAGS += -Wall -Wextra -Werror -pedantic -std=c11
 CFLAGS += -I../../h
-CFLAGS += -I../../../esh/include -I../../dev/windows
+CFLAGS += -I../../dev/windows
 CFLAGS += -DSCHED_TEST $(SCHED_CPPFLAGS)
 
 OBJS = $(OUTDIR)/test_sched.o
@@ -38,7 +38,7 @@ $(OUTDIR)/test_sched.o: test_sched.c
 $(OUTDIR)/sched.o: ../../sys/sched.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OUTDIR)/cortn.o: ../../../esh/cortn.c
+$(OUTDIR)/cortn.o: ../../dev/windows/cortn.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OUTDIR)/cortn_context.o: ../../dev/windows/cortn_context.c
