@@ -33,7 +33,7 @@ Stepの範囲だけを扱い、後続Stepを先取りしない。各Step完了�
 | 0 | 変更前状態と基準試験結果の記録 | done | uncommitted |
 | 1 | coroutine source/headerの物理移動 | done | uncommitted |
 | 2 | build定義とinclude pathの新配置対応 | done | uncommitted |
-| 3 | `file_system_init()`から`binit()`を分離し`finit()`へ改名 | pending | - |
+| 3 | `file_system_init()`から`binit()`を分離し`finit()`へ改名 | done | uncommitted |
 | 4 | production codeと試験の初期化呼出し更新 | pending | - |
 | 5 | 現行設計文書の更新 | pending | - |
 | 6 | 旧参照と依存関係の静的確認 | pending | - |
@@ -514,11 +514,39 @@ void finit(void)
 
 ### 結果
 
-`pending`
+- 実施日: 2026-10-14
+- 開始時HEAD: `32e2bde Update coroutine build paths`
+- `src/core/sys/sys/fio.c`を次のとおり変更
+  - `file_system_init()`を`finit()`へ改名
+  - `binit()`呼出しを削除
+  - 不要になった`buf.h`includeを削除
+  - `file[]`と`inode[]`のzero初期化を維持
+- `src/core/sys/h/file.h`の公開宣言を`void finit(void);`へ変更
+- alias、macro、互換wrapperは追加なし
+- 静的確認結果
+  - `fio.c`に`binit`参照なし
+  - `fio.c`に`buf.h`includeなし
+  - `file.h`と`fio.c`の`finit()`宣言・定義が一致
+  - 旧名はStep 4対象の呼出し元だけに残存
+- MINGW64 GCCで`fio.c`単体のsyntax check成功
+  - `-Wall -Wextra -Werror -pedantic -std=c11`
+- sandbox内の初回実行はMSYS2 named object作成拒否で失敗
+  - 通常のMINGW64環境で再実行し、syntax check成功
+- 呼出し元は旧名のままなので、計画どおり全体buildは未実施
 
 ### 次Stepへの引継事項
 
-`pending`
+- Step 4で旧名が残る次の6 sourceを更新する
+  - `src/core/esh/target/windows/esh_adapt.c`
+  - `src/core/esh/test/pipe/test_pipe.c`
+  - `src/core/esh/test/pipeline_exec/test_pipeline_exec.c`
+  - `src/core/sys/test/file/test_file.c`
+  - `src/core/sys/test/pipe/test_pipe.c`
+  - `src/core/sys/test/sched/test_sched.c`
+- 各`file_system_init()`を`binit()`、`finit()`の順へ置換する
+- `binit()`宣言用の`buf.h`を必要なsourceだけに追加する
+- Step 4完了後に関係suiteをclean buildする
+- `fio.c`へ`binit()`呼出しや`buf.h`includeを戻さない
 
 ## 11. Step 4 初期化呼出し元の更新
 
