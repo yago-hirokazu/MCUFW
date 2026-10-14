@@ -35,7 +35,7 @@ Stepの範囲だけを扱い、後続Stepを先取りしない。各Step完了�
 | 2 | build定義とinclude pathの新配置対応 | done | uncommitted |
 | 3 | `file_system_init()`から`binit()`を分離し`finit()`へ改名 | done | uncommitted |
 | 4 | production codeと試験の初期化呼出し更新 | done | uncommitted |
-| 5 | 現行設計文書の更新 | pending | - |
+| 5 | 現行設計文書の更新 | done | uncommitted |
 | 6 | 旧参照と依存関係の静的確認 | pending | - |
 | 7 | 全回帰試験とWindows target確認 | pending | - |
 
@@ -678,11 +678,34 @@ MSYS2 MINGW64 shellで次を実行する。
 
 ### 結果
 
-`pending`
+- 実施日: 2026-10-15
+- 開始時HEAD: `1854fbd Update file initialization callers`
+- `docs/cortn_windows.md`を次の現行実装へ更新
+  - coroutine engineとheaderの配置を`src/core/sys/dev/windows`へ変更
+  - `sched_backend.mk`によるbackend選択を追加
+  - cortn backendのC sourceとassembly sourceを記録
+  - thread backendが`sched_thread.c`だけを使用することを記録
+  - 更新日を2026-10-15へ変更
+- `docs/esh_pipe_core.md`を次の初期化責務へ更新
+  - `binit()`はbuffer cacheを初期化
+  - `finit()`はfile tableとinode tableを初期化
+  - 完全初期化順は`binit()`、`finit()`
+  - `finit()`は`binit()`を内部で呼ばない
+  - 更新日を2026-10-15へ変更
+- 対象2文書に旧coroutine pathと`file_system_init()`がないことを確認
+- sourceと`sched_backend.mk`を現行文書の記述と照合
+- review結果、計画、過去handoff内の旧記述は歴史的記録として変更なし
+- 文書だけの変更なのでbuildと実行試験は未実施
 
 ### 次Stepへの引継事項
 
-`pending`
+- Step 6でsource、header、Makefileの旧APIと旧pathを再検索する
+- `finit()`の定義と公開宣言が各1個であることを確認する
+- 全初期化箇所が`binit()`、`finit()`の順であることを確認する
+- `fio.c`に`binit`参照と`buf.h`includeがないことを確認する
+- cortn/thread backendのobject構成を静的に確認する
+- `vpath`が移動後のcoroutine sourceを一意に解決することを確認する
+- 歴史的記録内の旧名と旧pathを現行codeの残存と誤認しない
 
 ## 13. Step 6 旧参照と依存関係の静的確認
 
