@@ -35,7 +35,7 @@ $(OUTDIR):
 $(OUTDIR)/test_pipe.o: test_pipe.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OUTDIR)/cortn.o: ../../cortn.c
+$(OUTDIR)/cortn.o: ../../../sys/dev/windows/cortn.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OUTDIR)/cortn_context.o: ../../../sys/dev/windows/cortn_context.c

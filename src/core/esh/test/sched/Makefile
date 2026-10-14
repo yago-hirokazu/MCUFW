@@ -34,7 +34,7 @@ $(OUTDIR):
 $(OUTDIR)/test_sched.o: ../../../sys/test/sched/test_sched.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OUTDIR)/cortn.o: ../../cortn.c
+$(OUTDIR)/cortn.o: ../../../sys/dev/windows/cortn.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OUTDIR)/cortn_context.o: ../../../sys/dev/windows/cortn_context.c

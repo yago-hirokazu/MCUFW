@@ -32,7 +32,7 @@ Stepの範囲だけを扱い、後続Stepを先取りしない。各Step完了�
 |---|---|---|---|
 | 0 | 変更前状態と基準試験結果の記録 | done | uncommitted |
 | 1 | coroutine source/headerの物理移動 | done | uncommitted |
-| 2 | build定義とinclude pathの新配置対応 | pending | - |
+| 2 | build定義とinclude pathの新配置対応 | done | uncommitted |
 | 3 | `file_system_init()`から`binit()`を分離し`finit()`へ改名 | pending | - |
 | 4 | production codeと試験の初期化呼出し更新 | pending | - |
 | 5 | 現行設計文書の更新 | pending | - |
@@ -423,11 +423,41 @@ coroutine/thread両backendを持つsuiteは両方、`-O0`と`-O2`の両方を確
 
 ### 結果
 
-`pending`
+- 実施日: 2026-10-14
+- 開始時HEAD: `1773369 Move coroutine engine to Windows backend`
+- 旧`cortn.c`を直接指定していた次のMakefileを新pathへ変更
+  - `src/core/esh/test/cortn/Makefile`
+  - `src/core/esh/test/sched/Makefile`
+  - `src/core/esh/test/pipe/Makefile`
+  - `src/core/sys/test/sched/Makefile`
+- `src/core/sys/test/sched/Makefile`から不要な
+  `-I../../../esh/include`を削除
+- `sched_backend.mk`のbare filename定義は変更なし
+- `pipeline_exec/run_test.sh`へ構成別cleanを追加
+  - `-B`でも古い`.d`内の消滅済みpathが解決されるため、build前cleanが必要
+  - clean対象は各構成の`OUTDIR`と`TARGET`だけに限定
+- tracked build定義から旧source/header path参照が消えたことを確認
+- `pipeline_exec`生成dependencyで次を確認
+  - `../../../sys/dev/windows/cortn.c`
+  - `../../../sys/dev/windows/cortn.h`
+- MSYS2 MINGW64 shellで次の試験が成功
+  - `src/core/esh/test/cortn/run_test.sh`: O0/O2
+  - `src/core/esh/test/sched/run_test.sh`: cortn/thread x O0/O2
+  - `src/core/esh/test/pipe/run_test.sh`: cortn/thread x O0/O2
+  - `src/core/esh/test/pipeline_exec/run_test.sh`: cortn/thread x O0/O2
+  - `src/core/sys/test/sched/run_test.sh`: cortn/thread x O0/O2
+- sandbox内の初回実行はMSYS2 named object作成拒否で失敗
+  - 通常のMINGW64環境で再実行し、全試験成功
+- `pipeline_exec`の既存warningと異常系試験のerror表示は基準状態と同じ
+- 試験前に存在しなかった`src/core/sys/test/sched`生成物だけを削除
 
 ### 次Stepへの引継事項
 
-`pending`
+- Step 3では`fio.c`と`file.h`だけを変更する
+- `file_system_init()`を`finit()`へ改名し、内部の`binit()`呼出しを削除する
+- `file[]`と`inode[]`の初期化は維持する
+- 呼出し元はStep 4で更新するため、Step 3単独の一時的なcompile失敗は計画済み
+- coroutine配置とbuild定義をStep 3で変更しない
 
 ## 10. Step 3 `finit()`実装と`binit()`依存除去
 
