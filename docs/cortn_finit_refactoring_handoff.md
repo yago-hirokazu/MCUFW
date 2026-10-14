@@ -34,7 +34,7 @@ Stepの範囲だけを扱い、後続Stepを先取りしない。各Step完了�
 | 1 | coroutine source/headerの物理移動 | done | uncommitted |
 | 2 | build定義とinclude pathの新配置対応 | done | uncommitted |
 | 3 | `file_system_init()`から`binit()`を分離し`finit()`へ改名 | done | uncommitted |
-| 4 | production codeと試験の初期化呼出し更新 | pending | - |
+| 4 | production codeと試験の初期化呼出し更新 | done | uncommitted |
 | 5 | 現行設計文書の更新 | pending | - |
 | 6 | 旧参照と依存関係の静的確認 | pending | - |
 | 7 | 全回帰試験とWindows target確認 | pending | - |
@@ -605,11 +605,42 @@ MSYS2 MINGW64 shellで次を実行する。
 
 ### 結果
 
-`pending`
+- 実施日: 2026-10-15
+- 開始時HEAD: `9decfaf Separate file initialization from buffer cache`
+- 旧APIを使用していた6 source、32箇所を次の順へ変更
+
+  ```c
+	binit();
+	finit();
+  ```
+
+- `buf.h`を次のsourceへ追加
+  - `src/core/esh/target/windows/esh_adapt.c`
+  - `src/core/esh/test/pipeline_exec/test_pipeline_exec.c`
+- `esh_adapt.c`の混在していたCRLF/LFをLFへ統一
+- 残り4 sourceは既存の`buf.h`includeを使用
+- sourceとheaderに`file_system_init`が残っていないことを確認
+- `src/core/sys/sys/fio.c`に`binit`参照と`buf.h`includeがないことを確認
+- MSYS2 MINGW64 shellで次の試験が成功
+  - `src/core/sys/test/file/run_test.sh`: O0/O2
+  - `src/core/sys/test/bio/run_test.sh`: O0/O2
+  - `src/core/sys/test/pipe/run_test.sh`: O0/O2
+  - `src/core/sys/test/sched/run_test.sh`: cortn/thread x O0/O2
+  - `src/core/esh/test/pipe/run_test.sh`: cortn/thread x O0/O2
+  - `src/core/esh/test/pipeline_exec/run_test.sh`: cortn/thread x O0/O2
+- sandbox内の初回実行はMSYS2 named object作成拒否で失敗
+  - 通常のMINGW64環境で再実行し、全試験成功
+- `pipeline_exec`の既存warningと異常系試験のerror表示は基準状態と同じ
+- 試験前に存在しなかった`src/core/sys/test/sched`生成物だけを削除
 
 ### 次Stepへの引継事項
 
-`pending`
+- Step 5で`docs/cortn_windows.md`と`docs/esh_pipe_core.md`を更新する
+- coroutine engineの配置を`src/core/sys/dev/windows`として説明する
+- scheduler backend固有のsource構成を現在のbuild定義へ合わせる
+- buffer cache初期化とfile/inode table初期化の責務分離を説明する
+- 完全初期化順を`binit()`、`finit()`として記録する
+- Step 4で確認した試験結果を設計文書へ必要な範囲で反映する
 
 ## 12. Step 5 現行設計文書の更新
 

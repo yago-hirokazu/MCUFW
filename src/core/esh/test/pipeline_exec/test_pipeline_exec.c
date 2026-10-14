@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "buf.h"
 #include "esh_errno.h"
 #include "exe.h"
 #include "file.h"
@@ -62,7 +63,8 @@ extern int echo(int argc, char **argv);
 
 int main(void)
 {
-	file_system_init();
+	binit();
+	finit();
 	test_stdio_pipeline();
 	check_resources();
 	test_three_stage_pipeline();

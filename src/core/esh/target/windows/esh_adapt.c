@@ -1,6 +1,7 @@
 
 /* esh_adapt.c */
 
+#include "buf.h"
 #include "esh.h"
 #include "esh_adapt.h"
 #include "file.h"
@@ -8,7 +9,8 @@
 
 void eshinit(void)
 {
-	file_system_init();
+	binit();
+	finit();
 	ttyinit();
 	prompt();
 }

@@ -246,7 +246,8 @@ static void test_blocking_transfer(void)
 	for (i = 0; i < TEST_DATA_SIZE; i++)
 		source[i] = (unsigned char)(i * 37);
 	memset(result, 0, sizeof(result));
-	file_system_init();
+	binit();
+	finit();
 	proc_init(&procs[0]);
 	proc_init(&procs[1]);
 	CHECK(connect_pipe(&procs[0], &procs[1], &write_fd, &read_fd) == 0);
@@ -286,7 +287,8 @@ static void test_wait_lock(void)
 
 	input = 0x6d;
 	output = 0;
-	file_system_init();
+	binit();
+	finit();
 	proc_init(&owner);
 	proc_init(&sleeper);
 	CHECK(connect_pipe(&owner, &sleeper, &write_fd, &read_fd) == 0);
