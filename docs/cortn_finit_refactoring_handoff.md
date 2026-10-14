@@ -37,7 +37,7 @@ Stepの範囲だけを扱い、後続Stepを先取りしない。各Step完了�
 | 4 | production codeと試験の初期化呼出し更新 | done | uncommitted |
 | 5 | 現行設計文書の更新 | done | uncommitted |
 | 6 | 旧参照と依存関係の静的確認 | done | uncommitted |
-| 7 | 全回帰試験とWindows target確認 | pending | - |
+| 7 | 全回帰試験とWindows target確認 | done | uncommitted |
 
 状態は`pending`、`active`、`done`、`blocked`を使用する。各Step開始時に
 `active`、完了時に`done`へ更新する。完了コミットを作らない運用の場合は、
@@ -885,11 +885,64 @@ sam3 -a -b string
 
 ### 結果
 
-`pending`
+- 実施日: 2026-10-15
+- 開始時HEAD: `eb1b90a Record static dependency verification`
+- MSYS2 MINGW64 shellで次の回帰試験が成功
+  - `core/esh/test/cortn`: `-O0`, `-O2`
+  - `core/sys/test/bio`: `-O0`, `-O2`
+  - `core/sys/test/bdev`: `-O0`, `-O2`
+  - `core/sys/test/file`: `-O0`, `-O2`
+  - `core/sys/test/pipe`: `-O0`, `-O2`
+  - `core/sys/test/sched`: cortn/thread x `-O0`/`-O2`
+  - `core/sys/test/header`: C/C++、通常/reverse x `-O0`/`-O2`
+  - `core/sys/test/table`: `-O0`, `-O2`
+  - `core/esh/test/pipe`: cortn/thread x `-O0`/`-O2`
+  - `core/esh/test/sched`: cortn/thread x `-O0`/`-O2`
+  - `core/esh/test/pipeline_exec`: cortn/thread x `-O0`/`-O2`
+  - `core/esh/test/par/run_test1.sh`: `test pass`
+  - `core/esh/test/par/run_test2.sh`: `test pass`
+  - `core/esh/test/exe`: `all tests passed`
+- `pipeline_exec`の既存warningと異常系試験のerror表示は基準状態と同じ
+- Windows targetは専用の新規出力先を使用して両backendをbuild
+  - `SCHED_BACKEND=cortn`: pass
+  - `SCHED_BACKEND=thread`: pass
+- 実行物targetだけを直接指定した初回buildでは出力directoryが作成されず失敗
+  - source不具合ではなくMakefile target選択による実行手順上の問題
+  - 専用出力directoryを作成して再実行し、両backendとも成功
+- 両backendの実行物で`#`promptを確認
+- 両backendでsample commandの結果を確認
+  - `sam1`: `sample1 applet`
+  - `sam2 1 10 100`: argc、argv、数値変換結果を正常表示
+  - `sam3 -a -b string`: `-a`と`-b string`を正常認識
+- EOTを入力し、両実行物が正常終了
+- Step 7で新規作成した専用build出力と試験生成物だけを削除
+- 開始時から存在した未追跡fileと生成物は削除、移動、変更していない
+- Step 0の基準状態から新しい試験失敗なし
 
 ### 最終引継事項
 
-`pending`
+- 全Step完了
+- 最終変更file一覧
+  - `docs/cortn_finit_refactoring_handoff.md`
+  - `docs/cortn_windows.md`
+  - `docs/esh_pipe_core.md`
+  - `src/core/esh/target/windows/esh_adapt.c`
+  - `src/core/esh/test/cortn/Makefile`
+  - `src/core/esh/test/pipe/Makefile`
+  - `src/core/esh/test/pipe/test_pipe.c`
+  - `src/core/esh/test/pipeline_exec/run_test.sh`
+  - `src/core/esh/test/pipeline_exec/test_pipeline_exec.c`
+  - `src/core/esh/test/sched/Makefile`
+  - `src/core/sys/dev/windows/cortn.c`
+  - `src/core/sys/dev/windows/cortn.h`
+  - `src/core/sys/h/file.h`
+  - `src/core/sys/sys/fio.c`
+  - `src/core/sys/test/file/test_file.c`
+  - `src/core/sys/test/pipe/test_pipe.c`
+  - `src/core/sys/test/sched/Makefile`
+  - `src/core/sys/test/sched/test_sched.c`
+- `cortn.c`と`cortn.h`の旧配置fileは削除済み
+- 残課題なし
 
 ## 15. 最終Definition of Done
 
