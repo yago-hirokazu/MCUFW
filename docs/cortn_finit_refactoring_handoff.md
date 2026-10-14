@@ -36,7 +36,7 @@ Stepの範囲だけを扱い、後続Stepを先取りしない。各Step完了�
 | 3 | `file_system_init()`から`binit()`を分離し`finit()`へ改名 | done | uncommitted |
 | 4 | production codeと試験の初期化呼出し更新 | done | uncommitted |
 | 5 | 現行設計文書の更新 | done | uncommitted |
-| 6 | 旧参照と依存関係の静的確認 | pending | - |
+| 6 | 旧参照と依存関係の静的確認 | done | uncommitted |
 | 7 | 全回帰試験とWindows target確認 | pending | - |
 
 状態は`pending`、`active`、`done`、`blocked`を使用する。各Step開始時に
@@ -746,11 +746,46 @@ MSYS2 MINGW64 shellで次を実行する。
 
 ### 結果
 
-`pending`
+- 実施日: 2026-10-15
+- 開始時HEAD: `c896067 Update coroutine and file initialization docs`
+- 追跡対象の現行source、header、Makefileに`file_system_init`なし
+- build定義に次の旧path参照なし
+  - `src/core/esh/cortn.c`
+  - `src/core/esh/include/cortn.h`
+  - 相対pathの`../../cortn.c`
+  - 相対pathの`../../../esh/cortn.c`
+- `src/core/sys/sys/fio.c`に`binit`と`buf.h`なし
+- `finit()`は定義1個、公開宣言1個
+  - 定義: `src/core/sys/sys/fio.c`
+  - 公開宣言: `src/core/sys/h/file.h`
+- 全32個の`finit()`呼出しで直前に`binit()`を実行
+- `cortn.h`をincludeするproduction sourceはWindows backend内だけ
+  - `cortn.c`
+  - `cortn_context.c`
+  - `sched_cortn.c`
+- coroutine単体試験の`test_cortn.c`も意図どおり`cortn.h`をinclude
+- `sched_backend.mk`を使用する全6個のbuildについて、Make展開結果を確認
+  - `SCHED_BACKEND=thread`では`SCHED_CSOURCES=sched_thread.c`
+  - `SCHED_ASOURCES`は空
+  - coroutine objectはthread構成へ混入しない
+- 追跡対象に`cortn.c`と`cortn.h`の同名fileなし
+- `sys/dev/windows`を含む`vpath`で同名sourceの曖昧な解決なし
+- 移動したsource/headerで次を確認
+  - header guardは`__CORTN_H__`を維持
+  - `typedef`なし
+  - 80文字を超えるcomment行なし
+- 修正が必要な参照漏れと依存混入なし
+- Step 6は静的確認だけのため、build/test未実施
+- sandbox内のMSYS2起動はnamed object作成拒否で失敗
+  - 通常のMINGW64環境でMake展開を再実行し、確認成功
 
 ### 次Stepへの引継事項
 
-`pending`
+- Step 7の全回帰試験とWindows target確認へ進める
+- 全試験はMSYS2 MINGW64 shell内でclean buildする
+- backend選択を持つsuiteはcoroutine/thread、`-O0`/`-O2`を確認する
+- Windows targetは両backendをbuildし、各sample commandを実行する
+- 既存の未追跡生成物を削除、移動、commitしない
 
 ## 14. Step 7 全回帰試験とWindows target確認
 
