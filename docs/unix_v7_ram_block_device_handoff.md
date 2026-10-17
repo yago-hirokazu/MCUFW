@@ -4,8 +4,8 @@
 
 対象: `C:\usr\src\MCUFW`
 
-確認時HEAD: `d7ec485`
-状態: Step 5完了。確定仕様はSection 11、実施記録はSection 12以降を参照
+確認時HEAD: `0acf602`（Step 6開始時）
+状態: Step 0〜6完了。確定仕様はSection 11、実施記録はSection 12以降を参照
 
 ## 1. 目的と到達点
 
@@ -55,7 +55,7 @@ commitは依頼の範囲に従い、未commitなら記録欄にその旨を書�
 | 3 | breadとbwriteの実装 | done | 開始HEAD 0054ec9、本書を含むStep 3 commitに記録 |
 | 4 | 資源と排他とpipe共存 | done | 開始HEAD 6fc0b54、本書を含むStep 4 commitに記録 |
 | 5 | 遅延書込みと書戻し | done | 開始HEAD 4de9278、本書を含むStep 5 commitに記録 |
-| 6 | Windows統合と全回帰 | pending | |
+| 6 | Windows統合と全回帰 | done | 開始HEAD 0acf602、本書を含むStep 6 commitに記録 |
 
 状態は`pending`、`active`、`done`、`blocked`を使用する。
 失敗試験や未解決事項がある状態を`done`としない。
@@ -68,7 +68,7 @@ commitは依頼の範囲に従い、未commitなら記録欄にその旨を書�
 | `src/core/sys/h/conf.h` | bdevsw、bdev_queue、dev検査、要求検査、提出、queue API |
 | `src/core/sys/conf/conf.c` | 固定table、pipeとRAMのsentinel、登録済みRAM entry |
 | `src/core/sys/dev/ramdisk.c` | 固定RAM領域、raminit、ramstrategy、同期コピーと完了 |
-| `src/core/sys/dev/bio.c` | cache取得・解放、bread/bwrite、geterror、iodone |
+| `src/core/sys/dev/bio.c` | cache取得・解放、bread/bwrite、遅延書込み、flush、iodone |
 | `src/core/sys/dev/bdev.c` | enqueue、start、complete、error/retry |
 | `src/core/sys/sys/alloc.c` | pipe inodeごとにgetblkで取得しbufferを保持 |
 | `src/core/sys/h/sched.h` | kernel lock、wait channel、sleep/wakeup API |
@@ -77,7 +77,8 @@ commitは依頼の範囲に従い、未commitなら記録欄にその旨を書�
 `bread()`、`bwrite()`とRAM driverは実装済み。実際の非同期I/O待機は未実装。
 buffer I/O APIはBDEV_SYNC driverだけへ提出し、未対応driverはENOSYSで拒否する。
 `iodone()`は`B_DONE`を設定するが、同期要求の待機者を起床させない。
-`getblk()`と`geteblk()`は再利用候補が`B_DELWRI`なら`NULL`を返し、書戻さない。
+`getblk()`と`geteblk()`はdirty候補を書戻してから再利用する。
+書戻し失敗時は内容と関連付けを保持してNULLを返し、bflushでerrorを取得できる。
 `getblk()`はbusy hitや空きなしでも待機せず`NULL`を返す。
 
 既存pipeは寿命の間bufferを`B_BUSY`で保持する。既定構成は3本のpipeが3個を使い、
@@ -466,7 +467,7 @@ RAM容量外はEOFではなくI/O errorとし、短縮転送は行わない。
 初回起動はswitchが静的に構成された状態でraminit、binit、finitの順とする。
 raminitはRAM保存領域だけをzero clearし、cacheとfile tableを操作しない。
 binitだけを再実行した場合はRAM内容を維持する。
-現行Windowsのeshinitはbinit/finitを呼ぶため、Step 6でraminitをその前へ接続する。
+WindowsのeshinitはStep 6でraminit/binit/finitの順へ接続した。
 
 raminitは起動・試験のquiescent初期化専用とする。実行中reset APIは追加しない。
 再初期化は全process停止、全file/inode解放、queue空、busy bufferなし、
@@ -1198,3 +1199,164 @@ Windows build・対話コマンド、parser/executorを含む全体回帰を行�
 dirty導入後もbinitはflushを行わないため、再初期化前にbflush(NODEV)==0かつ
 全利用者停止を保証する。RAMの揮発性、busy時EAGAIN、BDEV_SYNC限定は維持する。
 本Stepは非同期driverの待機・error通知基盤やSTM32実機移植を先取りしない。
+
+## 18. Step 6 実施記録
+
+開始HEAD: `0acf602`
+
+作業状態: Windows統合、対話試験、全体回帰試験完了。本書を含むStep 6 commitに記録
+
+### 起動接続とbuild
+
+Windowsのeshinitをraminit、binit、finit、ttyinit、promptの順にした。
+他の利用者が起動する前に保存領域、cache、file/inode tableを初期化する。
+同梱V7 `usr/sys/sys/main.c` のmainがbinitをiinit/root取得より先に呼ぶ構成を
+参考とし、RAM保存領域の初期化はMCUFW固有の前処理として追加した。
+
+eshinitはcold start専用である。実行中の再初期化やRAM reset commandは追加しない。
+quiescent状態で再呼出しする場合も、全file/inode解放、queue空、busy bufferなし、
+未保存dirtyなしを事前に保証する。binit単独ではRAM内容を消さない。
+
+Windows MakefileはStep 2からbdev.c/ramdisk.cをlink済みであり、追加のsource登録は
+不要だった。MINGW64ではDLLコピー元をshellで使えるforward slashにした。
+OPTの既定値は-O0のまま、OPT=-O2で最適化構成も選べるようにした。
+backendまたはOPT切替前にはmake cleanする。同じOUTDIRのobjectを流用しない。
+cleanは選択TARGETとOUTDIRだけを削除し、無関係なexeと既存runtime DLLは残す。
+
+```sh
+cd /c/usr/src/MCUFW/src/target/windows
+make clean
+make -j4 SCHED_BACKEND=cortn OPT=-O0
+./main.exe
+# sam1 / sam2 1 10 100 / sam3 -a -b string / echo hello | cat
+# Ctrl-Dで終了
+make clean
+make -j4 SCHED_BACKEND=thread OPT=-O2
+./main.exe
+make clean
+```
+
+GCCはMSYS2 MINGW64 shell経由だけで実行する。PowerShell直起動は行わない。
+
+### 起動関数を含む結合試験
+
+esh/pipeline_execのMakefileに実際のWindows esh_adapt.cを追加した。
+test_startup_ramは実際のeshinitを呼び、両minorの最終blockへ異なるpatternを
+bdwriteし、flushする。binit単独の後は全byteが保持されることを確認する。
+全利用者の停止・全資源解放後にeshinitを再度呼び、両minorの全blockがzeroに
+戻ることと、cacheに残った古いpatternを返さないことを確認する。
+以降は従来のpipeline/parser/executor結合試験をそのまま実行する。
+
+### API使用例
+
+minor 0のblock内1 byteを更新し、同じdevのdirtyを保存完了までflushする例。
+coreの呼出し側がkernel lockを取得し、payloadへのアクセスと解放まで保持する。
+部分更新ではgetblkでなくbreadを使い、残りのbyteを維持する。
+
+```c
+#include "buf.h"
+#include "ramdisk.h"
+#include "sched.h"
+#include "sys_error.h"
+
+int ram_update_byte(unsigned long block, size_t offset, unsigned char value)
+{
+	struct buf *bp;
+	unsigned int dev = makedev(RAM_MAJOR, 0);
+	int error;
+
+	if (offset >= BSIZE)
+		return -SYS_EINVAL;
+	kernel_lock();
+	bp = bread(dev, block, &error);
+	if (!bp)
+		goto out;
+	bp->b_addr[offset] = value;
+	error = bdwrite(bp);
+	if (error)
+		brelse(bp);
+	else
+		error = bflush(dev);
+out:
+	kernel_unlock();
+	return error;
+}
+```
+
+bdwriteの成功後はbuffer所有権を失うので、元のbpを参照・解放しない。
+同じlock区間で即時に1blockを書きたい場合は、bdwrite/bflushの代わりに
+`error = bwrite(bp)`を呼ぶ。書込みAPIの完了後に追加のbrelseを行わない。
+flush失敗時は保持されたdirtyを再取得して確認し、bflushで保存を再試行する。
+失敗を解消するためのbinit/raminitは未保存内容を捨てるので使用しない。
+
+### メモリと資源上限
+
+MINGW64でsys/schedの実測値を再確認した。Step 4/5から固定領域の追加はない。
+
+| 対象 | byte |
+|---|---:|
+| RAM保存領域: 2 unit * 16 block * 256 | 8192 |
+| cache payload: NBUF=5 * BSIZE=256 | 1280 |
+| cache header: 5 * sizeof(struct buf)=88 | 440 |
+| 空き/pipe/RAM list sentinel: 3 * 88 | 264 |
+| RAM I/O queue | 32 |
+| bdevsw: 2 entry | 64 |
+| nblkdev | 4 |
+| sizeofによる合計 | 10276 |
+
+linker padding、file/inode、scheduler、stack、CRTなどは上記合計に含まない。
+Windows main.exeのGNU sizeによる-O2計測は以下。host PEのsection値であり、
+STM32のlinker配置・stack使用量や必要RAMを保証する値ではない。
+
+| backend | text | data | bss | 合計 |
+|---|---:|---:|---:|---:|
+| cortn | 127040 | 960 | 288672 | 416672 |
+| thread | 126648 | 976 | 24448 | 152072 |
+
+NINODE=3、NFILE=12、NOFILE=12、PIPELINE_MAX=4を維持する。
+最大3本のpipeが3bufferを保持し、既定NBUF=5では残り2bufferをRAM I/Oと共用する。
+専用予約poolはない。NBUF=3もbuild可能だが、最大pipe保持中のRAM I/OはEAGAIN。
+
+### 試験結果
+
+着手前にsys/bioのO0/O2 baselineを再実行し、成功とmake cleanを確認した。
+最終版の全体回帰は以下。全てMSYS2 MINGW64で実行した。
+
+| suite | 構成 | 結果 |
+|---|---|---|
+| sys/header | C/C++、include順序と単独include、O0/O2 | pass |
+| sys/table、bio、bdev、ramdisk、file、pipe | 各O0/O2 | pass |
+| sys/sched | NBUF=5/3、cortn/thread、O0/O2の8構成 | pass |
+| esh/pipe、sched、pipeline_exec | 各cortn/thread、O0/O2 | pass |
+| esh/cortn、pipeline | 各O0/O2 | pass |
+| esh/exe | 既定build、test1〜10とgolden比較 | pass |
+| esh/par | run_test1.sh、run_test2.shとgolden比較 | pass |
+| Windows main | cortn/thread、O0/O2の4構成 | pass |
+
+Windows mainは4構成とも端末で起動し、# promptを確認してsam1、sam2 1 10 100、
+sam3 -a -b string、echo hello | catを実行した。期待する引数・option表示とhelloの
+pipe転送を確認し、Ctrl-Dでexit 0終了した。各構成の終了後にmake cleanした。
+試験logはMSYS2 `/tmp/mcufw_step6_*.log`に記録した。
+
+legacy suiteではMAKEFLAGSでOUTDIR=_output_step6を指定し、既存_outputを保護した。
+parに既存のtest_par.exeがあったため退避し、試験後のclean完了後に復元した。
+復元前後のSHA256一致を確認した。
+既存Windows DLLのSHA256は試験前後で一致した。
+
+全15 suiteとWindows本体4構成が成功した。各make clean成功後に今回の生成対象
+76 path（OUTDIR/TARGET）を確認し、残存0を確認してから既存par実行ファイルを
+復元した。既存_outputは変更していない。git diff --checkと、変更Cのtab幅8での
+80 column検査も成功した。.gitignoreとAGENTS.mdの既存変更は本Stepに含めない。
+
+変更対象はWindows esh_adapt.c、Windows Makefile、esh/pipeline_execのMakefileと
+test_pipeline_exec.c、および本書の5 file。Step 0〜6の完了条件を満たした。
+
+### 完成範囲と制約
+
+devのmajor/minorでRAM blockを指定でき、同期read/write、cache、遅延書込み、
+flushと失敗時のdirty保持を利用できる。Windows shell起動へ初期化を接続した。
+RAMは揮発性であり、cold startで内容が消える。物理ストレージは使用しない。
+BDEV_SYNC driverだけを公開buffer I/O APIの対象とし、真の非同期I/O待機、
+background flush、busy buffer待機は未実装。詳細契約はSection 11と17を参照する。
+V7ディスクイメージ互換、完全なfilesystem、MMU/trap syscallは実装しない。
+STM32実機、Keil、他toolchainの検証は今回の完了条件に含めず、後続作業とする。

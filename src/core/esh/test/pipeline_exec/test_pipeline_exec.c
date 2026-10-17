@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "buf.h"
+#include "esh.h"
 #include "esh_errno.h"
 #include "exe.h"
 #include "file.h"
@@ -13,6 +14,7 @@
 #include "param.h"
 #include "par.h"
 #include "pipe.h"
+#include "ramdisk.h"
 #include "sched.h"
 #include "script.h"
 #include "stdio_adapt.h"
@@ -35,6 +37,7 @@ static size_t source_count = TEST_DATA_SIZE;
 
 static size_t busy_buffer_count(void);
 static void check_resources(void);
+static void test_startup_ram(void);
 static int producer_main(int argc, char **argv);
 static int filter_main(int argc, char **argv);
 static int consumer_main(int argc, char **argv);
@@ -63,8 +66,8 @@ extern int echo(int argc, char **argv);
 
 int main(void)
 {
-	binit();
-	finit();
+	test_startup_ram();
+	check_resources();
 	test_stdio_pipeline();
 	check_resources();
 	test_three_stage_pipeline();
@@ -109,6 +112,51 @@ static void check_resources(void)
 	CHECK(file_in_use() == 0);
 	CHECK(pipe_in_use() == 0);
 	CHECK(busy_buffer_count() == 0);
+}
+
+static void test_startup_ram(void)
+{
+	struct buf *bp;
+	unsigned int unit;
+	unsigned long block;
+	size_t i;
+	int error;
+
+	eshinit();
+	kernel_lock();
+	for (unit = 0; unit < RAM_NDEV; unit++) {
+		bp = getblk(makedev(RAM_MAJOR, unit), RAM_NBLK - 1);
+		CHECK(bp != NULL);
+		memset(bp->b_addr, 0x51 + unit, BSIZE);
+		CHECK(bdwrite(bp) == 0);
+	}
+	CHECK(bflush(NODEV) == 0);
+	kernel_unlock();
+	/* Quiescent cache reset preserves stored RAM contents */
+	binit();
+	kernel_lock();
+	for (unit = 0; unit < RAM_NDEV; unit++) {
+		bp = bread(makedev(RAM_MAJOR, unit), RAM_NBLK - 1, &error);
+		CHECK(bp != NULL && error == 0);
+		for (i = 0; i < BSIZE; i++)
+			CHECK(bp->b_addr[i] == 0x51 + unit);
+		brelse(bp);
+	}
+	kernel_unlock();
+	/* Cold start resets storage and invalidates old cached contents */
+	eshinit();
+	kernel_lock();
+	for (unit = 0; unit < RAM_NDEV; unit++) {
+		for (block = 0; block < RAM_NBLK; block++) {
+			bp = bread(makedev(RAM_MAJOR, unit), block, &error);
+			CHECK(bp != NULL && error == 0);
+			for (i = 0; i < BSIZE; i++)
+				CHECK(bp->b_addr[i] == 0);
+			brelse(bp);
+		}
+	}
+	CHECK(bflush(NODEV) == 0);
+	kernel_unlock();
 }
 
 static int producer_main(int argc, char **argv)

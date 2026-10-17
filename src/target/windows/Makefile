@@ -99,7 +99,8 @@ DEPS = $(OBJS:%.o=%.d)
 
 # CFLAGS
 CFLAGS = -mno-ms-bitfields
-CFLAGS += -g -O0
+OPT ?= -O0
+CFLAGS += -g $(OPT)
 
 INCLUDES := -I./Inc
 INCLUDES += -I./Adapt
@@ -129,6 +130,10 @@ CYGWIN_DLL_SPI = ./Drivers/adafruit_ft232h/lib/windows/i386/libMPSSE.dll
 CYGWIN_DLL_I2C = ./Drivers/adafruit_ft232h/lib/windows/i386/libMPSSE_i2c.dll
 DLL_SPI = $(subst /,\,$(CYGWIN_DLL_SPI))
 DLL_I2C = $(subst /,\,$(CYGWIN_DLL_I2C))
+ifeq ($(MSYSTEM),MINGW64)
+DLL_SPI = $(CYGWIN_DLL_SPI)
+DLL_I2C = $(CYGWIN_DLL_I2C)
+endif
 
 all: $(OUTDIR) $(TARGET)
 	$(COPY) $(DLL_SPI) .
@@ -156,8 +161,7 @@ $(OBJS): Makefile ../../core/sys/dev/windows/sched_backend.mk
 
 .PHONY: clean
 clean:
-	$(DEL) *.exe
-	$(DEL) *.dll
+	$(DEL) $(TARGET)
 	$(RMDIR) $(OUTDIR)
 
 CPPFLAGS=$(CFLAGS)
