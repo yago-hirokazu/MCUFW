@@ -76,6 +76,7 @@ int bwrite(struct buf *bp);
 /* Reject invalid ownership or unsupported device without consuming buffer */
 int bdwrite(struct buf *bp);
 /* Synchronous completion; retain dirty data and association on I/O failure */
+/* Unsupported device consumes buffer but never creates new dirty state */
 int bawrite(struct buf *bp);
 /* NODEV selects all; zero guarantees no matching dirty buffers remain */
 /* Busy dirty buffers yield EAGAIN; I/O errors take priority and are retained */

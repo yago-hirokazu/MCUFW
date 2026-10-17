@@ -53,6 +53,10 @@ static void check_write_rejected(struct buf *bp, int error);
 static void test_delayed_write(void);
 static void test_writeback_failure(void);
 static void test_dirty_reuse(void);
+static void test_unwritable_device(void);
+static void test_dirty_registration_failure(void);
+static void test_writeback_rejection(void);
+static void check_payload(struct buf *bp, unsigned char value);
 
 int main(void)
 {
@@ -74,6 +78,9 @@ int main(void)
 	test_delayed_write();
 	test_writeback_failure();
 	test_dirty_reuse();
+	test_unwritable_device();
+	test_dirty_registration_failure();
+	test_writeback_rejection();
 	if (failures) {
 		printf("%d tests failed\n", failures);
 		return 1;
@@ -811,4 +818,175 @@ static void test_dirty_reuse(void)
 	CHECK(bawrite(bp) == 0);
 	CHECK(!(bp->b_flags & (B_BUSY | B_ASYNC | B_DELWRI)));
 	end_io_test();
+}
+
+static void check_payload(struct buf *bp, unsigned char value)
+{
+	size_t i;
+
+	for (i = 0; i < BSIZE; i++)
+		CHECK(bp->b_addr[i] == value);
+}
+
+static void test_unwritable_device(void)
+{
+	struct bdevsw registered;
+	struct buf *held[NBUF];
+	struct buf *bp;
+	unsigned int dev = makedev(RAM_MAJOR, 0);
+	int error;
+	int kind;
+	int i;
+
+	for (kind = 0; kind < 4; kind++) {
+		begin_io_test();
+		registered = bdevsw[RAM_MAJOR];
+		if (kind == 2)
+			bdevsw[RAM_MAJOR].d_strategy = NULL;
+		if (kind == 3)
+			bdevsw[RAM_MAJOR].d_flags = 0;
+		for (i = 0; i < NBUF * 2; i++) {
+			if (kind == 0)
+				bp = geteblk();
+			else
+				bp = getblk(kind == 1 ? PIPEDEV : dev,
+					    (unsigned long)i);
+			CHECK(bp != NULL);
+			if (!bp)
+				break;
+			memset(bp->b_addr, 0x61, BSIZE);
+			error = kind == 3 ? -SYS_ENOSYS : -SYS_ENODEV;
+			CHECK(bawrite(bp) == error);
+			CHECK(count_av_list() == NBUF);
+		}
+		CHECK(io_reads == 0 && io_writes == 0);
+		for (i = 0; i < NBUF; i++)
+			CHECK(!(buf[i].b_flags & (B_BUSY | B_DELWRI)));
+		bdevsw[RAM_MAJOR] = registered;
+		CHECK(bflush(NODEV) == 0);
+		for (i = 0; i < NBUF; i++) {
+			held[i] = getblk(PIPEDEV, (unsigned long)i);
+			CHECK(held[i] != NULL);
+		}
+		for (i = 0; i < NBUF; i++)
+			brelse(held[i]);
+		bp = bread(dev, 0, &error);
+		CHECK(bp != NULL && error == 0);
+		if (bp) {
+			check_payload(bp, 0);
+			brelse(bp);
+		}
+		end_io_test();
+	}
+}
+
+static void test_dirty_registration_failure(void)
+{
+	struct bdevsw registered;
+	struct buf *bp;
+	unsigned int dev = makedev(RAM_MAJOR, 0);
+	int error;
+	int kind;
+
+	for (kind = 0; kind < 2; kind++) {
+		begin_io_test();
+		registered = bdevsw[RAM_MAJOR];
+		bp = getblk(dev, 0);
+		CHECK(bp != NULL);
+		memset(bp->b_addr, 0x83, BSIZE);
+		CHECK(bdwrite(bp) == 0);
+		bp = getblk(dev, 0);
+		CHECK(bp != NULL);
+		if (kind == 0)
+			bdevsw[RAM_MAJOR].d_strategy = NULL;
+		else
+			bdevsw[RAM_MAJOR].d_flags = 0;
+		error = kind == 0 ? -SYS_ENODEV : -SYS_ENOSYS;
+		CHECK(bawrite(bp) == error);
+		CHECK(incore(dev, 0));
+		CHECK(count_av_list() == NBUF);
+		bdevsw[RAM_MAJOR] = registered;
+		bp = getblk(dev, 0);
+		CHECK(bp != NULL);
+		if (bp) {
+			CHECK(bp->b_flags & B_DELWRI);
+			CHECK(bp->b_flags & B_ERROR);
+			CHECK(bp->b_error == -error);
+			check_payload(bp, 0x83);
+			brelse(bp);
+		}
+		CHECK(bflush(dev) == 0);
+		binit();
+		bp = bread(dev, 0, &error);
+		CHECK(bp != NULL && error == 0);
+		if (bp) {
+			check_payload(bp, 0x83);
+			brelse(bp);
+		}
+		end_io_test();
+	}
+}
+
+static void test_writeback_rejection(void)
+{
+	struct bdev_queue other;
+	struct bdev_queue *queue;
+	struct buf dummy;
+	struct buf *bp;
+	unsigned int dev = makedev(RAM_MAJOR, 0);
+	int error;
+	int operation;
+	int device;
+
+	for (device = 0; device < 2; device++) {
+		for (operation = 0; operation < 4; operation++) {
+			begin_io_test();
+			bp = getblk(dev, 0);
+			CHECK(bp != NULL);
+			memset(bp->b_addr, 0xa7, BSIZE);
+			bp->b_flags |= B_AGE;
+			CHECK(bdwrite(bp) == 0);
+			CHECK(bfreelist.av_forw == bp);
+			bdev_queue_init(&other);
+			queue = device == 0 ? &ramqueue : &other;
+			if (device == 1)
+				bdevsw[0].d_queue = queue;
+			memset(&dummy, 0, sizeof(dummy));
+			dummy.b_flags = B_BUSY;
+			queue->dq_tail = &dummy;
+			if (operation == 0 || operation == 1) {
+				CHECK(bflush(operation ? NODEV : dev) ==
+				      -SYS_EINVAL);
+			} else if (operation == 2) {
+				CHECK(geteblk() == NULL);
+			} else {
+				CHECK(getblk(PIPEDEV, 90) == NULL);
+			}
+			CHECK(count_av_list() == NBUF);
+			CHECK(io_writes == 0);
+			check_invariants();
+			bdev_queue_init(queue);
+			bdevsw[0].d_queue = NULL;
+			bp = getblk(dev, 0);
+			CHECK(bp != NULL);
+			if (bp) {
+				CHECK(bp->b_flags & B_DELWRI);
+				CHECK(bp->b_flags & B_DONE);
+				check_payload(bp, 0xa7);
+				brelse(bp);
+			}
+			error = bflush(dev);
+			CHECK(error == 0);
+			if (!error) {
+				binit();
+				bp = bread(dev, 0, &error);
+				CHECK(bp != NULL && error == 0);
+				if (bp) {
+					check_payload(bp, 0xa7);
+					brelse(bp);
+				}
+			}
+			end_io_test();
+		}
+	}
 }

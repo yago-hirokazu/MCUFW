@@ -13,7 +13,9 @@ static struct buf *getdev(unsigned int dev);
 static int sync_device(unsigned int dev);
 static int sync_io(struct buf *bp);
 static struct buf *available_buffer(void);
+static int write_buffer_check(struct buf *bp);
 static int write_buffer(struct buf *bp, int retain);
+static int writeback(struct buf *bp);
 static int geterror(struct buf *bp);
 static void prepare_read(struct buf *bp);
 static void prepare_write(struct buf *bp);
@@ -127,17 +129,20 @@ struct buf *bread(unsigned int dev, unsigned long blkno, int *error)
 
 int bwrite(struct buf *bp)
 {
-	return write_buffer(bp, bp && (bp->b_flags & B_DELWRI));
+	int result;
+
+	result = write_buffer_check(bp);
+	if (result)
+		return result;
+	return write_buffer(bp, bp->b_flags & B_DELWRI);
 }
 
 int bdwrite(struct buf *bp)
 {
 	int result;
 
-	if (!bp || (bp->b_flags & B_ASYNC))
-		return -SYS_EINVAL;
-	result = bdev_buffer_check(bp);
-	if (result < 0)
+	result = write_buffer_check(bp);
+	if (result)
 		return result;
 	result = sync_device(bp->b_dev);
 	if (result)
@@ -152,6 +157,11 @@ int bdwrite(struct buf *bp)
 
 int bawrite(struct buf *bp)
 {
+	int result;
+
+	result = write_buffer_check(bp);
+	if (result)
+		return result;
 	/* Synchronous drivers complete before release and error return */
 	return write_buffer(bp, 1);
 }
@@ -179,8 +189,7 @@ int bflush(unsigned int dev)
 				result = -SYS_EAGAIN;
 			continue;
 		}
-		notavail(bp);
-		error = bawrite(bp);
+		error = writeback(bp);
 		if (error && (!result || result == -SYS_EAGAIN))
 			result = error;
 	}
@@ -239,17 +248,22 @@ void iodone(struct buf *bp)
 		bp->b_flags &= ~B_WANTED;
 }
 
+static int write_buffer_check(struct buf *bp)
+{
+	if (!bp || (bp->b_flags & B_ASYNC))
+		return -SYS_EINVAL;
+	return bdev_buffer_check(bp);
+}
+
+/* Consume prevalidated owned buffer on every return path */
 static int write_buffer(struct buf *bp, int retain)
 {
 	int result;
 
-	if (!bp || (bp->b_flags & B_ASYNC))
-		return -SYS_EINVAL;
-	result = bdev_buffer_check(bp);
-	if (result < 0)
-		return result;
-	prepare_write(bp);
 	result = sync_device(bp->b_dev);
+	if (result)
+		retain = bp->b_flags & B_DELWRI;
+	prepare_write(bp);
 	if (!result)
 		result = sync_io(bp);
 	if (result) {
@@ -259,6 +273,20 @@ static int write_buffer(struct buf *bp, int retain)
 	}
 	brelse(bp);
 	return result;
+}
+
+/* Acquire available dirty buffer and release even on validation failure */
+static int writeback(struct buf *bp)
+{
+	int result;
+
+	notavail(bp);
+	result = write_buffer_check(bp);
+	if (result) {
+		brelse(bp);
+		return result;
+	}
+	return write_buffer(bp, 1);
 }
 
 static struct buf *getdev(unsigned int dev)
@@ -279,10 +307,11 @@ static struct buf *available_buffer(void)
 		bp = bfreelist.av_forw;
 		if (bp == &bfreelist)
 			return NULL;
-		notavail(bp);
-		if (!(bp->b_flags & B_DELWRI))
+		if (!(bp->b_flags & B_DELWRI)) {
+			notavail(bp);
 			return bp;
-		if (bawrite(bp))
+		}
+		if (writeback(bp))
 			return NULL;
 	}
 	return NULL;

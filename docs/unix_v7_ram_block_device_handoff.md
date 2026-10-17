@@ -4,8 +4,8 @@
 
 対象: `C:\usr\src\MCUFW`
 
-確認時HEAD: `0acf602`（Step 6開始時）
-状態: Step 0〜6完了。確定仕様はSection 11、実施記録はSection 12以降を参照
+確認時HEAD: `28a835b`（レビュー指摘修正の開始時）
+状態: Step 0〜6とレビュー指摘2件の修正完了。修正記録はSection 19を参照
 
 ## 1. 目的と到達点
 
@@ -1135,8 +1135,10 @@ bdwriteはNULL、非busy、B_ASYNC、queue所属、壊れたqueue、および未
 状態変更なしで拒否する。dev検査は既存の共通登録・同期能力検査であり、minorと
 block容量の検証はdriver提出時に行う。bdwrite後にbufferを参照・再解放しない。
 bawriteも所有権違反は状態変更なしで拒否する。有効な所有bufferでのI/O失敗は
-bufferを解放しつつdirtyとして保持する。初回bwriteの非dirty I/O失敗は従来どおり
-無効化する。再初期化で未保存dirtyを捨てる使い方は禁止する。
+bufferを解放しつつdirtyとして保持する。ただし提出前のdev共通検査で失敗した
+非dirty bufferは、新たにdirtyへ遷移させず無効化して解放する。既存dirtyの場合は
+登録や同期能力の問題でも内容と関連付けを保持する。初回bwriteの非dirty I/O失敗は
+従来どおり無効化する。再初期化で未保存dirtyを捨てる使い方は禁止する。
 
 書戻し失敗はB_DELWRI/B_DONE/B_ERROR、正のb_errorと未転送b_residを残す。
 getblkで同じblockを再取得でき、breadはこのdirty cache内容を返す。その際の
@@ -1144,6 +1146,8 @@ error出力は0であり、過去の保存失敗はb_error/B_ERRORで確認す�
 未保存内容を上書きしない。bwrite、bawrite、bflushで再試行できる。
 
 flushはbuffer配列をNBUF回だけ走査し、空いている対象dirtyを各1回書戻す。
+flushとcache追出しは内部writeback helperで取得と解放を対応させる。queue不整合等の
+事前検査失敗時も、内部で取得したbufferはdirtyのまま空きリストへ戻す。
 対象busy dirtyは保持して-SYS_EAGAINを返す。他のbufferの処理は続け、
 保存errorをbusy由来のEAGAINより優先する。複数errorは先に観測した非EAGAINを
 返す。個別の失敗情報は各dirty bufferにも残る。全てbusyなら待機せず戻る。
@@ -1360,3 +1364,65 @@ BDEV_SYNC driverだけを公開buffer I/O APIの対象とし、真の非同期I/
 background flush、busy buffer待機は未実装。詳細契約はSection 11と17を参照する。
 V7ディスクイメージ互換、完全なfilesystem、MMU/trap syscallは実装しない。
 STM32実機、Keil、他toolchainの検証は今回の完了条件に含めず、後続作業とする。
+
+## 19. コードレビュー指摘の修正
+
+開始HEAD: `28a835b`
+
+作業状態: 2件の修正、再発防止試験、関連回帰試験完了。本書を含む修正commitに記録
+
+### 書込み対象外devによるcache枯渇
+
+修正前は、geteblkで取得したNODEV bufferをbawriteすると、提出前のENODEVでも
+新しいB_DELWRIを付けて解放していた。NBUF個をこの状態にするとflushできない
+dirtyだけが残り、正常なRAM I/Oやpipe用のcache取得もできなくなっていた。
+
+write_bufferはdev共通検査をprepare_writeより先に行い、検査に失敗したときは
+元々dirtyだったbufferだけを保持対象とする。未dirtyのNODEV、PIPEDEV、strategyが
+未登録またはBDEV_SYNCでないdeviceへの要求は、errorを返しつつ無効化・解放する。
+bawriteの所有権違反時の状態不変、およびbdwriteのdev拒否時の所有権維持は変えない。
+登録を戻せば再試行できる既存dirtyや、提出可能なdeviceでのI/O失敗は引き続き保持する。
+
+### 内部書戻しの事前検査失敗によるbusy残留
+
+修正前はbflushとavailable_bufferがnotavailした後、queue不整合を検出して
+bawriteが状態変更なしで戻ると、B_BUSYのbufferが取得者不在のまま残っていた。
+queueを修復しても同じblockを取得できず、flushもEAGAINになっていた。
+
+公開APIの事前検査をwrite_buffer_checkへ分け、write_bufferは検査済みの所有bufferを
+必ず消費する処理とした。内部writebackは空きbufferを取得し、事前検査で失敗した
+場合にもbrelseする。bflushとgetblk/geteblkのdirty追出しはこのhelperへ統一した。
+検査失敗だけではpayload、dev/block、dirty/DONE、保存error情報を変更しない。
+再度取得できたbufferは、queue修復後に通常のflushで保存できる。
+
+### 再発防止試験
+
+sys/bioへ以下を追加した。修正前は追加試験が失敗し、修正後はO0/O2で成功した。
+
+- NODEV、PIPEDEV、strategyなし、同期能力なしへのbawriteを各NBUF*2回試行
+- 各失敗後に新規dirtyがなく、全NBUF個と正常RAM readを利用できること
+- 登録不備によるbawrite失敗でも、既存dirtyの全byteとdev/blockが維持されること
+- 登録復元後のflushとcache再初期化後のreadで、保存済みpatternを確認
+- RAM queueと別majorの登録queueの不整合を、それぞれ注入
+- dev指定flush、全dev flush、geteblk、getblkによる追出しの4経路で拒否を確認
+- 拒否後の空きlist、busy数、device list、payloadとdriver未提出を確認
+- queue修復後の同じblockの再取得、flushと全byteの保存内容を確認
+
+変更対象はdev/bio.c、h/buf.h、test/bio/test_bio.cと本書。
+
+### 検証結果
+
+| suite | 構成 | 結果 |
+|---|---|---|
+| sys/bio | 新規14 caseを含む全試験、O0/O2 | pass |
+| sys/header | C/C++、include順序と単独include、O0/O2 | pass |
+| sys/bdev、ramdisk、file、pipe | 各O0/O2 | pass |
+| sys/sched | NBUF=5/3、cortn/thread、O0/O2の8構成 | pass |
+| esh/pipeline_exec | 実際の起動関数を含むcortn/thread、O0/O2の4構成 | pass |
+
+関連8 suiteで成功した。今回の変更箇所に対する回帰範囲とし、Step 6で実施済みの
+Windows本体の対話試験、legacy parser/executor等の全体回帰は繰り返していない。
+各make clean後に生成対象46 pathの残存0を確認した。git diff --checkと変更C/headerの
+tab幅8・80 column検査も成功した。.gitignoreとAGENTS.mdの既存変更は含めない。
+修正前の失敗はMSYS2 `/tmp/mcufw_ram_fix_before.log`、修正後の試験は
+`/tmp/mcufw_ram_fix_after_*.log`に記録した。
