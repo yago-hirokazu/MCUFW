@@ -19,15 +19,23 @@ int bdev_strategy(struct buf *bp)
 int bdev_request_check(struct buf *bp)
 {
 	struct bdevsw *dp;
-	int found;
-	int result;
-	int i;
 
 	if (!bp || !(bp->b_flags & B_BUSY))
 		return -SYS_EINVAL;
 	dp = bdev_get(bp->b_dev);
 	if (!dp || !dp->d_strategy)
 		return -SYS_ENODEV;
+	return bdev_buffer_check(bp);
+}
+
+int bdev_buffer_check(struct buf *bp)
+{
+	int found;
+	int result;
+	int i;
+
+	if (!bp || !(bp->b_flags & B_BUSY))
+		return -SYS_EINVAL;
 	found = 0;
 	for (i = 0; i < nblkdev; i++) {
 		if (!bdevsw[i].d_queue)

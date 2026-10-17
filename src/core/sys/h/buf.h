@@ -65,6 +65,12 @@ extern struct buf bfreelist;
 void binit(void);
 struct buf *getblk(unsigned int dev, unsigned long blkno);
 struct buf *geteblk(void);
+/* Caller holds kernel lock; only BDEV_SYNC drivers supported */
+/* Return owned buffer on success; set required error output on failure */
+struct buf *bread(unsigned int dev, unsigned long blkno, int *error);
+/* Consume owned synchronous buffer even on I/O error */
+/* Reject ownership violations without modifying buffer */
+int bwrite(struct buf *bp);
 void brelse(struct buf *bp);
 int incore(unsigned int dev, unsigned long blkno);
 void clrbuf(struct buf *bp);

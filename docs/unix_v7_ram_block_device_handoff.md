@@ -5,7 +5,7 @@
 対象: `C:\usr\src\MCUFW`
 
 確認時HEAD: `d7ec485`
-状態: Step 2完了。確定仕様はSection 11、実施記録はSection 12以降を参照
+状態: Step 3完了。確定仕様はSection 11、実施記録はSection 12以降を参照
 
 ## 1. 目的と到達点
 
@@ -16,7 +16,7 @@ MCUFWでUNIX V7方式のブロックデバイスI/Oを利用可能にする。
 V7の名前、責務分割、要求と完了の流れを採用する。PDP-11用ディスクドライバや
 V7 kernel全体の移植、V7ディスクイメージとの互換性は今回の目標に含めない。
 
-最初の到達点はStep 3の完了、すなわち`bread(dev, blkno)`と`bwrite(bp)`による
+最初の到達点はStep 3の完了、すなわち`bread(dev, blkno, &error)`と`bwrite(bp)`による
 RAMブロックの読み書きである。Step 4で既存pipeとの共存を確認し、Step 5で
 遅延書込み、Step 6で全体の統合を完了する。
 
@@ -52,7 +52,7 @@ commitは依頼の範囲に従い、未commitなら記録欄にその旨を書�
 | 0 | 仕様とbaselineの確定 | done | 開始HEAD a3a6893、本書を含むcommitに記録 |
 | 1 | dev指定と要求契約の整備 | done | 開始HEAD 3c50a9e、本書を含むStep 1 commitに記録 |
 | 2 | RAMドライバの単体実装 | done | 開始HEAD a2f6171、本書を含むStep 2 commitに記録 |
-| 3 | breadとbwriteの実装 | pending | |
+| 3 | breadとbwriteの実装 | done | 開始HEAD 0054ec9、本書を含むStep 3 commitに記録 |
 | 4 | 資源と排他とpipe共存 | pending | |
 | 5 | 遅延書込みと書戻し | pending | |
 | 6 | Windows統合と全回帰 | pending | |
@@ -68,13 +68,14 @@ commitは依頼の範囲に従い、未commitなら記録欄にその旨を書�
 | `src/core/sys/h/conf.h` | bdevsw、bdev_queue、dev検査、要求検査、提出、queue API |
 | `src/core/sys/conf/conf.c` | 固定table、pipeとRAMのsentinel、登録済みRAM entry |
 | `src/core/sys/dev/ramdisk.c` | 固定RAM領域、raminit、ramstrategy、同期コピーと完了 |
-| `src/core/sys/dev/bio.c` | cache取得・解放、再関連付け、iodone |
+| `src/core/sys/dev/bio.c` | cache取得・解放、bread/bwrite、geterror、iodone |
 | `src/core/sys/dev/bdev.c` | enqueue、start、complete、error/retry |
 | `src/core/sys/sys/alloc.c` | pipe inodeごとにgetblkで取得しbufferを保持 |
 | `src/core/sys/h/sched.h` | kernel lock、wait channel、sleep/wakeup API |
 | `src/core/sys/h/sys_error.h` | host errnoから独立したerror定義 |
 
-`bread()`、`bwrite()`、RAM保存領域とdriver、実際のI/O待機は未実装。
+`bread()`、`bwrite()`とRAM driverは実装済み。実際の非同期I/O待機は未実装。
+buffer I/O APIはBDEV_SYNC driverだけへ提出し、未対応driverはENOSYSで拒否する。
 `iodone()`は`B_DONE`を設定するが、同期要求の待機者を起床させない。
 `getblk()`と`geteblk()`は再利用候補が`B_DELWRI`なら`NULL`を返し、書戻さない。
 `getblk()`はbusy hitや空きなしでも待機せず`NULL`を返す。
@@ -808,3 +809,145 @@ read成功のbufferはcaller所有、bwriteの同期完了は内部解放とい�
 raminitを通常のcache取得やbinitから呼ばない。保存内容が消えるためである。
 BSIZE=256、NBUF=3、既存pipeの寿命中保持、callerによるkernel lockは維持した。
 共存時のNBUF変更はStep 4、遅延書込みはStep 5、起動接続と全回帰はStep 6。
+
+## 15. Step 3実施記録
+
+実施日: 2026-10-17
+
+開始HEAD: `0054ec9 Add synchronous RAM block device driver`
+
+branch: `feature/mrunsv`
+
+作業状態: 実装と関連回帰試験完了。本書を含むStep 3 commitに記録
+
+### V7原実装との対応
+
+AGENTS.mdの「可能な限りオリジナルの実装を踏襲すること」に従い、bundled V7の
+usr/sys/dev/bio.cにあるbread、bwrite、iowait、geterrorを確認した。
+
+- breadはgetblkで取得し、B_DONEのcache hitならstrategyを呼ばず返す
+- cache missはB_READとBSIZEを設定してstrategyへ提出する
+- bwriteはB_READ/B_DONE/B_ERROR/B_DELWRI/B_AGEをclearしてBSIZEを設定する
+- 同期writeの完了後はerrorを取り出してからbrelseする
+- geterrorはB_ERRORを調べ、b_errorが0ならEIOへ置き換える
+
+上記の処理順と責務を維持した。準備・検査・提出をprepare_read、prepare_write、
+sync_device、sync_io、io_errorへ分け、何をする処理か関数名で示した。
+エラー解釈はV7名のstatic geterrorを使用する。
+
+MCUFW向けの差分:
+
+- global u.u_errorの代わりにbreadの必須error out引数とbwriteの戻り値を使用
+- read失敗時は途中取得bufferを解放してNULLを返す
+- busy hitとpool枯渇は待機せずEAGAINを返す
+- bwriteのB_ASYNCは所有権違反として拒否し、raw strategyのB_ASYNCは維持する
+- trap、spl、sleep/wakeupを追加せず、現在の同期driverだけを扱う
+
+### 同期driverの契約
+
+conf.hのstruct bdevswへd_flags、同期完了を表すBDEV_SYNCを追加し、RAM entryに
+BDEV_SYNCを設定した。pipe entryのflagは0で、strategyも未登録のままとした。
+これは待機実装がない段階で未完了要求を誤って解放しないためのMCUFW固有の構成情報。
+V7のbdevswそのもののfieldではない。
+
+bread/bwriteはstrategy未登録ならENODEV、BDEV_SYNCなしならENOSYSとし、
+driverへ提出する前に拒否する。raw bdev_strategyはd_flagsで制限しないため、
+既存の非同期mockとqueue試験はそのまま動作する。
+
+BDEV_SYNCは「受付要求をstrategyが戻るまでに完了する」というdriverの保証である。
+sync_ioは提出が受付された場合にB_DONEをassertで検査してからgeterrorを呼ぶ。
+assertはdriver契約違反の開発時検出であり、非同期I/Oの待機処理ではない。
+非同期driverへBDEV_SYNCを設定してはならない。実際の待機・起床・再開は未実装。
+
+### 所有権とエラー処理
+
+dev登録検査と所有権検査を分離するため、既存検査からbdev_buffer_checkを切り出した。
+この関数はbusy状態と全登録queueを検査し、状態を変更せず0または負のSYS errorを返す。
+bdev_request_checkは従来のdev/strategy検査後に同じ関数を呼ぶ。
+
+bwriteはNULL、非busy、B_ASYNC、queue所属、不正queueを前処理より前に拒否する。
+その場合、bufferとpayload、free list、queueを変更せずcallerへ返す。
+queue所属はEAGAIN、不正queueとその他の所有権違反はEINVALとする。
+
+所有権が有効なら、V7同様にwrite用flagを整理し、提出拒否またはI/O失敗の場合も
+bufferを消費する。errorは解放前に退避し、B_ERRORを設定してcacheを無効化してから
+brelseする。未登録/未対応deviceで失敗してもB_DELWRIを残して再利用を妨げない。
+callerはbwrite完了後のbufferを再解放・再参照しないこと。
+
+bread成功時は*error=0、callerがB_BUSY bufferを所有する。
+失敗時はNULLと負のSYS errorを返し、取得済みbufferを回収する。
+error引数NULLの場合は取得もI/Oも行わずNULLを返す。
+
+### 変更ファイル
+
+- src/core/sys/dev/bio.c
+- src/core/sys/dev/bdev.c
+- src/core/sys/h/buf.h
+- src/core/sys/h/conf.h
+- src/core/sys/conf/conf.c
+- src/core/sys/test/bio/test_bio.c
+- docs/unix_v7_ram_block_device_handoff.md
+
+NBUF、pipe、scheduler、RAM保存領域の実装は変更していない。
+開始前からあった利用者の.gitignoreとAGENTS.mdの変更は編集していない。
+
+### 試験内容
+
+変更前: sys/header、table、bio、bdev、ramdisk、file、pipeの全7 suiteをO0/O2で
+実行し、試験と各構成のmake cleanがすべてexit 0。
+
+bioへ追加した観点:
+
+- 公開bwriteで両装置の全32blockを書き、binit後にbreadで全byteを検証
+- cache hitではread strategyを再実行しないこと
+- breadによる部分更新後、bwriteとcache破棄を経ても未更新byteを維持すること
+- strategyへ渡すread/write flag、転送長、error/residの初期化
+- 容量外、巨大block、不正minor、NULL error引数、未登録/不正dev
+- B_ERRORの具体的errorとb_error=0時のEIO fallback
+- driver受付拒否とI/O失敗時の回収、cache無効化、失敗後の再読込み
+- BDEV_SYNCなしではcallbackを呼ばずENOSYSを返すこと
+- busy hit、全buffer保持、dirty候補によるEAGAINと状態維持
+- bwriteのB_ASYNC、非busy、pending/active、他queue、不正queueの拒否
+- 所有権拒否でbuffer/payload/free listが変化しないこと
+- 有効所有bufferの失敗時は解放され、poolとqueueが回収されること
+
+変更後の結果:
+
+| suite | 構成 | 試験とclean |
+|---|---|---|
+| sys/bio | O0/O2、新規I/O試験を含む | ともにexit 0 |
+| sys/header | C/C++、O0/O2、単独includeとinclude順 | ともにexit 0 |
+| sys/bdev | O0/O2 | ともにexit 0 |
+| sys/ramdisk | O0/O2 | ともにexit 0 |
+| sys/table | O0/O2 | ともにexit 0 |
+| sys/file | O0/O2 | ともにexit 0 |
+| sys/pipe | O0/O2 | ともにexit 0 |
+| sys/sched | cortn/thread × O0/O2 | ともにexit 0 |
+| esh/pipe | cortn/thread × O0/O2 | ともにexit 0 |
+| esh/sched | cortn/thread × O0/O2 | ともにexit 0 |
+| esh/pipeline_exec | cortn/thread × O0/O2 | ともにexit 0 |
+| esh/exe | 既定build、test1〜10とgolden比較 | ともにexit 0 |
+
+全12 suiteが成功した。bioは書込み前処理の最終調整後にもO0/O2で再実行して成功。
+実行はMSYS2 MINGW64 login shell経由とし、PowerShellからgccを直接起動していない。
+既存eshの警告と異常入力に対するparser診断はあるが、試験失敗はない。
+logは`/tmp/mcufw_step3_before_<suite>.log`、
+`/tmp/mcufw_step3_after_<suite>.log`に保存した。
+
+成功・失敗時とも構成を指定してmake cleanする手順を使用し、今回の全cleanがexit 0。
+生成対象のOUTDIR/TARGET計62 pathを確認して残存0だった。
+git diff --check -- docs srcと、変更C/headerのtab幅8での80 column検査も成功した。
+Windows mainのbuild・対話試験、TDM-GCC toolchain、par、STM32実機は未実行。
+今回の関連回帰以外の全体確認はStep 6へ残す。
+
+### 次Stepへの注意事項
+
+次はStep 4の資源・排他・pipe共存。現在のAPIはcallerがkernel lockで直列化し、
+低層関数は内部でlockせず、sleep/yieldもしない。
+最大3本のpipeとI/O用buffer2個の構成に合わせてNBUFの既定値を5へ変更する。
+今回のbio試験はNBUFに追従するが、全既存試験の固定値前提も確認すること。
+
+Step 5で遅延書込みを実装すると、dirty候補がEAGAINとなる今回のbaseline試験は
+書戻し成功・失敗を検証する試験へ更新する必要がある。
+raw B_ASYNCは使用可能だが、公開bwriteの非同期対応はまだない。
+BDEV_SYNCだけで非同期driverを動かさず、待機機構を追加してから対応範囲を広げる。

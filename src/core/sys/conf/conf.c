@@ -17,8 +17,8 @@ static struct buf pipe_tab;
 static struct buf ram_tab;
 
 struct bdevsw bdevsw[] = {
-	{ NULL, &pipe_tab, NULL },
-	{ ramstrategy, &ram_tab, &ramqueue }
+	{ NULL, &pipe_tab, NULL, 0 },
+	{ ramstrategy, &ram_tab, &ramqueue, BDEV_SYNC }
 };
 
 int nblkdev = sizeof(bdevsw) / sizeof(bdevsw[0]);

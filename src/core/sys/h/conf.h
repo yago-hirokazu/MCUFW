@@ -16,7 +16,11 @@ struct bdevsw {
 	int (*d_strategy)(struct buf *bp);
 	struct buf *d_tab;
 	struct bdev_queue *d_queue;
+	unsigned int d_flags;
 };
+
+/* Strategy completes accepted requests before returning */
+#define BDEV_SYNC	0x01U
 
 #define BDEV_QUEUE_FAILED	(-1)
 #define BDEV_QUEUE_DONE		0
@@ -27,6 +31,8 @@ extern int nblkdev;
 
 /* Caller serializes switch, cache and queue operations */
 struct bdevsw *bdev_get(unsigned int dev);
+/* Validate ownership independently of device registration */
+int bdev_buffer_check(struct buf *bp);
 /* Validate request without submission or state change */
 int bdev_request_check(struct buf *bp);
 /* Return 0 on acceptance; rejection leaves buffer and queues unchanged */

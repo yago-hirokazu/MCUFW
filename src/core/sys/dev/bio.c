@@ -1,13 +1,21 @@
 /* bio.c */
 
+#include <assert.h>
 #include <string.h>
 
 #include "buf.h"
 #include "conf.h"
+#include "sys_error.h"
 
 unsigned char buffers[NBUF][BSIZE];
 
 static struct buf *getdev(unsigned int dev);
+static int sync_device(unsigned int dev);
+static int sync_io(struct buf *bp);
+static int geterror(struct buf *bp);
+static void prepare_read(struct buf *bp);
+static void prepare_write(struct buf *bp);
+static void io_error(struct buf *bp, int error);
 static void b_list_init(struct buf *head);
 static void b_list_remove(struct buf *bp);
 static void b_list_insert(struct buf *head, struct buf *bp);
@@ -94,6 +102,51 @@ struct buf *geteblk(void)
 	return bp;
 }
 
+struct buf *bread(unsigned int dev, unsigned long blkno, int *error)
+{
+	struct buf *bp;
+
+	if (!error)
+		return NULL;
+	*error = sync_device(dev);
+	if (*error)
+		return NULL;
+	bp = getblk(dev, blkno);
+	if (!bp) {
+		*error = -SYS_EAGAIN;
+		return NULL;
+	}
+	if ((bp->b_flags & B_DONE) && !(bp->b_flags & B_ERROR))
+		return bp;
+	prepare_read(bp);
+	*error = sync_io(bp);
+	if (*error) {
+		io_error(bp, *error);
+		brelse(bp);
+		return NULL;
+	}
+	return bp;
+}
+
+int bwrite(struct buf *bp)
+{
+	int result;
+
+	if (!bp || (bp->b_flags & B_ASYNC))
+		return -SYS_EINVAL;
+	result = bdev_buffer_check(bp);
+	if (result < 0)
+		return result;
+	prepare_write(bp);
+	result = sync_device(bp->b_dev);
+	if (!result)
+		result = sync_io(bp);
+	if (result)
+		io_error(bp, result);
+	brelse(bp);
+	return result;
+}
+
 void brelse(struct buf *bp)
 {
 	if (!bp || !(bp->b_flags & B_BUSY))
@@ -152,6 +205,61 @@ static struct buf *getdev(unsigned int dev)
 
 	dp = bdev_get(dev);
 	return dp ? dp->d_tab : NULL;
+}
+
+static int sync_device(unsigned int dev)
+{
+	struct bdevsw *dp;
+
+	dp = bdev_get(dev);
+	if (!dp || !dp->d_strategy)
+		return -SYS_ENODEV;
+	if (!(dp->d_flags & BDEV_SYNC))
+		return -SYS_ENOSYS;
+	return 0;
+}
+
+static int sync_io(struct buf *bp)
+{
+	int result;
+
+	result = bdev_strategy(bp);
+	if (result < 0)
+		return result;
+	/* BDEV_SYNC replaces V7 iowait sleep until asynchronous I/O support */
+	assert(bp->b_flags & B_DONE);
+	return geterror(bp);
+}
+
+static int geterror(struct buf *bp)
+{
+	if (bp->b_flags & B_ERROR)
+		return bp->b_error ? -bp->b_error : -SYS_EIO;
+	return 0;
+}
+
+static void prepare_read(struct buf *bp)
+{
+	bp->b_flags &= ~(B_DONE | B_ERROR | B_ASYNC);
+	bp->b_flags |= B_READ;
+	bp->b_bcount = BSIZE;
+	bp->b_resid = BSIZE;
+	bp->b_error = 0;
+}
+
+static void prepare_write(struct buf *bp)
+{
+	bp->b_flags &= ~(B_READ | B_DONE | B_ERROR | B_DELWRI | B_AGE);
+	bp->b_bcount = BSIZE;
+	bp->b_resid = BSIZE;
+	bp->b_error = 0;
+}
+
+static void io_error(struct buf *bp, int error)
+{
+	bp->b_flags |= B_ERROR;
+	bp->b_error = -error;
+	bp->b_resid = bp->b_bcount;
 }
 
 static void b_list_init(struct buf *head)
