@@ -22,6 +22,7 @@ CSOURCES += help.c lex.c par.c run.c test.c tok.c tty.c
 CSOURCES += stdio_adapt.c tty_adapt.c cmd_sample.c qbyte.c symchar.c
 CSOURCES += $(SCHED_CSOURCES)
 CSOURCES += alloc.c bio.c conf.c fio.c iget.c pipe.c rdwri.c sched.c sys2.c
+CSOURCES += bdev.c ramdisk.c
 ASOURCES = $(SCHED_ASOURCES)
 
 OBJS = $(addprefix $(OUTDIR)/,$(CSOURCES:.c=.o))

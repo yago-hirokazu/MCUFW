@@ -11,6 +11,7 @@ OBJS = $(OUTDIR)/test_bdev.o
 OBJS += $(OUTDIR)/bdev.o
 OBJS += $(OUTDIR)/bio.o
 OBJS += $(OUTDIR)/conf.o
+OBJS += $(OUTDIR)/ramdisk.o
 
 .PHONY: all clean
 
@@ -32,6 +33,9 @@ $(OUTDIR)/bio.o: ../../dev/bio.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OUTDIR)/conf.o: ../../conf/conf.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OUTDIR)/ramdisk.o: ../../dev/ramdisk.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

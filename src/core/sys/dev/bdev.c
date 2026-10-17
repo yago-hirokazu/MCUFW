@@ -8,6 +8,16 @@ static int bdev_queue_contains(struct bdev_queue *queue, struct buf *target);
 
 int bdev_strategy(struct buf *bp)
 {
+	int result;
+
+	result = bdev_request_check(bp);
+	if (result < 0)
+		return result;
+	return bdevsw[major(bp->b_dev)].d_strategy(bp);
+}
+
+int bdev_request_check(struct buf *bp)
+{
 	struct bdevsw *dp;
 	int found;
 	int result;
@@ -29,7 +39,7 @@ int bdev_strategy(struct buf *bp)
 	}
 	if (found)
 		return -SYS_EAGAIN;
-	return dp->d_strategy(bp);
+	return 0;
 }
 
 void bdev_queue_init(struct bdev_queue *queue)

@@ -9,6 +9,9 @@ CFLAGS += -I../../h
 
 OBJS = $(OUTDIR)/test_table.o
 OBJS += $(OUTDIR)/conf.o
+OBJS += $(OUTDIR)/ramdisk.o
+OBJS += $(OUTDIR)/bdev.o
+OBJS += $(OUTDIR)/bio.o
 
 .PHONY: all clean
 
@@ -24,6 +27,15 @@ $(OUTDIR)/test_table.o: test_table.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OUTDIR)/conf.o: ../../conf/conf.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OUTDIR)/bio.o: ../../dev/bio.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OUTDIR)/bdev.o: ../../dev/bdev.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OUTDIR)/ramdisk.o: ../../dev/ramdisk.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

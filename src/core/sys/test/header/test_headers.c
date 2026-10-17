@@ -1,6 +1,7 @@
 /* test_headers.c */
 
 #if defined(TEST_REVERSE)
+#include "ramdisk.h"
 #include "conf.h"
 #include "sched_backend.h"
 #include "pipe.h"
@@ -18,6 +19,8 @@
 #include "sched.h"
 #include "sched_backend.h"
 #endif
+
+#include "ramdisk.h"
 
 #if defined(__cplusplus)
 #define STATIC_ASSERT(condition, message) static_assert(condition, message)
@@ -38,6 +41,9 @@ STATIC_ASSERT(SYS_EBADF > 0, "Error sign");
 STATIC_ASSERT(SYS_ENOSYS == 8, "Existing error values");
 STATIC_ASSERT(SYS_ENODEV == 9, "Device error value");
 STATIC_ASSERT(SYS_EIO == 10, "I/O error value");
+STATIC_ASSERT(RAM_MAJOR == 1U, "RAM major");
+STATIC_ASSERT(RAM_NDEV == 2U, "RAM device count");
+STATIC_ASSERT(RAM_NBLK == 16UL, "RAM block count");
 STATIC_ASSERT(PIPE_IO_PROGRESS == 0, "Pipe I/O result base");
 STATIC_ASSERT(sizeof(((struct proc *)0)->p_ofile) /
 	      sizeof(((struct proc *)0)->p_ofile[0]) == NOFILE,

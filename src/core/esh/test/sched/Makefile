@@ -20,6 +20,8 @@ OBJS += $(OUTDIR)/rdwri.o
 OBJS += $(OUTDIR)/sched.o
 OBJS += $(OUTDIR)/bio.o
 OBJS += $(OUTDIR)/conf.o
+OBJS += $(OUTDIR)/ramdisk.o
+OBJS += $(OUTDIR)/bdev.o
 
 .PHONY: all clean
 
@@ -71,6 +73,12 @@ $(OUTDIR)/sched_cortn.o: ../../../sys/dev/windows/sched_cortn.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OUTDIR)/sched_thread.o: ../../../sys/dev/windows/sched_thread.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OUTDIR)/bdev.o: ../../../sys/dev/bdev.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OUTDIR)/ramdisk.o: ../../../sys/dev/ramdisk.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

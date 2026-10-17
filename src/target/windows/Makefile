@@ -75,6 +75,7 @@ CSOURCES += $(SCHED_CSOURCES)
 CSOURCES += alloc.c fio.c iget.c pipe.c rdwri.c sched.c sys2.c
 CSOURCES += bio.c
 CSOURCES += conf.c
+CSOURCES += bdev.c ramdisk.c
 
 ## ../../core/shell/target/windows
 CSOURCES += esh_adapt.c

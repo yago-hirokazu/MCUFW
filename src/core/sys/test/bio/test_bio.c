@@ -6,6 +6,7 @@
 
 #include "buf.h"
 #include "conf.h"
+#include "ramdisk.h"
 
 #define CHECK(condition) \
 	do { \
@@ -150,8 +151,11 @@ static void test_binit(void)
 	binit();
 	CHECK(nblkdev == 2);
 	CHECK(bdevsw[1].d_tab != bdevsw[0].d_tab);
-	CHECK(bdevsw[1].d_strategy == NULL);
-	CHECK(bdevsw[1].d_queue == NULL);
+	CHECK(bdevsw[RAM_MAJOR].d_strategy == ramstrategy);
+	CHECK(bdevsw[RAM_MAJOR].d_queue == &ramqueue);
+	CHECK(ramqueue.dq_head == NULL);
+	CHECK(ramqueue.dq_tail == NULL);
+	CHECK(ramqueue.dq_active == NULL);
 	CHECK(bdevsw[major(PIPEDEV)].d_strategy == NULL);
 	CHECK(bdevsw[major(PIPEDEV)].d_queue == NULL);
 	for (i = 0; i < NBUF; i++) {

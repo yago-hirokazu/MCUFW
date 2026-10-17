@@ -4,6 +4,7 @@
 
 #include "buf.h"
 #include "conf.h"
+#include "ramdisk.h"
 #include "sys_error.h"
 
 #define MOCK_RETRY_LIMIT	2U
@@ -20,6 +21,7 @@
 
 static int failures;
 static struct bdev_queue mock_queue;
+static struct bdevsw saved_devices[2];
 static struct buf *mock_started[NBUF * 3];
 static int mock_started_count;
 static int mock_completed_count;
@@ -55,6 +57,8 @@ int main(void)
 	test_other_queue();
 	test_invalid_queue();
 	test_driver_result();
+	CHECK(bdevsw[RAM_MAJOR].d_strategy == ramstrategy);
+	CHECK(bdevsw[RAM_MAJOR].d_queue == &ramqueue);
 	if (failures) {
 		printf("%d tests failed\n", failures);
 		return EXIT_FAILURE;
@@ -121,6 +125,9 @@ static int mock_interrupt(int error)
 
 static void setup(void)
 {
+	memcpy(saved_devices, bdevsw, sizeof(saved_devices));
+	bdevsw[RAM_MAJOR].d_strategy = NULL;
+	bdevsw[RAM_MAJOR].d_queue = NULL;
 	bdevsw[major(PIPEDEV)].d_strategy = mock_strategy;
 	bdevsw[major(PIPEDEV)].d_queue = &mock_queue;
 	binit();
@@ -140,8 +147,7 @@ static void teardown(void)
 		CHECK(!(buf[i].b_flags & B_BUSY));
 		CHECK(buf[i].b_io_next == NULL);
 	}
-	bdevsw[major(PIPEDEV)].d_strategy = NULL;
-	bdevsw[major(PIPEDEV)].d_queue = NULL;
+	memcpy(bdevsw, saved_devices, sizeof(saved_devices));
 }
 
 static void test_empty(void)

@@ -21,6 +21,8 @@ OBJS += $(OUTDIR)/alloc.o
 OBJS += $(OUTDIR)/iget.o
 OBJS += $(OUTDIR)/bio.o
 OBJS += $(OUTDIR)/conf.o
+OBJS += $(OUTDIR)/ramdisk.o
+OBJS += $(OUTDIR)/bdev.o
 
 .PHONY: all clean
 
@@ -72,6 +74,12 @@ $(OUTDIR)/bio.o: ../../dev/bio.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OUTDIR)/conf.o: ../../conf/conf.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OUTDIR)/bdev.o: ../../dev/bdev.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OUTDIR)/ramdisk.o: ../../dev/ramdisk.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

@@ -5,7 +5,7 @@
 対象: `C:\usr\src\MCUFW`
 
 確認時HEAD: `d7ec485`
-状態: Step 1完了。確定仕様はSection 11、実施記録はSection 12以降を参照
+状態: Step 2完了。確定仕様はSection 11、実施記録はSection 12以降を参照
 
 ## 1. 目的と到達点
 
@@ -51,7 +51,7 @@ commitは依頼の範囲に従い、未commitなら記録欄にその旨を書�
 |---|---|---|---|
 | 0 | 仕様とbaselineの確定 | done | 開始HEAD a3a6893、本書を含むcommitに記録 |
 | 1 | dev指定と要求契約の整備 | done | 開始HEAD 3c50a9e、本書を含むStep 1 commitに記録 |
-| 2 | RAMドライバの単体実装 | pending | |
+| 2 | RAMドライバの単体実装 | done | 開始HEAD a2f6171、本書を含むStep 2 commitに記録 |
 | 3 | breadとbwriteの実装 | pending | |
 | 4 | 資源と排他とpipe共存 | pending | |
 | 5 | 遅延書込みと書戻し | pending | |
@@ -65,8 +65,9 @@ commitは依頼の範囲に従い、未commitなら記録欄にその旨を書�
 | ファイル | 確認済みの内容 |
 |---|---|
 | `src/core/sys/h/buf.h` | dev分解マクロ、範囲検査付きmakedev、BSIZE=256、NBUF=3 |
-| `src/core/sys/h/conf.h` | bdevsw、bdev_queue、bdev_get、bdev_strategy、queue API |
-| `src/core/sys/conf/conf.c` | 固定table、pipeとRAM予約用sentinel、2個のbdevswエントリ |
+| `src/core/sys/h/conf.h` | bdevsw、bdev_queue、dev検査、要求検査、提出、queue API |
+| `src/core/sys/conf/conf.c` | 固定table、pipeとRAMのsentinel、登録済みRAM entry |
+| `src/core/sys/dev/ramdisk.c` | 固定RAM領域、raminit、ramstrategy、同期コピーと完了 |
 | `src/core/sys/dev/bio.c` | cache取得・解放、再関連付け、iodone |
 | `src/core/sys/dev/bdev.c` | enqueue、start、complete、error/retry |
 | `src/core/sys/sys/alloc.c` | pipe inodeごとにgetblkで取得しbufferを保持 |
@@ -252,17 +253,24 @@ STM32実機移植はこの後の作業とする。
 GCCは必ずMSYS2 MINGW64 shell経由で使用する。
 PowerShellから`C:\msys64\mingw64\bin\gcc.exe`を直接実行しない。
 以下はMINGW64 shell内で実行する。各directoryの存在とscript内容を開始時に確認する。
+AGENTS.mdの絶対ルールに従い、成功・失敗とも試験後はmake cleanを実行し、
+今回生成した*.d、*.o、*.exeが残っていないことを確認する。
+OUTDIR/TARGETを変えてbuildした構成は、同じ値をmake cleanにも渡す。
 
 ```sh
-cd /c/usr/src/MCUFW
-for suite in header table bio bdev file pipe sched; do
-    (cd "src/core/sys/test/$suite" && bash ./run_test.sh) || exit 1
+cd /c/usr/src/MCUFW/src/core/sys/test/bdev
+rc=0
+bash ./run_test.sh || rc=$?
+for opt in O0 O2; do
+    make clean OUTDIR="_output_$opt" TARGET="test_bdev_$opt.exe" || exit 1
 done
-for suite in pipe sched cortn pipeline pipeline_exec exe; do
-    (cd "src/core/esh/test/$suite" && bash ./run_test.sh) || exit 1
-done
-(cd src/core/esh/test/par && bash ./run_test1.sh && bash ./run_test2.sh)
+test "$rc" -eq 0
 ```
+
+上記はbdevの例。同様にsysのheader、table、bio、ramdisk、file、pipe、schedと、
+eshのpipe、sched、cortn、pipeline、pipeline_exec、exe、parを影響範囲に応じて実行する。
+schedとeshのpipe/pipeline_execではbackendと最適化の全構成をcleanする。
+ramdisk/run_test.shはEXIT trapと構成ごとのmake cleanを持つ。
 
 新規RAM試験は同様のrun_test.shでO0/O2を検証する。
 backend対応suiteはcoroutine/thread両方の結果を記録する。
@@ -684,3 +692,119 @@ RAM_MAJOR等のRAM固有定義はStep 2のramdisk.hで追加する。
 試験のsetup/teardownでswitch entryを差し替える箇所は、RAM driver登録後に
 production entryを正しく保存・復元するよう見直すこと。
 conf.cがdriver symbolを参照するStep 2で、関連Makefileのlink対象も同時に更新する。
+
+## 14. Step 2実施記録
+
+実施日: 2026-10-17
+
+開始HEAD: `a2f6171 Add block device validation and request dispatch`
+
+branch: `feature/mrunsv`
+
+作業状態: 実装と関連回帰試験完了。本書を含むStep 2 commitに記録
+
+### 実装内容
+
+- h/ramdisk.hへRAM_MAJOR=1、RAM_NDEV=2、RAM_NBLK=16とAPIを追加
+- dev/ramdisk.cへ独立した8192 byteの固定保存領域とramqueueを追加
+- conf.cのmajor 1にramstrategy、専用sentinel、ramqueueを登録
+- raminitは保存領域だけをclearし、cacheとqueueを操作しない
+- ramstrategyはenqueue、start、転送、completeの順で同期処理する
+- minorとblock、転送長、payloadを検査してからRAM配列へアクセスする
+- 受付後の失敗もB_ERROR/b_error/b_residを設定して一度だけ完了する
+- B_ASYNCはiodoneで解放し、driverはcomplete後にbufferを参照しない
+- headerのC/C++単独include試験にramdisk.hを追加
+- 新規test/ramdiskにO0/O2試験と、失敗時にもcleanするrun_test.shを追加
+
+raw ramstrategyにも二重提出拒否の契約があるため、Step 1の提出前検査を
+bdev_request_check(bp)へ切り出した。検査は状態を変更せず0または負のSYS errorを
+返す。bdev_strategyとramstrategyが同じ検査を呼び、全登録queueを確認する。
+共通entryから呼ぶ場合は検査が二度行われるが、raw呼出しにも同じ所有権検査を
+適用する。既存bdev_strategyの受付・拒否契約は変更していない。
+
+RAM queueが他の要求を保持する場合はEAGAINで拒否する。
+今回の同期契約では通常その状態にならず、受付要求が未完了のまま返る経路を作らない。
+raminitの呼出しはquiescent状態に限定し、その後binitしてから利用を再開する。
+Windows eshinitへのraminit接続は計画どおりStep 6へ残した。
+
+### buildと既存試験の変更
+
+conf.cがramstrategy/ramqueueを参照するため、conf.cをlinkする12個のMakefileへ
+ramdisk.cと必要なbdev.cを追加した。table試験にもiodoneを提供するbio.cを追加した。
+対象はsysのtable/bio/bdev/file/pipe/sched、eshのpipe/sched/pipeline_exec/exeと、
+Windows通常/TDM-GCCである。
+
+bio試験はRAM登録済みの期待値へ更新した。
+bdev試験はsetupでswitch全entryを保存し、mock実行後に復元する。
+RAM entryを恒久的にNULLへ戻す従来の試験前提を解消した。
+
+新規ファイル:
+
+- src/core/sys/h/ramdisk.h
+- src/core/sys/dev/ramdisk.c
+- src/core/sys/test/ramdisk/Makefile
+- src/core/sys/test/ramdisk/run_test.sh
+- src/core/sys/test/ramdisk/test_ramdisk.c
+
+既存変更は上記Makefile、conf.c、bdev.c、conf.h、bio/bdev/header試験と本書。
+開始前からあった利用者の.gitignoreとAGENTS.mdの変更は編集していない。
+
+### 試験とclean
+
+変更前: sys/header、table、bio、bdev、file、pipeの全6 suiteをO0/O2で実行し、
+すべてexit 0。各構成のOUTDIR/TARGETを指定したmake cleanもexit 0。
+
+新規RAM試験の観点:
+
+- 初期RAMのzero、両装置の全blockへのbinary書込みと再読込み
+- 全32blockを書いてcacheを追い出し、binit後にも保存内容が残ること
+- 同一block番号の装置分離、隣接block分離、先頭と最終block
+- minor 2/255、block 16/ULONG_MAX、NULL payload
+- 転送長0/1/BSIZE-1/BSIZE+1/size_t最大値の拒否
+- 失敗したreadでpayloadを変更せず、失敗したwriteでRAMを変更しないこと
+- 古いB_DONE/B_ERROR/B_DELWRIを残した要求の成功時整理
+- B_ASYNC成功・失敗後の解放、error/resid、queue空、pool全回収
+- raw strategyのNULL/非busy/不正major、同一と他queueへの二重提出拒否
+- raminitがcacheを変更せず、続くbinit後にRAMのzeroを読み直せること
+
+sys/bdevのStep 1回帰では拒否時のbuffer/payload/list/queue不変も再確認する。
+新規ramdisk/run_test.shは構成ごとのcleanとEXIT trapを実装した。
+既存scriptは実行側で各構成をcleanし、script失敗時もcleanする手順を使用した。
+試験はMSYS2 MINGW64 login shell経由で実行し、PowerShellからgccを直接起動していない。
+一時logは`/tmp/mcufw_step2_before_<suite>.log`と
+`/tmp/mcufw_step2_after_<suite>.log`に保存した。
+
+変更後の結果:
+
+| suite | 構成 | 試験とclean |
+|---|---|---|
+| sys/ramdisk | O0/O2 | ともにexit 0 |
+| sys/header | C/C++、O0/O2、単独includeとinclude順 | ともにexit 0 |
+| sys/table | O0/O2 | ともにexit 0 |
+| sys/bio | O0/O2 | ともにexit 0 |
+| sys/bdev | O0/O2 | ともにexit 0 |
+| sys/file | O0/O2 | ともにexit 0 |
+| sys/pipe | O0/O2 | ともにexit 0 |
+| sys/sched | cortn/thread × O0/O2 | ともにexit 0 |
+| esh/pipe | cortn/thread × O0/O2 | ともにexit 0 |
+| esh/sched | cortn/thread × O0/O2 | ともにexit 0 |
+| esh/pipeline_exec | cortn/thread × O0/O2 | ともにexit 0 |
+| esh/exe | 既定build、test1〜10とgolden比較 | ともにexit 0 |
+
+全12 suiteが成功した。各構成のmake cleanもすべてexit 0。
+生成対象のOUTDIR/TARGET計62 pathを確認し、残存0だった。
+以前からある別構成の生成物は今回のclean対象へ混ぜていない。
+git diff --check -- docs srcと、変更C/headerのtab幅8での80 column検査も成功した。
+既存eshの警告・異常入力に対するparser診断はあるが、試験失敗はない。
+Windows mainのbuild・対話試験、TDM-GCC toolchainのbuild、par、STM32実機は
+未実行。Windows Makefileのsource追加は反映し、全target検証はStep 6へ残す。
+
+### 次Stepへの注意事項
+
+次はStep 3のbread/bwrite。RAM側は要求ごとにB_DONE/B_ERROR/B_DELWRIを整理するが、
+利用側もread/writeのflag、b_bcount、所有権を正しく設定すること。
+read成功のbufferはcaller所有、bwriteの同期完了は内部解放という契約を守る。
+共通I/O提出はbdev_strategy、dev検査はbdev_getを使用できる。
+raminitを通常のcache取得やbinitから呼ばない。保存内容が消えるためである。
+BSIZE=256、NBUF=3、既存pipeの寿命中保持、callerによるkernel lockは維持した。
+共存時のNBUF変更はStep 4、遅延書込みはStep 5、起動接続と全回帰はStep 6。

@@ -6,6 +6,7 @@
 #include "conf.h"
 #include "file.h"
 #include "inode.h"
+#include "ramdisk.h"
 
 struct buf buf[NBUF];
 struct file file[NFILE];
@@ -17,7 +18,7 @@ static struct buf ram_tab;
 
 struct bdevsw bdevsw[] = {
 	{ NULL, &pipe_tab, NULL },
-	{ NULL, &ram_tab, NULL }
+	{ ramstrategy, &ram_tab, &ramqueue }
 };
 
 int nblkdev = sizeof(bdevsw) / sizeof(bdevsw[0]);

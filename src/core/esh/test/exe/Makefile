@@ -67,6 +67,7 @@ CSOURCES += tty.c
 CSOURCES += alloc.c
 CSOURCES += bio.c
 CSOURCES += conf.c
+CSOURCES += bdev.c ramdisk.c
 CSOURCES += fio.c
 CSOURCES += iget.c
 CSOURCES += pipe.c

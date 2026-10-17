@@ -27,6 +27,8 @@ extern int nblkdev;
 
 /* Caller serializes switch, cache and queue operations */
 struct bdevsw *bdev_get(unsigned int dev);
+/* Validate request without submission or state change */
+int bdev_request_check(struct buf *bp);
 /* Return 0 on acceptance; rejection leaves buffer and queues unchanged */
 int bdev_strategy(struct buf *bp);
 
