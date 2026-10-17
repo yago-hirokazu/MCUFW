@@ -1,5 +1,6 @@
 /* test_bio.c */
 
+#include <limits.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -29,6 +30,8 @@ static void test_lru(void);
 static void test_age(void);
 static void test_geteblk_and_clrbuf(void);
 static void test_error_release(void);
+static void test_device_numbers(void);
+static void test_devices(void);
 
 int main(void)
 {
@@ -39,6 +42,8 @@ int main(void)
 	test_age();
 	test_geteblk_and_clrbuf();
 	test_error_release();
+	test_device_numbers();
+	test_devices();
 	if (failures) {
 		printf("%d tests failed\n", failures);
 		return 1;
@@ -143,7 +148,10 @@ static void test_binit(void)
 	int i;
 
 	binit();
-	CHECK(nblkdev == 1);
+	CHECK(nblkdev == 2);
+	CHECK(bdevsw[1].d_tab != bdevsw[0].d_tab);
+	CHECK(bdevsw[1].d_strategy == NULL);
+	CHECK(bdevsw[1].d_queue == NULL);
 	CHECK(bdevsw[major(PIPEDEV)].d_strategy == NULL);
 	CHECK(bdevsw[major(PIPEDEV)].d_queue == NULL);
 	for (i = 0; i < NBUF; i++) {
@@ -269,5 +277,67 @@ static void test_error_release(void)
 	CHECK(bp->b_dev == NODEV);
 	CHECK(bp->b_flags & B_ERROR);
 	CHECK(!incore(PIPEDEV, 91));
+	check_invariants();
+}
+
+static void test_device_numbers(void)
+{
+	unsigned int maj;
+	unsigned int min;
+	unsigned int dev;
+
+	for (maj = 0; maj <= 255; maj++) {
+		for (min = 0; min <= 255; min++) {
+			dev = makedev(maj, min);
+			CHECK(major(dev) == maj);
+			CHECK(minor(dev) == min);
+		}
+	}
+	CHECK(makedev(256, 0) == NODEV);
+	CHECK(makedev(0, 256) == NODEV);
+	CHECK(makedev(UINT_MAX, 0) == NODEV);
+	CHECK(makedev(0, UINT_MAX) == NODEV);
+	CHECK(makedev(-1, 0) == NODEV);
+	CHECK(makedev(0, -1) == NODEV);
+	maj = 1;
+	min = 2;
+	CHECK(makedev(maj++, min++) == 0x0102U);
+	CHECK(maj == 2 && min == 3);
+}
+
+static void test_devices(void)
+{
+	struct buf *first;
+	struct buf *second;
+	struct buf *head;
+	unsigned int invalid[] = { NODEV, 0x10000U, 0x1000000U,
+				   0xffffU, 0x0200U };
+	size_t i;
+
+	binit();
+	for (i = 0; i < sizeof(invalid) / sizeof(invalid[0]); i++) {
+		CHECK(bdev_get(invalid[i]) == NULL);
+		CHECK(getblk(invalid[i], 0) == NULL);
+		CHECK(!incore(invalid[i], 0));
+	}
+	head = bdevsw[1].d_tab;
+	bdevsw[1].d_tab = NULL;
+	CHECK(bdev_get(makedev(1, 0)) == NULL);
+	CHECK(getblk(makedev(1, 0), 0) == NULL);
+	bdevsw[1].d_tab = head;
+	first = getblk(makedev(1, 0), 7);
+	second = getblk(makedev(1, 1), 7);
+	CHECK(first != NULL && second != NULL && first != second);
+	first->b_addr[0] = 0x35;
+	second->b_addr[0] = 0x79;
+	brelse(first);
+	brelse(second);
+	CHECK(getblk(makedev(1, 0), 7) == first);
+	CHECK(getblk(makedev(1, 1), 7) == second);
+	CHECK(first->b_addr[0] == 0x35);
+	CHECK(second->b_addr[0] == 0x79);
+	brelse(first);
+	brelse(second);
+	CHECK(bdev_get(makedev(1, 255)) == &bdevsw[1]);
 	check_invariants();
 }

@@ -1,6 +1,7 @@
 /* test_headers.c */
 
 #if defined(TEST_REVERSE)
+#include "conf.h"
 #include "sched_backend.h"
 #include "pipe.h"
 #include "inode.h"
@@ -10,6 +11,7 @@
 #else
 #include "param.h"
 #include "sys_error.h"
+#include "conf.h"
 #include "file.h"
 #include "inode.h"
 #include "pipe.h"
@@ -33,6 +35,9 @@ STATIC_ASSERT(FREAD == 0x01U, "FREAD value");
 STATIC_ASSERT(FWRITE == 0x02U, "FWRITE value");
 STATIC_ASSERT(FPIPE == 0x04U, "FPIPE value");
 STATIC_ASSERT(SYS_EBADF > 0, "Error sign");
+STATIC_ASSERT(SYS_ENOSYS == 8, "Existing error values");
+STATIC_ASSERT(SYS_ENODEV == 9, "Device error value");
+STATIC_ASSERT(SYS_EIO == 10, "I/O error value");
 STATIC_ASSERT(PIPE_IO_PROGRESS == 0, "Pipe I/O result base");
 STATIC_ASSERT(sizeof(((struct proc *)0)->p_ofile) /
 	      sizeof(((struct proc *)0)->p_ofile[0]) == NOFILE,

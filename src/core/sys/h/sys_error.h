@@ -12,7 +12,9 @@ enum sys_error {
 	SYS_EINVAL,
 	SYS_EPIPE,
 	SYS_EAGAIN,
-	SYS_ENOSYS
+	SYS_ENOSYS,
+	SYS_ENODEV,
+	SYS_EIO
 };
 
 #endif

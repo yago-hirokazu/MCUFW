@@ -25,6 +25,11 @@ struct bdevsw {
 extern struct bdevsw bdevsw[];
 extern int nblkdev;
 
+/* Caller serializes switch, cache and queue operations */
+struct bdevsw *bdev_get(unsigned int dev);
+/* Return 0 on acceptance; rejection leaves buffer and queues unchanged */
+int bdev_strategy(struct buf *bp);
+
 void bdev_queue_init(struct bdev_queue *queue);
 int bdev_queue_enqueue(struct bdev_queue *queue, struct buf *bp);
 struct buf *bdev_queue_start(struct bdev_queue *queue);

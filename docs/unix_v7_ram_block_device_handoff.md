@@ -5,7 +5,7 @@
 対象: `C:\usr\src\MCUFW`
 
 確認時HEAD: `d7ec485`
-状態: Step 0完了。確定仕様はSection 11、baseline結果はSection 12を参照
+状態: Step 1完了。確定仕様はSection 11、実施記録はSection 12以降を参照
 
 ## 1. 目的と到達点
 
@@ -50,7 +50,7 @@ commitは依頼の範囲に従い、未commitなら記録欄にその旨を書�
 | Step | 内容 | 状態 | 完了commitまたは作業状態 |
 |---|---|---|---|
 | 0 | 仕様とbaselineの確定 | done | 開始HEAD a3a6893、本書を含むcommitに記録 |
-| 1 | dev指定と要求契約の整備 | pending | |
+| 1 | dev指定と要求契約の整備 | done | 開始HEAD 3c50a9e、本書を含むStep 1 commitに記録 |
 | 2 | RAMドライバの単体実装 | pending | |
 | 3 | breadとbwriteの実装 | pending | |
 | 4 | 資源と排他とpipe共存 | pending | |
@@ -64,9 +64,9 @@ commitは依頼の範囲に従い、未commitなら記録欄にその旨を書�
 
 | ファイル | 確認済みの内容 |
 |---|---|
-| `src/core/sys/h/buf.h` | devマクロ、buffer構造、BSIZE=256、NBUF=3、PIPEDEV=0 |
-| `src/core/sys/h/conf.h` | bdevsw、明示的なbdev_queue、queue API |
-| `src/core/sys/conf/conf.c` | 固定table、pipe用b-list sentinel、単一bdevswエントリ |
+| `src/core/sys/h/buf.h` | dev分解マクロ、範囲検査付きmakedev、BSIZE=256、NBUF=3 |
+| `src/core/sys/h/conf.h` | bdevsw、bdev_queue、bdev_get、bdev_strategy、queue API |
+| `src/core/sys/conf/conf.c` | 固定table、pipeとRAM予約用sentinel、2個のbdevswエントリ |
 | `src/core/sys/dev/bio.c` | cache取得・解放、再関連付け、iodone |
 | `src/core/sys/dev/bdev.c` | enqueue、start、complete、error/retry |
 | `src/core/sys/sys/alloc.c` | pipe inodeごとにgetblkで取得しbufferを保持 |
@@ -348,7 +348,7 @@ majorはdriver種類、minorはそのdriver内のRAM装置番号を表す。
 major 1のentryに専用b-list sentinelと1個のqueueを持ち、両minorで共有する。
 同じb-list内でもcache keyのdev全体を比較し、装置間を分離する。
 
-現行makedevはminorの範囲外bitがmajorへ混入する。
+Step 0確認時のmakedevはminorの範囲外bitがmajorへ混入する。
 Step 1でmakedevを同名static inline関数へ変更し、unsigned intの引数を
 一度ずつ評価する。各引数が255を超えればNODEVを返し、範囲検査後にshift/ORする。
 現行sourceに定数式としてのmakedev利用はない。PIPEDEVの定数0Uは維持し、
@@ -582,3 +582,105 @@ Step 0は設計と既存試験のbaseline取得を完了した。
 makedevの範囲検査、getblk用のdev検査とI/O提出用検査の区別、
 受付拒否時の状態不変、SYS errorの既存値維持が中心となる。
 Step 0完了時点で阻害要因はない。遅延書込みと非同期driverの追加契約は後続範囲。
+
+## 13. Step 1実施記録
+
+実施日: 2026-10-17
+
+開始HEAD: `3c50a9e Document RAM block device plan and Step 0 baseline`
+
+branch: `feature/mrunsv`
+
+作業状態: 実装と関連回帰試験完了。本書を含むStep 1 commitに記録
+
+### 実装内容
+
+- buf.hのmakedevをstatic inline関数にし、引数の単一評価と8 bit範囲検査を追加
+- conf.cへRAM予約用sentinelとmajor 1の未登録entryを追加
+- bdev_get(dev)で符号化、major範囲、d_tabを共通検査
+- bio.cのcache取得とincoreもbdev_getを使用
+- bdev_strategy(bp)で所有状態、dev、strategy登録、全登録queueを検査して提出
+- 不正queueはEINVAL、既存queue内の二重提出はEAGAINで拒否し、完了させない
+- queue走査をNBUFで制限し、循環、head/tail不整合、active重複等を拒否
+- SYS_ENODEV=9、SYS_EIO=10を末尾へ追加し、既存error番号を維持
+
+bdev_getの配置はconf.cとした。既存のbio/confだけをlinkする試験やtargetに
+bdev.cへの新たなlink依存を作らず、cache取得と提出で同じ検査を再利用できる。
+この関数はstrategyやminorの有効性を検査しない。PIPEDEVとRAM予約entryの
+cache取得は可能だが、strategy未登録のI/O提出はENODEVとなる。
+
+bdev_queue_enqueueの既存0/-1契約は変更していない。
+bdev_strategyの負のSYS error契約と混同しないこと。
+低層APIは内部lockを追加せず、caller直列化というStep 0の前提を維持した。
+任意の不正addressを検証する機構はなく、queue pointerは有効なstruct bufを指す
+前提で、走査可能なqueue構造の不整合を検出する。
+
+RAM driver、保存配列、raminit、bread/bwrite、NBUF変更は追加していない。
+
+### 変更ファイル
+
+- src/core/sys/h/buf.h
+- src/core/sys/h/conf.h
+- src/core/sys/h/sys_error.h
+- src/core/sys/conf/conf.c
+- src/core/sys/dev/bdev.c
+- src/core/sys/dev/bio.c
+- src/core/sys/test/bio/test_bio.c
+- src/core/sys/test/bdev/test_bdev.c
+- src/core/sys/test/header/test_headers.c
+- src/core/sys/test/header/run_test.sh
+- docs/unix_v7_ram_block_device_handoff.md
+
+### 試験内容
+
+変更前: sysのheader、table、bio、bdev、file、pipeを各run_test.shで実行し、
+全6 suiteがexit 0。既定scriptのO0/O2構成を使用した。
+
+追加した試験:
+
+- major/minorの全65536組の往復、範囲外と負値、引数の単一評価
+- NODEV、上位bit、不正major、NULL d_tabのcache取得拒否
+- 同じblock番号の異なるminor間でpayloadが混ざらないこと
+- 未登録strategy、NULLと非busy bufferの拒否
+- activeとpending双方、他majorのqueueからの二重提出拒否
+- queue循環、容量上限、head/tail、非busy要素、active重複の拒否
+- 拒否前後でbuffer pool、payload、list head、queueが変化しないこと
+- driver受付拒否と、受付後B_ERROR完了の区別
+- major 1へのdispatchと、minor 255をdriverまでそのまま渡すこと
+- buf.h/conf.hのC/C++単独includeと既存error番号の維持
+
+変更後の結果:
+
+| suite | 構成 | 結果 |
+|---|---|---|
+| sys/header | C/C++、O0/O2、include順と単独include | exit 0 |
+| sys/table | O0/O2 | exit 0 |
+| sys/bio | O0/O2、追加dev試験を含む | exit 0 |
+| sys/bdev | O0/O2、追加提出試験を含む | exit 0 |
+| sys/file | O0/O2 | exit 0 |
+| sys/pipe | O0/O2 | exit 0 |
+| sys/sched | cortn/thread × O0/O2 | exit 0 |
+| esh/pipe | cortn/thread × O0/O2 | exit 0 |
+| esh/pipeline_exec | cortn/thread × O0/O2 | exit 0 |
+
+全9 suiteでall tests passedを確認した。bdevはmajor 1とpending二重提出の
+追加試験後にもO0/O2で再実行して成功した。
+環境はStep 0と同じMSYS2 MINGW64のGCC 16.1.0。
+実行は承認済みのsandbox外bash login shell経由とし、MAKEFLAGS=-j4を指定した。
+logは一時領域の`/tmp/mcufw_step1_before_<suite>.log`、
+`/tmp/mcufw_step1_after_<suite>.log`、
+`/tmp/mcufw_step1_after_esh_<suite>.log`に保存した。
+既存eshの警告と異常入力に対するparser診断はあるが、scriptはすべて成功した。
+
+git diff --checkとsourceのtab幅8による80 column検査も成功した。
+Windows mainのbuild・対話試験、exe/parの再実行、STM32実機試験は未実行。
+今回はdev/queueとpipeを直接利用する関連suiteを確認し、全回帰はStep 6で行う。
+
+### 次Stepへの注意事項
+
+Step 2でRAM driverとqueueをmajor 1へ登録する。現在のd_strategy/d_queueはNULL。
+RAM_MAJOR等のRAM固有定義はStep 2のramdisk.hで追加する。
+全minorは同じentryとsentinelを共有し、有効minor 0/1の判定はdriverで行う。
+試験のsetup/teardownでswitch entryを差し替える箇所は、RAM driver登録後に
+production entryを正しく保存・復元するよう見直すこと。
+conf.cがdriver symbolを参照するStep 2で、関連Makefileのlink対象も同時に更新する。

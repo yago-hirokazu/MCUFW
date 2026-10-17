@@ -35,8 +35,12 @@
 #endif
 
 #ifndef makedev
-#define makedev(maj, min)	(((unsigned int)(maj) << 8) | \
-				 (unsigned int)(min))
+static inline unsigned int makedev(unsigned int maj, unsigned int min)
+{
+	if (maj > 0xffU || min > 0xffU)
+		return NODEV;
+	return (maj << 8) | min;
+}
 #endif
 
 struct buf {

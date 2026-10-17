@@ -2,8 +2,35 @@
 
 #include "buf.h"
 #include "conf.h"
+#include "sys_error.h"
 
 static int bdev_queue_contains(struct bdev_queue *queue, struct buf *target);
+
+int bdev_strategy(struct buf *bp)
+{
+	struct bdevsw *dp;
+	int found;
+	int result;
+	int i;
+
+	if (!bp || !(bp->b_flags & B_BUSY))
+		return -SYS_EINVAL;
+	dp = bdev_get(bp->b_dev);
+	if (!dp || !dp->d_strategy)
+		return -SYS_ENODEV;
+	found = 0;
+	for (i = 0; i < nblkdev; i++) {
+		if (!bdevsw[i].d_queue)
+			continue;
+		result = bdev_queue_contains(bdevsw[i].d_queue, bp);
+		if (result < 0)
+			return result;
+		found |= result;
+	}
+	if (found)
+		return -SYS_EAGAIN;
+	return dp->d_strategy(bp);
+}
 
 void bdev_queue_init(struct bdev_queue *queue)
 {
@@ -82,16 +109,28 @@ int bdev_queue_error(struct bdev_queue *queue, unsigned int retry_limit,
 static int bdev_queue_contains(struct bdev_queue *queue, struct buf *target)
 {
 	struct buf *bp;
+	struct buf *last;
 	int count;
+	int found;
 
-	if (queue->dq_active == target)
-		return 1;
-	count = 0;
-	for (bp = queue->dq_head; bp && count < NBUF;
-	     bp = bp->b_io_next) {
-		if (bp == target)
-			return 1;
+	if ((!queue->dq_head) != (!queue->dq_tail))
+		return -SYS_EINVAL;
+	if (queue->dq_active &&
+	    (!(queue->dq_active->b_flags & B_BUSY) ||
+	     queue->dq_active->b_io_next))
+		return -SYS_EINVAL;
+	found = queue->dq_active == target;
+	count = queue->dq_active ? 1 : 0;
+	last = NULL;
+	for (bp = queue->dq_head; bp; bp = bp->b_io_next) {
+		if (count >= NBUF || !(bp->b_flags & B_BUSY) ||
+		    bp == queue->dq_active)
+			return -SYS_EINVAL;
+		found |= bp == target;
+		last = bp;
 		count++;
 	}
-	return bp != NULL;
+	if (last != queue->dq_tail)
+		return -SYS_EINVAL;
+	return found;
 }

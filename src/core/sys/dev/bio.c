@@ -148,14 +148,10 @@ void iodone(struct buf *bp)
 
 static struct buf *getdev(unsigned int dev)
 {
-	unsigned int maj;
+	struct bdevsw *dp;
 
-	if (dev == NODEV)
-		return NULL;
-	maj = major(dev);
-	if (maj >= (unsigned int)nblkdev)
-		return NULL;
-	return bdevsw[maj].d_tab;
+	dp = bdev_get(dev);
+	return dp ? dp->d_tab : NULL;
 }
 
 static void b_list_init(struct buf *head)

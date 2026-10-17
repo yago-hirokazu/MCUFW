@@ -13,9 +13,23 @@ struct inode inode[NINODE];
 struct buf bfreelist;
 
 static struct buf pipe_tab;
+static struct buf ram_tab;
 
 struct bdevsw bdevsw[] = {
-	{ NULL, &pipe_tab, NULL }
+	{ NULL, &pipe_tab, NULL },
+	{ NULL, &ram_tab, NULL }
 };
 
 int nblkdev = sizeof(bdevsw) / sizeof(bdevsw[0]);
+
+struct bdevsw *bdev_get(unsigned int dev)
+{
+	unsigned int maj;
+
+	if (dev == NODEV || dev > 0xffffU || nblkdev <= 0)
+		return NULL;
+	maj = major(dev);
+	if (maj >= (unsigned int)nblkdev || !bdevsw[maj].d_tab)
+		return NULL;
+	return &bdevsw[maj];
+}
