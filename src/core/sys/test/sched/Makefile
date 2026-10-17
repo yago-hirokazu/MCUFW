@@ -9,6 +9,7 @@ CFLAGS += -Wall -Wextra -Werror -pedantic -std=c11
 CFLAGS += -I../../h
 CFLAGS += -I../../dev/windows
 CFLAGS += -DSCHED_TEST $(SCHED_CPPFLAGS)
+CFLAGS += $(EXTRA_CPPFLAGS)
 
 OBJS = $(OUTDIR)/test_sched.o
 OBJS += $(OUTDIR)/sched.o

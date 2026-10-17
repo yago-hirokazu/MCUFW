@@ -29,7 +29,7 @@ struct bdevsw {
 extern struct bdevsw bdevsw[];
 extern int nblkdev;
 
-/* Caller serializes switch, cache and queue operations */
+/* Caller holds kernel lock; no internal lock or wait */
 struct bdevsw *bdev_get(unsigned int dev);
 /* Validate ownership independently of device registration */
 int bdev_buffer_check(struct buf *bp);

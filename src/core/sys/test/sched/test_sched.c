@@ -1,13 +1,24 @@
 /* test_sched.c */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
+#ifdef SCHED_THREAD
+#ifndef _WIN32_WINNT
+#define _WIN32_WINNT 0x0600
+#endif
+#include <process.h>
+#include <windows.h>
+#endif
+
 #include "buf.h"
+#include "conf.h"
 #include "file.h"
 #include "inode.h"
 #include "param.h"
 #include "pipe.h"
+#include "ramdisk.h"
 #include "sched.h"
 #include "sys_error.h"
 
@@ -45,7 +56,27 @@ struct wait_arg {
 	int lock_held;
 };
 
+struct io_stage {
+	const unsigned char *source;
+	unsigned char *output;
+	size_t total;
+	size_t transferred;
+	unsigned int updates;
+	int read_fd;
+	int write_fd;
+	int error;
+};
+
+#ifdef SCHED_THREAD
+struct native_arg {
+	HANDLE start;
+	int error;
+};
+#endif
+
 static int failures;
+static int (*saved_ram_strategy)(struct buf *bp);
+static unsigned int max_pipe_io;
 
 static ptrdiff_t proc_read(int fd, void *buf, size_t count);
 static ptrdiff_t proc_write(int fd, const void *buf, size_t count);
@@ -66,6 +97,23 @@ static void test_wake_then_release(void);
 static void test_yield_failure_cleanup(void);
 static void test_prepare_exhaustion(void);
 static void check_resources(void);
+static void check_buffer_lists(void);
+static void ram_test_begin(void);
+static void ram_test_end(void);
+static int locked_ram_strategy(struct buf *bp);
+static void make_full_pipes(struct proc *owner, int pipes[NINODE][2]);
+static void drain_full_pipes(struct proc *owner, int pipes[NINODE][2]);
+static void test_ram_capacity(void);
+#if NBUF >= NINODE + 2
+static int ram_increment(void);
+static unsigned int ram_counter(void);
+static void io_stage_entry(void *arg);
+static void test_pipeline_ram(void);
+#ifdef SCHED_THREAD
+static unsigned __stdcall native_ram_entry(void *arg);
+static void test_parallel_ram(void);
+#endif
+#endif
 
 int main(void)
 {
@@ -79,6 +127,18 @@ int main(void)
 	test_yield_failure_cleanup();
 	test_prepare_exhaustion();
 	check_resources();
+	test_ram_capacity();
+#if NBUF >= NINODE + 2
+	test_pipeline_ram();
+#ifdef SCHED_THREAD
+	test_parallel_ram();
+#endif
+#endif
+	printf("resources NBUF=%d BSIZE=%d buf=%zu payload=%zu headers=%zu\n",
+	       NBUF, BSIZE, sizeof(struct buf), sizeof(buffers), sizeof(buf));
+	printf("resources sentinels=%zu queue=%zu switch=%zu count=%zu\n",
+	       (nblkdev + 1) * sizeof(struct buf), sizeof(ramqueue),
+	       nblkdev * sizeof(bdevsw[0]), sizeof(nblkdev));
 	if (failures) {
 		printf("%d tests failed\n", failures);
 		return 1;
@@ -446,4 +506,398 @@ static void check_resources(void)
 	CHECK(file_in_use() == 0);
 	CHECK(pipe_in_use() == 0);
 	CHECK(count == 0);
+	check_buffer_lists();
 }
+
+static void check_buffer_lists(void)
+{
+	struct buf *head;
+	struct buf *bp;
+	int seen[NBUF] = { 0 };
+	int dev;
+	int count;
+	int i;
+
+	for (dev = -1; dev < nblkdev; dev++) {
+		head = dev < 0 ? &bfreelist : bdevsw[dev].d_tab;
+		if (!head)
+			continue;
+		bp = head->b_forw;
+		for (count = 0; bp != head && count < NBUF; count++) {
+			CHECK(bp->b_forw->b_back == bp);
+			CHECK(bp->b_back->b_forw == bp);
+			for (i = 0; i < NBUF && bp != &buf[i]; i++)
+				;
+			CHECK(i < NBUF);
+			if (i < NBUF)
+				seen[i]++;
+			if (dev < 0)
+				CHECK(bp->b_dev == NODEV);
+			else
+				CHECK(major(bp->b_dev) == (unsigned int)dev);
+			bp = bp->b_forw;
+		}
+		CHECK(bp == head);
+		if (dev >= 0 && bdevsw[dev].d_queue) {
+			CHECK(bdevsw[dev].d_queue->dq_head == NULL);
+			CHECK(bdevsw[dev].d_queue->dq_tail == NULL);
+			CHECK(bdevsw[dev].d_queue->dq_active == NULL);
+		}
+	}
+	bp = bfreelist.av_forw;
+	for (count = 0; bp != &bfreelist && count < NBUF; count++) {
+		CHECK(bp->av_forw->av_back == bp);
+		CHECK(bp->av_back->av_forw == bp);
+		CHECK(!(bp->b_flags & B_BUSY));
+		bp = bp->av_forw;
+	}
+	CHECK(bp == &bfreelist && count == NBUF);
+	for (i = 0; i < NBUF; i++)
+		CHECK(seen[i] == 1);
+}
+
+static void ram_test_begin(void)
+{
+	CHECK(current_proc() == NULL);
+	CHECK(!kernel_is_locked());
+	raminit();
+	binit();
+	finit();
+	saved_ram_strategy = bdevsw[RAM_MAJOR].d_strategy;
+	bdevsw[RAM_MAJOR].d_strategy = locked_ram_strategy;
+	max_pipe_io = 0;
+}
+
+static void ram_test_end(void)
+{
+	CHECK(!kernel_is_locked());
+	CHECK(current_proc() == NULL);
+	bdevsw[RAM_MAJOR].d_strategy = saved_ram_strategy;
+	check_resources();
+}
+
+static int locked_ram_strategy(struct buf *bp)
+{
+	CHECK(kernel_is_locked());
+	if (pipe_in_use() == NINODE)
+		max_pipe_io++;
+	return ramstrategy(bp);
+}
+
+static void make_full_pipes(struct proc *owner, int pipes[NINODE][2])
+{
+	unsigned char marker;
+	int i;
+
+	for (i = 0; i < NINODE; i++) {
+		CHECK(pipe_for_proc(owner, pipes[i]) == 0);
+		marker = (unsigned char)(0x30 + i);
+		CHECK(writep(owner, getf(owner, pipes[i][1]), &marker, 1) == 1);
+	}
+	CHECK(pipe_in_use() == NINODE);
+	CHECK(file_in_use() == NINODE * 2);
+}
+
+static void drain_full_pipes(struct proc *owner, int pipes[NINODE][2])
+{
+	unsigned char marker;
+	int i;
+
+	for (i = 0; i < NINODE; i++) {
+		marker = 0;
+		CHECK(readp(owner, getf(owner, pipes[i][0]), &marker, 1) == 1);
+		CHECK(marker == (unsigned char)(0x30 + i));
+	}
+	close_all(owner);
+}
+
+static void test_ram_capacity(void)
+{
+	struct proc owner;
+	struct buf *held[NBUF];
+	struct buf *bp;
+	int pipes[NINODE][2];
+	int fd[2];
+	int error;
+	int extra;
+	int i;
+
+	ram_test_begin();
+	proc_init(&owner);
+	kernel_lock();
+	make_full_pipes(&owner, pipes);
+	extra = NBUF - NINODE;
+	for (i = 0; i < extra; i++) {
+		held[i] = bread(makedev(RAM_MAJOR, 0), (unsigned long)i,
+				&error);
+		CHECK(held[i] != NULL && error == 0);
+		held[i]->b_addr[0] = (unsigned char)(0x70 + i);
+		CHECK(kernel_is_locked());
+	}
+	CHECK(bread(makedev(RAM_MAJOR, 0), NBUF, &error) == NULL);
+	CHECK(error == -SYS_EAGAIN);
+	if (extra) {
+		CHECK(bread(makedev(RAM_MAJOR, 0), 0, &error) == NULL);
+		CHECK(error == -SYS_EAGAIN);
+	}
+	CHECK(pipe_for_proc(&owner, fd) == -SYS_ENFILE);
+	CHECK(file_in_use() == NINODE * 2);
+	for (i = 0; i < extra; i++)
+		CHECK(bwrite(held[i]) == 0);
+	if (extra) {
+		for (i = 0; i < extra * 2 + 1; i++) {
+			bp = bread(makedev(RAM_MAJOR, 1), (unsigned long)i,
+				   &error);
+			CHECK(bp != NULL && error == 0);
+			bp->b_addr[0] = (unsigned char)i;
+			CHECK(bwrite(bp) == 0);
+		}
+		bp = getblk(makedev(RAM_MAJOR, 0), RAM_NBLK);
+		CHECK(bp != NULL);
+		CHECK(bwrite(bp) == -SYS_EIO);
+		bp = bread(makedev(RAM_MAJOR, 0), 0, &error);
+		CHECK(bp != NULL && error == 0 && bp->b_addr[0] == 0x70);
+		brelse(bp);
+		CHECK(max_pipe_io > 0);
+	}
+	drain_full_pipes(&owner, pipes);
+	CHECK(kernel_is_locked());
+	for (i = 0; i < NBUF; i++) {
+		held[i] = getblk(makedev(RAM_MAJOR, 0), (unsigned long)i);
+		CHECK(held[i] != NULL);
+	}
+	CHECK(pipe_for_proc(&owner, fd) == -SYS_ENFILE);
+	CHECK(file_in_use() == 0 && inode_in_use() == 0);
+	for (i = 0; i < NBUF; i++)
+		brelse(held[i]);
+	CHECK(pipe_for_proc(&owner, fd) == 0);
+	close_all(&owner);
+	kernel_unlock();
+	ram_test_end();
+}
+
+#if NBUF >= NINODE + 2
+static int ram_increment(void)
+{
+	struct buf *bp;
+	unsigned int value;
+	int error;
+
+	kernel_lock();
+	bp = bread(makedev(RAM_MAJOR, 0), 0, &error);
+	if (bp) {
+		value = bp->b_addr[0] | ((unsigned int)bp->b_addr[1] << 8);
+		value++;
+		bp->b_addr[0] = (unsigned char)value;
+		bp->b_addr[1] = (unsigned char)(value >> 8);
+#ifdef SCHED_THREAD
+		/* Encourage native preemption while update remains protected */
+		SwitchToThread();
+#endif
+		error = bwrite(bp);
+	}
+	kernel_unlock();
+	return error;
+}
+
+static unsigned int ram_counter(void)
+{
+	struct buf *bp;
+	unsigned int value;
+	int error;
+
+	value = 0;
+	kernel_lock();
+	bp = bread(makedev(RAM_MAJOR, 0), 0, &error);
+	CHECK(bp != NULL && error == 0);
+	if (bp) {
+		value = bp->b_addr[0] | ((unsigned int)bp->b_addr[1] << 8);
+		brelse(bp);
+	}
+	kernel_unlock();
+	return value;
+}
+
+static void io_stage_entry(void *arg)
+{
+	struct io_stage *stage;
+	unsigned char data[37];
+	ptrdiff_t count;
+	ptrdiff_t written;
+	size_t remaining;
+
+	stage = arg;
+	for (;;) {
+		if (stage->read_fd < 0) {
+			remaining = stage->total - stage->transferred;
+			if (!remaining)
+				break;
+			if (remaining > sizeof(data))
+				remaining = sizeof(data);
+			memcpy(data, stage->source + stage->transferred,
+			       remaining);
+			count = (ptrdiff_t)remaining;
+		} else {
+			count = proc_read(stage->read_fd, data, sizeof(data));
+			if (count <= 0) {
+				stage->error = (int)count;
+				break;
+			}
+		}
+		stage->error = ram_increment();
+		if (stage->error)
+			break;
+		stage->updates++;
+		if (stage->write_fd >= 0) {
+			written = proc_write(stage->write_fd, data,
+					     (size_t)count);
+			if (written != count) {
+				stage->error = -SYS_EIO;
+				break;
+			}
+		} else {
+			if (stage->transferred + (size_t)count > stage->total) {
+				stage->error = -SYS_EIO;
+				break;
+			}
+			memcpy(stage->output + stage->transferred, data,
+			       (size_t)count);
+		}
+		stage->transferred += (size_t)count;
+	}
+	if (stage->read_fd >= 0)
+		CHECK(proc_close(stage->read_fd) == 0);
+	if (stage->write_fd >= 0)
+		CHECK(proc_close(stage->write_fd) == 0);
+}
+
+static void test_pipeline_ram(void)
+{
+	struct proc procs[PIPELINE_MAX];
+	struct io_stage stages[PIPELINE_MAX];
+	unsigned char source[TEST_DATA_SIZE];
+	unsigned char output[TEST_DATA_SIZE];
+	unsigned int updates;
+	int prepared;
+	int i;
+
+	ram_test_begin();
+	memset(stages, 0, sizeof(stages));
+	memset(output, 0, sizeof(output));
+	for (i = 0; i < TEST_DATA_SIZE; i++)
+		source[i] = (unsigned char)(i * 37);
+	for (i = 0; i < PIPELINE_MAX; i++) {
+		proc_init(&procs[i]);
+		stages[i].source = source;
+		stages[i].output = output;
+		stages[i].total = sizeof(source);
+		stages[i].read_fd = -1;
+		stages[i].write_fd = -1;
+	}
+	prepared = 0;
+	for (i = 0; i < PIPELINE_MAX - 1; i++) {
+		if (connect_pipe(&procs[i], &procs[i + 1],
+				 &stages[i].write_fd, &stages[i + 1].read_fd)) {
+			CHECK(0);
+			goto out;
+		}
+	}
+	CHECK(pipe_in_use() == NINODE);
+	for (i = 0; i < PIPELINE_MAX; i++) {
+		if (sched_prepare(&procs[i], io_stage_entry, &stages[i])) {
+			CHECK(0);
+			goto out;
+		}
+		prepared++;
+	}
+	CHECK(run_scheduler(procs, PIPELINE_MAX) == 0);
+	updates = 0;
+	for (i = 0; i < PIPELINE_MAX; i++) {
+		CHECK(stages[i].error == 0);
+		CHECK(stages[i].transferred == sizeof(source));
+		updates += stages[i].updates;
+	}
+	CHECK(max_pipe_io > 0);
+	CHECK(ram_counter() == updates);
+	CHECK(memcmp(source, output, sizeof(source)) == 0);
+out:
+	for (i = 0; i < PIPELINE_MAX; i++)
+		close_all_locked(&procs[i]);
+	for (i = 0; i < prepared; i++)
+		sched_release(&procs[i]);
+	ram_test_end();
+}
+
+#ifdef SCHED_THREAD
+static unsigned __stdcall native_ram_entry(void *arg)
+{
+	struct native_arg *worker;
+	int i;
+
+	worker = arg;
+	if (current_proc() ||
+	    WaitForSingleObject(worker->start, 20000) != WAIT_OBJECT_0) {
+		worker->error = -SYS_EINVAL;
+		return 1;
+	}
+	for (i = 0; i < 500; i++) {
+		worker->error = ram_increment();
+		if (worker->error)
+			return 1;
+	}
+	return 0;
+}
+
+static void test_parallel_ram(void)
+{
+	struct proc owner;
+	struct native_arg workers[2];
+	HANDLE threads[2];
+	HANDLE start;
+	DWORD result;
+	int pipes[NINODE][2];
+	int created;
+	int i;
+
+	ram_test_begin();
+	proc_init(&owner);
+	kernel_lock();
+	make_full_pipes(&owner, pipes);
+	kernel_unlock();
+	start = CreateEvent(NULL, TRUE, FALSE, NULL);
+	CHECK(start != NULL);
+	created = 0;
+	if (start) {
+		for (i = 0; i < 2; i++) {
+			workers[i].start = start;
+			workers[i].error = 0;
+			threads[i] = (HANDLE)_beginthreadex(NULL, 0,
+					native_ram_entry, &workers[i], 0, NULL);
+			if (!threads[i])
+				break;
+			created++;
+		}
+		CHECK(SetEvent(start));
+		if (created) {
+			result = WaitForMultipleObjects((DWORD)created, threads,
+						      TRUE, 20000);
+			CHECK(result == WAIT_OBJECT_0);
+			if (result != WAIT_OBJECT_0)
+				exit(1);
+		}
+		for (i = 0; i < created; i++) {
+			CHECK(workers[i].error == 0);
+			CHECK(CloseHandle(threads[i]));
+		}
+		CHECK(CloseHandle(start));
+	}
+	CHECK(created == 2);
+	CHECK(ram_counter() == (unsigned int)(created * 500));
+	CHECK(max_pipe_io > 0);
+	kernel_lock();
+	drain_full_pipes(&owner, pipes);
+	kernel_unlock();
+	ram_test_end();
+}
+#endif
+#endif

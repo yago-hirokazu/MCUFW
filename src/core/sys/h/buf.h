@@ -10,7 +10,7 @@
 #endif
 
 #ifndef NBUF
-#define NBUF	3
+#define NBUF	5
 #endif
 
 #define NODEV	((unsigned int)-1)
@@ -62,10 +62,12 @@ extern unsigned char buffers[NBUF][BSIZE];
 extern struct buf buf[NBUF];
 extern struct buf bfreelist;
 
+/* Caller holds kernel lock for cache, I/O and owned payload access */
+/* Quiescent initialization and single-execution tests may omit lock */
 void binit(void);
 struct buf *getblk(unsigned int dev, unsigned long blkno);
 struct buf *geteblk(void);
-/* Caller holds kernel lock; only BDEV_SYNC drivers supported */
+/* Only BDEV_SYNC drivers supported; busy hit or exhaustion is EAGAIN */
 /* Return owned buffer on success; set required error output on failure */
 struct buf *bread(unsigned int dev, unsigned long blkno, int *error);
 /* Consume owned synchronous buffer even on I/O error */

@@ -5,7 +5,7 @@
 対象: `C:\usr\src\MCUFW`
 
 確認時HEAD: `d7ec485`
-状態: Step 3完了。確定仕様はSection 11、実施記録はSection 12以降を参照
+状態: Step 4完了。確定仕様はSection 11、実施記録はSection 12以降を参照
 
 ## 1. 目的と到達点
 
@@ -53,7 +53,7 @@ commitは依頼の範囲に従い、未commitなら記録欄にその旨を書�
 | 1 | dev指定と要求契約の整備 | done | 開始HEAD 3c50a9e、本書を含むStep 1 commitに記録 |
 | 2 | RAMドライバの単体実装 | done | 開始HEAD a2f6171、本書を含むStep 2 commitに記録 |
 | 3 | breadとbwriteの実装 | done | 開始HEAD 0054ec9、本書を含むStep 3 commitに記録 |
-| 4 | 資源と排他とpipe共存 | pending | |
+| 4 | 資源と排他とpipe共存 | done | 開始HEAD 6fc0b54、本書を含むStep 4 commitに記録 |
 | 5 | 遅延書込みと書戻し | pending | |
 | 6 | Windows統合と全回帰 | pending | |
 
@@ -64,7 +64,7 @@ commitは依頼の範囲に従い、未commitなら記録欄にその旨を書�
 
 | ファイル | 確認済みの内容 |
 |---|---|
-| `src/core/sys/h/buf.h` | dev分解マクロ、範囲検査付きmakedev、BSIZE=256、NBUF=3 |
+| `src/core/sys/h/buf.h` | dev分解マクロ、範囲検査付きmakedev、BSIZE=256、NBUF=5 |
 | `src/core/sys/h/conf.h` | bdevsw、bdev_queue、dev検査、要求検査、提出、queue API |
 | `src/core/sys/conf/conf.c` | 固定table、pipeとRAMのsentinel、登録済みRAM entry |
 | `src/core/sys/dev/ramdisk.c` | 固定RAM領域、raminit、ramstrategy、同期コピーと完了 |
@@ -80,8 +80,8 @@ buffer I/O APIはBDEV_SYNC driverだけへ提出し、未対応driverはENOSYS�
 `getblk()`と`geteblk()`は再利用候補が`B_DELWRI`なら`NULL`を返し、書戻さない。
 `getblk()`はbusy hitや空きなしでも待機せず`NULL`を返す。
 
-既存pipeは寿命の間bufferを`B_BUSY`で保持する。3本で現行NBUFを使い切るため、
-RAM I/O追加時にはbuffer予算の検討が必要になる。
+既存pipeは寿命の間bufferを`B_BUSY`で保持する。既定構成は3本のpipeが3個を使い、
+残る2個をRAM I/Oで利用できる。専用予約はなく、競合・枯渇時はEAGAINを返す。
 
 関連文書:
 
@@ -472,7 +472,7 @@ raminitは起動・試験のquiescent初期化専用とする。実行中reset A
 未保存dirty dataなしの状態に限定し、raminitの直後にbinitする。
 cache有効のままRAMだけを消して利用を再開する経路を公開しない。
 
-Step 1〜3ではNBUF=3を維持し、Step 4で共存構成の既定値を5へ変更する。
+Step 1〜3ではNBUF=3を維持した。Step 4で共存構成の既定値を5へ変更した。
 NINODE=3とPIPELINE_MAX=4は維持し、最大3本のpipeに加えて2個のI/O bufferを
 保持できる構成とする。予約poolは分けず、枯渇時はEAGAINとする。
 小容量の上書き構成は維持するが、その構成では最大pipeとRAM I/Oの併用を保証しない。
@@ -951,3 +951,151 @@ Step 5で遅延書込みを実装すると、dirty候補がEAGAINとなる今回
 書戻し成功・失敗を検証する試験へ更新する必要がある。
 raw B_ASYNCは使用可能だが、公開bwriteの非同期対応はまだない。
 BDEV_SYNCだけで非同期driverを動かさず、待機機構を追加してから対応範囲を広げる。
+
+## 16. Step 4実施記録
+
+実施日: 2026-10-17
+
+開始HEAD: `6fc0b54 Add synchronous buffer reads and writes`
+
+branch: `feature/mrunsv`
+
+作業状態: 実装と関連回帰試験完了。本書を含むStep 4 commitに記録
+
+### 資源とlockの確定
+
+buf.hの既定NBUFを3から5へ変更した。BSIZE=256、NINODE=3、PIPELINE_MAX=4は
+維持し、最大3本のpipeと、同時保持できるRAM I/O buffer2個の予算とした。
+NBUFの既定値は引き続きbuf.hの一箇所だけで定義する。
+compile optionによるNBUF=3の上書きも維持し、同一buildでは全TUへ同じ値を渡す。
+poolは分割・予約せず、実際に空きがなければgetblkはNULL、breadはEAGAINとなる。
+
+lock境界は既存のcaller方式を維持し、buf.h、conf.h、sched.hで対象を明記した。
+kernel lockはcacheのb-list/av-list、B_BUSY、queue、pipe/file/inode、wait条件を保護する。
+cache取得からpayloadの参照・更新、提出、解放までcallerが同じlockで保護する。
+低層APIは内部でlockしないので、すでにlockを持つcallerから再帰lockしない。
+初期化と他の実行主体がない単体試験だけはlock省略可とする。
+
+確認したproductionの呼出し経路:
+
+- esh/exe.cのpipe接続・owner解放・各process close_allはkernel lock区間内
+- sys/pipe.cのsys_pipeはlockを取得してpipe_for_procへ接続
+- sys/sys2.cのsys_read/sys_write/sys_closeはlock区間内で低層file/pipe処理を呼ぶ
+- alloc.cのgetblk、iget.cのbrelseは上記callerのlockを継承する
+- Windows esh_adapt.cのbinit/finitはlive資源のない起動時初期化
+
+低層buffer I/Oはcurrent_procを必要とせず、process外のcallerもlockを取得して使える。
+本Stepでsleep/wakeup、非同期I/O待機、ISR対応は追加していない。
+busy hitや枯渇は即座にEAGAINとし、所有状態を変えず、内部で無期限retryしない。
+
+### V7との対応
+
+bundled V7 usr/sys/dev/bio.cのgetblkで、busy bufferとfree list枯渇時に
+sleepして再探索する経路と、splによるlist保護を確認した。
+MCUFWでは従来方針どおりcallerのkernel lockで保護し、取得不能を明示的に返す。
+buffer/list/queueとpipeの実装本体は変更せず、資源上限と呼出し規約の確認に留めた。
+
+### 共存試験
+
+sys/test/schedへ以下を追加した。
+
+1. process外のcallerがkernel lockを保持して3本のpipeへ異なるmarkerを書く
+2. 既定構成では残り2 bufferをRAM I/Oで同時保持する
+3. busy hit・全buffer保持・追加pipe生成が失敗しても所有資源が変わらないことを確認
+4. RAMへの書込みとcache再利用、I/O失敗を経てもpipe markerを読み戻せることを確認
+5. 全bufferをRAM要求で保持した状態のpipe生成失敗と、解放後の生成成功を確認
+6. 最大4段・3 pipeのbinary転送中に、各段が同じRAM blockのcounterを更新する
+7. EOFまで転送でき、counterが各段の更新回数合計と一致することを確認
+8. thread構成ではnative thread2本をeventで同時開始し、各500回counterを更新する
+
+native thread試験はschedulerのrun tokenに依存しない実際の並行実行である。
+各threadのcurrent_procはNULLのまま、3本のpipeを保持しながらRAMを更新する。
+read-modify-write中にSwitchToThreadを呼び、lockで保護された区間の競合を促す。
+2本をjoinしてからcounter=1000、pipe marker、全資源回収を確認する。
+native threadを起動するコードはWindows thread試験だけにあり、portable coreへは
+追加していない。
+
+RAM strategyの試験wrapperでkernel_is_lockedを検査する。
+cache取得・更新・提出・解放でcallerのlockが維持され、二重lockで停止しないことを
+実際のthread backendでも確認する。試験終了時にはfile/inode/busy bufferが0で、
+b-list/av-listの双方向link、全bufferの単一所属、queue空も確認する。
+
+小容量NBUF=3では、3本のpipeだけでpoolを使い切り、RAM I/OはEAGAINとなることと、
+pipe dataと資源の回収を検証する。RAM用2 bufferが必要なpipeline/native並行試験は
+この構成では実施しない。
+
+### メモリ予算
+
+Windows MINGW64でsizeofを測定した。O0/O2と両backendで同じ結果だった。
+
+| 項目 | NBUF=5のbyte数 |
+|---|---:|
+| RAM保存領域 2装置×16block×256 | 8192 |
+| cache payload buffers | 1280 |
+| buffer header 5×sizeof(struct buf) | 440 |
+| sentinel 3×sizeof(struct buf) | 264 |
+| RAM queue sizeof(struct bdev_queue) | 32 |
+| 上記小計 | 10208 |
+| bdevsw 2 entry | 64 |
+| nblkdev | 4 |
+| sizeofの合計 | 10276 |
+
+sizeof(struct buf)=88。NBUF=3ではpayload=768、header=264であり、
+既定値変更による増分は512+176=688 byte。
+linker alignment/padding、file/inode table、scheduler、stack、試験専用領域は
+上記合計に含まない。STM32の実際のheader幅・配置は移植時に測定する。
+
+### 変更ファイル
+
+- src/core/sys/h/buf.h
+- src/core/sys/h/conf.h
+- src/core/sys/h/sched.h
+- src/core/sys/test/sched/Makefile
+- src/core/sys/test/sched/run_test.sh
+- src/core/sys/test/sched/test_sched.c
+- docs/unix_v7_ram_block_device_handoff.md
+
+開始前からある利用者の.gitignoreとAGENTS.mdの変更は編集していない。
+変更前はsys/header/table/bio/bdev/ramdisk/file/pipeの7 suiteをO0/O2で実行し、
+試験と各構成のmake cleanがすべてexit 0。
+
+schedのrun_test.shは、既定値とEXTRA_CPPFLAGS=-DNBUF=3の各構成について、
+coroutine/thread × O0/O2の計8構成を実行する。
+各構成終了時のmake cleanと、失敗時にもcleanするEXIT trapを追加した。
+試験はMSYS2 MINGW64 login shell経由で実行し、PowerShellからgccを直接起動しない。
+一時logは`/tmp/mcufw_step4_before_<suite>.log`と
+`/tmp/mcufw_step4_after_<suite>.log`へ保存した。
+
+変更後の結果:
+
+| suite | 構成 | 試験とclean |
+|---|---|---|
+| sys/sched | NBUF=5/3 × cortn/thread × O0/O2、計8構成 | ともにexit 0 |
+| sys/header | C/C++、O0/O2、単独includeとinclude順 | ともにexit 0 |
+| sys/table | O0/O2 | ともにexit 0 |
+| sys/bio | O0/O2 | ともにexit 0 |
+| sys/bdev | O0/O2 | ともにexit 0 |
+| sys/ramdisk | O0/O2 | ともにexit 0 |
+| sys/file | O0/O2 | ともにexit 0 |
+| sys/pipe | O0/O2 | ともにexit 0 |
+| esh/pipe | cortn/thread × O0/O2 | ともにexit 0 |
+| esh/sched | cortn/thread × O0/O2 | ともにexit 0 |
+| esh/pipeline_exec | cortn/thread × O0/O2 | ともにexit 0 |
+| esh/exe | 既定build、test1〜10とgolden比較 | ともにexit 0 |
+
+全12 suiteで成功し、sys/schedでは8回のall tests passedを確認した。
+全構成のmake cleanが成功し、生成対象のOUTDIR/TARGET計70 pathの残存は0。
+既存eshの警告と異常入力に対するparser診断はあるが、試験失敗はない。
+git diff --check -- docs srcと、変更C/headerのtab幅8での80 column検査も成功した。
+Windows mainのbuild・対話試験、TDM-GCC toolchain、par、STM32実機は未実行。
+今回の関連回帰以外の全体確認はStep 6へ残す。
+
+### 次Stepへの注意事項
+
+次はStep 5の遅延書込みと書戻し。dirty bufferの保持・再利用、flushの完了保証、
+書込み失敗後の保持と通知方法をStep開始時に確定する。
+V7のbdwrite/bawrite/getblk/geteblk/bflushをまとめて確認してから実装すること。
+現在の公開bwriteは同期専用で、B_ASYNCは拒否する。raw strategyのB_ASYNCは有効。
+失敗dirty bufferをB_ERRORのまま通常brelseへ渡すとdev関連が失われるため、
+dirty dataの保持方針とerror後処理を一組で設計する。
+本Stepのlock区間を維持し、遅延書込みを導入しても未完了要求を解放しないこと。

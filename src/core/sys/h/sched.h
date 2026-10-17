@@ -45,7 +45,7 @@ struct wait_chan {
 	struct proc *wc_tail;
 };
 
-/* Non-recursive kernel lock protects pipe predicates and wait lists */
+/* Non-recursive kernel lock protects pipes, cache, queues and wait lists */
 /* Release joins backend outside lock; close fds before releasing process */
 void kernel_lock(void);
 void kernel_unlock(void);
