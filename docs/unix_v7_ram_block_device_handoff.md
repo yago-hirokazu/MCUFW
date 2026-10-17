@@ -5,7 +5,7 @@
 対象: `C:\usr\src\MCUFW`
 
 確認時HEAD: `d7ec485`
-状態: Step 4完了。確定仕様はSection 11、実施記録はSection 12以降を参照
+状態: Step 5完了。確定仕様はSection 11、実施記録はSection 12以降を参照
 
 ## 1. 目的と到達点
 
@@ -54,7 +54,7 @@ commitは依頼の範囲に従い、未commitなら記録欄にその旨を書�
 | 2 | RAMドライバの単体実装 | done | 開始HEAD a2f6171、本書を含むStep 2 commitに記録 |
 | 3 | breadとbwriteの実装 | done | 開始HEAD 0054ec9、本書を含むStep 3 commitに記録 |
 | 4 | 資源と排他とpipe共存 | done | 開始HEAD 6fc0b54、本書を含むStep 4 commitに記録 |
-| 5 | 遅延書込みと書戻し | pending | |
+| 5 | 遅延書込みと書戻し | done | 開始HEAD 4de9278、本書を含むStep 5 commitに記録 |
 | 6 | Windows統合と全回帰 | pending | |
 
 状態は`pending`、`active`、`done`、`blocked`を使用する。
@@ -413,7 +413,8 @@ busy hitと空きなしはNULL、breadからは-SYS_EAGAINへ変換する。
 Step 5前のdirty候補による取得不能も-SYS_EAGAINとし、spin retryしない。
 breadはdevの共通検査を先に行い、不正major等を枯渇と混同しない。
 
-breadのcache hit条件はB_DONEかつB_ERRORなしとする。
+breadのcache hit条件はB_DONEかつB_ERRORなしとする。ただしStep 5で追加した
+失敗dirty bufferはB_DONEとB_DELWRIを維持し、保存前のcache内容を返す。
 getblkはblock内容を初期化しないので、全blockを書き換える場合だけ直接使用できる。
 部分更新はbreadで旧内容を取得してからbwriteする。
 
@@ -441,7 +442,7 @@ mock非同期driverを使う既存queue試験は残すが、bread/bwriteには�
 
 raw strategyではB_ASYNCも処理する。iodone内でbrelseされるので、完了後は
 driverと呼出し側のどちらもbufferを参照しない。既存queue_completeの返却pointerも
-完了の識別以外に使用しない。bwriteは同期専用で、bawrite等はStep 5で追加する。
+完了の識別以外に使用しない。bwriteは同期専用で、Step 5の追加APIはSection 17参照。
 
 ### 11.4 errorの割当
 
@@ -503,8 +504,8 @@ conf.cをlinkする各Makefileへramdisk.cと必要なbdev.cを同じStepで追�
 Makefile整備をStep 6まで延期して中間Stepをlink不能にしない。
 Step 6はWindows起動接続と全体確認を担当する。
 
-Step 5のdirty失敗保持、flush保証、非同期error通知は同Step開始時に確定する。
-Step 0の同期RAM契約に影響しない範囲の追加契約として扱う。
+Step 5のdirty失敗保持、flush保証、error通知はSection 17で確定する。
+Step 0の同期RAM契約を維持し、非同期driverの待機機構は追加しない。
 
 ### 11.7 Step 1の着手範囲
 
@@ -1099,3 +1100,101 @@ V7のbdwrite/bawrite/getblk/geteblk/bflushをまとめて確認してから実�
 失敗dirty bufferをB_ERRORのまま通常brelseへ渡すとdev関連が失われるため、
 dirty dataの保持方針とerror後処理を一組で設計する。
 本Stepのlock区間を維持し、遅延書込みを導入しても未完了要求を解放しないこと。
+
+## 17. Step 5 実施記録
+
+開始HEAD: `4de9278`
+
+作業状態: 実装と関連回帰試験完了。本書を含むStep 5 commitに記録
+
+### V7との対応と追加契約
+
+根拠は同梱V7 `usr/sys/dev/bio.c` のbdwrite、bawrite、getblk、geteblk、
+bflush、brelse、iodone。bdwriteのB_DELWRI/B_DONE設定と解放、dirty候補を
+書戻してから再探索する流れ、devまたはNODEVによるflush対象選択を踏襲した。
+
+V7のbawrite/bflushは非同期提出を行う。MCUFWは既存のBDEV_SYNC契約に限定し、
+書込み完了と結果取得を済ませてから解放する。公開bawriteは非同期driverには
+未対応であり、B_ASYNCを立てず、同期完了の結果を返す。raw strategyの
+B_ASYNC/iodone経路は変更していない。完了後に解放済みbufferを参照しない。
+
+V7のerror時の関連付け破棄はdirtyデータの保持と両立しないため、dirtyについて
+保持する契約を追加した。これに伴いbrelseはB_ERRORかつB_DELWRIの場合に
+dev/block関連付けを維持する。保存成功後だけdirtyを落として再利用可能にする。
+
+| API | 契約 |
+|---|---|
+| bdwrite(bp) | 所有bufferをB_DELWRI/B_DONEにして解放。I/Oせず0を返す |
+| bawrite(bp) | 同期提出・完了・解放し、0または負のerrorを返す |
+| bwrite(bp) | 従来の同期契約を維持。既存dirtyの失敗時は内容と関連付けを保持 |
+| bflush(dev) | 指定devのdirtyを保存。NODEVなら全dev。成功0は対象dirtyなしを保証 |
+| getblk/geteblk | 空き先頭のdirtyを書戻して再探索。保存前に再関連付けしない |
+
+bdwriteはNULL、非busy、B_ASYNC、queue所属、壊れたqueue、および未対応devを
+状態変更なしで拒否する。dev検査は既存の共通登録・同期能力検査であり、minorと
+block容量の検証はdriver提出時に行う。bdwrite後にbufferを参照・再解放しない。
+bawriteも所有権違反は状態変更なしで拒否する。有効な所有bufferでのI/O失敗は
+bufferを解放しつつdirtyとして保持する。初回bwriteの非dirty I/O失敗は従来どおり
+無効化する。再初期化で未保存dirtyを捨てる使い方は禁止する。
+
+書戻し失敗はB_DELWRI/B_DONE/B_ERROR、正のb_errorと未転送b_residを残す。
+getblkで同じblockを再取得でき、breadはこのdirty cache内容を返す。その際の
+error出力は0であり、過去の保存失敗はb_error/B_ERRORで確認する。readを再提出して
+未保存内容を上書きしない。bwrite、bawrite、bflushで再試行できる。
+
+flushはbuffer配列をNBUF回だけ走査し、空いている対象dirtyを各1回書戻す。
+対象busy dirtyは保持して-SYS_EAGAINを返す。他のbufferの処理は続け、
+保存errorをbusy由来のEAGAINより優先する。複数errorは先に観測した非EAGAINを
+返す。個別の失敗情報は各dirty bufferにも残る。全てbusyなら待機せず戻る。
+PIPEDEVなどstrategyなしのdevを明示指定すると-SYS_ENODEVを返す。
+
+getblk/geteblkの再探索は最大NBUF+1回。書戻しに失敗すると直ちにNULLで戻り、
+breadからは-SYS_EAGAINになる。呼出し側はbflushで保存errorを取得して対処できる。
+自動retry loop、非同期error callback、background workerは追加していない。
+成功した書戻しbufferは通常の空きリスト末尾へ解放するため、全buffer dirty時は
+最大NBUF件を保存してから先頭を再利用する。V7の非同期B_AGE操作は採用しない。
+
+全APIとpayload操作は既存どおりcallerのkernel lock区間で行う。
+flushのコピー量は最大NBUF*BSIZE、既定値では1280 byte。内部lock、sleep、
+heap確保、待機queue、永続ストレージ、構造体memberや固定領域の追加はない。
+
+### 変更ファイルと試験
+
+- `src/core/sys/dev/bio.c`: 遅延書込み、同期書戻し、flush、dirty失敗保持
+- `src/core/sys/h/buf.h`: 公開APIと完了・所有権契約
+- `src/core/sys/test/bio/test_bio.c`: dirty遷移、全dirty再利用、dev選択、失敗・再試行
+- `src/core/sys/test/bio/run_test.sh`: 各構成と失敗終了時のmake clean
+- `src/core/sys/test/sched/test_sched.c`: 最大pipe保持中のdirty追出しとflush
+- 本書: 進捗、契約と実施結果
+
+専用試験はbdwriteでI/Oしないこと、dirty cache hit、busy dirtyのEAGAIN、
+minor別flushと全flush、cache再初期化後の保存内容、全dirtyからのgetblk/geteblk、
+driver受付拒否、完了error、dirtyのbwrite失敗と再取得、再試行成功、
+所有権違反時の状態不変、双方向listとqueueの不変条件を確認する。
+Step 4の容量試験も遅延書込みで実行し、既定NBUF=5で3本のpipeを保持したまま
+残り2bufferをdirtyにし、追出し・flush後もRAM内容とpipe markerが一致することを
+確認する。同期I/Oのpipeline・native thread試験も維持する。
+
+| suite | 構成 | 結果 |
+|---|---|---|
+| sys/header | C/C++、通常・逆順include、単独header、O0/O2 | pass |
+| sys/table、bio、bdev、ramdisk、file、pipe | 各O0/O2 | pass |
+| sys/sched | NBUF=5/3、cortn/thread、O0/O2の8構成 | pass |
+| esh/pipe、sched、pipeline_exec | 各cortn/thread、O0/O2 | pass |
+
+全11 suiteで成功。sys/schedはdirty共存を追加した最終版で8構成を再確認した。
+試験後は各Makefileのmake cleanを実行し、生成対象66 pathの残存0を確認した。
+git diff --checkと変更C/headerのtab幅8・80 column検査も成功した。
+試験logはMSYS2の
+`/tmp/mcufw_step5_*.log`、dirty共存の最終版は
+`/tmp/mcufw_step5_sys_sched_dirty.log`に記録した。
+着手前のbaseline再実行は行わず、比較元はStep 4の記録とcommitとした。
+Windows mainの起動接続・対話試験と全体回帰はStep 6、STM32実機は後続作業。
+
+### 次Stepへの注意事項
+
+次はStep 6のWindows起動接続と全回帰。raminit/binit/finitの初期化順を接続し、
+Windows build・対話コマンド、parser/executorを含む全体回帰を行う。
+dirty導入後もbinitはflushを行わないため、再初期化前にbflush(NODEV)==0かつ
+全利用者停止を保証する。RAMの揮発性、busy時EAGAIN、BDEV_SYNC限定は維持する。
+本Stepは非同期driverの待機・error通知基盤やSTM32実機移植を先取りしない。

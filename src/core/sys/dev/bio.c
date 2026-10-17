@@ -12,6 +12,8 @@ unsigned char buffers[NBUF][BSIZE];
 static struct buf *getdev(unsigned int dev);
 static int sync_device(unsigned int dev);
 static int sync_io(struct buf *bp);
+static struct buf *available_buffer(void);
+static int write_buffer(struct buf *bp, int retain);
 static int geterror(struct buf *bp);
 static void prepare_read(struct buf *bp);
 static void prepare_write(struct buf *bp);
@@ -76,13 +78,10 @@ struct buf *getblk(unsigned int dev, unsigned long blkno)
 		return bp;
 	}
 
-	bp = bfreelist.av_forw;
-	if (bp == &bfreelist)
-		return NULL;
-	if (bp->b_flags & B_DELWRI)
+	bp = available_buffer();
+	if (!bp)
 		return NULL;
 
-	notavail(bp);
 	reassociate(bp, dp, dev, blkno);
 	return bp;
 }
@@ -91,13 +90,10 @@ struct buf *geteblk(void)
 {
 	struct buf *bp;
 
-	bp = bfreelist.av_forw;
-	if (bp == &bfreelist)
-		return NULL;
-	if (bp->b_flags & B_DELWRI)
+	bp = available_buffer();
+	if (!bp)
 		return NULL;
 
-	notavail(bp);
 	reassociate(bp, &bfreelist, NODEV, 0);
 	return bp;
 }
@@ -116,7 +112,8 @@ struct buf *bread(unsigned int dev, unsigned long blkno, int *error)
 		*error = -SYS_EAGAIN;
 		return NULL;
 	}
-	if ((bp->b_flags & B_DONE) && !(bp->b_flags & B_ERROR))
+	if ((bp->b_flags & B_DONE) &&
+	    (!(bp->b_flags & B_ERROR) || (bp->b_flags & B_DELWRI)))
 		return bp;
 	prepare_read(bp);
 	*error = sync_io(bp);
@@ -130,6 +127,11 @@ struct buf *bread(unsigned int dev, unsigned long blkno, int *error)
 
 int bwrite(struct buf *bp)
 {
+	return write_buffer(bp, bp && (bp->b_flags & B_DELWRI));
+}
+
+int bdwrite(struct buf *bp)
+{
 	int result;
 
 	if (!bp || (bp->b_flags & B_ASYNC))
@@ -137,13 +139,51 @@ int bwrite(struct buf *bp)
 	result = bdev_buffer_check(bp);
 	if (result < 0)
 		return result;
-	prepare_write(bp);
 	result = sync_device(bp->b_dev);
-	if (!result)
-		result = sync_io(bp);
 	if (result)
-		io_error(bp, result);
+		return result;
+	bp->b_flags &= ~(B_READ | B_ERROR);
+	bp->b_flags |= B_DELWRI | B_DONE;
+	bp->b_error = 0;
+	bp->b_resid = 0;
 	brelse(bp);
+	return 0;
+}
+
+int bawrite(struct buf *bp)
+{
+	/* Synchronous drivers complete before release and error return */
+	return write_buffer(bp, 1);
+}
+
+int bflush(unsigned int dev)
+{
+	struct buf *bp;
+	int result;
+	int error;
+	int i;
+
+	if (dev != NODEV) {
+		error = sync_device(dev);
+		if (error)
+			return error;
+	}
+	result = 0;
+	for (i = 0; i < NBUF; i++) {
+		bp = &buf[i];
+		if (!(bp->b_flags & B_DELWRI) ||
+		    (dev != NODEV && bp->b_dev != dev))
+			continue;
+		if (bp->b_flags & B_BUSY) {
+			if (!result)
+				result = -SYS_EAGAIN;
+			continue;
+		}
+		notavail(bp);
+		error = bawrite(bp);
+		if (error && (!result || result == -SYS_EAGAIN))
+			result = error;
+	}
 	return result;
 }
 
@@ -151,7 +191,7 @@ void brelse(struct buf *bp)
 {
 	if (!bp || !(bp->b_flags & B_BUSY))
 		return;
-	if (bp->b_flags & B_ERROR) {
+	if ((bp->b_flags & B_ERROR) && !(bp->b_flags & B_DELWRI)) {
 		b_list_remove(bp);
 		b_list_insert(&bfreelist, bp);
 		bp->b_dev = NODEV;
@@ -199,12 +239,53 @@ void iodone(struct buf *bp)
 		bp->b_flags &= ~B_WANTED;
 }
 
+static int write_buffer(struct buf *bp, int retain)
+{
+	int result;
+
+	if (!bp || (bp->b_flags & B_ASYNC))
+		return -SYS_EINVAL;
+	result = bdev_buffer_check(bp);
+	if (result < 0)
+		return result;
+	prepare_write(bp);
+	result = sync_device(bp->b_dev);
+	if (!result)
+		result = sync_io(bp);
+	if (result) {
+		io_error(bp, result);
+		if (retain)
+			bp->b_flags |= B_DELWRI | B_DONE;
+	}
+	brelse(bp);
+	return result;
+}
+
 static struct buf *getdev(unsigned int dev)
 {
 	struct bdevsw *dp;
 
 	dp = bdev_get(dev);
 	return dp ? dp->d_tab : NULL;
+}
+
+static struct buf *available_buffer(void)
+{
+	struct buf *bp;
+	int i;
+
+	/* Bound retries even when every available buffer needs writeback */
+	for (i = 0; i <= NBUF; i++) {
+		bp = bfreelist.av_forw;
+		if (bp == &bfreelist)
+			return NULL;
+		notavail(bp);
+		if (!(bp->b_flags & B_DELWRI))
+			return bp;
+		if (bawrite(bp))
+			return NULL;
+	}
+	return NULL;
 }
 
 static int sync_device(unsigned int dev)

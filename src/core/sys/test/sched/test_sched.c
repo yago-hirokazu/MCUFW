@@ -643,14 +643,14 @@ static void test_ram_capacity(void)
 	CHECK(pipe_for_proc(&owner, fd) == -SYS_ENFILE);
 	CHECK(file_in_use() == NINODE * 2);
 	for (i = 0; i < extra; i++)
-		CHECK(bwrite(held[i]) == 0);
+		CHECK(bdwrite(held[i]) == 0);
 	if (extra) {
 		for (i = 0; i < extra * 2 + 1; i++) {
 			bp = bread(makedev(RAM_MAJOR, 1), (unsigned long)i,
 				   &error);
 			CHECK(bp != NULL && error == 0);
 			bp->b_addr[0] = (unsigned char)i;
-			CHECK(bwrite(bp) == 0);
+			CHECK(bdwrite(bp) == 0);
 		}
 		bp = getblk(makedev(RAM_MAJOR, 0), RAM_NBLK);
 		CHECK(bp != NULL);
@@ -660,6 +660,7 @@ static void test_ram_capacity(void)
 		brelse(bp);
 		CHECK(max_pipe_io > 0);
 	}
+	CHECK(bflush(NODEV) == 0);
 	drain_full_pipes(&owner, pipes);
 	CHECK(kernel_is_locked());
 	for (i = 0; i < NBUF; i++) {

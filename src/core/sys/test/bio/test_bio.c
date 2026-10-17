@@ -50,6 +50,9 @@ static void test_io_registration(void);
 static void test_io_exhaustion(void);
 static void test_write_ownership(void);
 static void check_write_rejected(struct buf *bp, int error);
+static void test_delayed_write(void);
+static void test_writeback_failure(void);
+static void test_dirty_reuse(void);
 
 int main(void)
 {
@@ -68,6 +71,9 @@ int main(void)
 	test_io_registration();
 	test_io_exhaustion();
 	test_write_ownership();
+	test_delayed_write();
+	test_writeback_failure();
+	test_dirty_reuse();
 	if (failures) {
 		printf("%d tests failed\n", failures);
 		return 1;
@@ -565,9 +571,11 @@ static void test_io_registration(void)
 	bp = getblk(makedev(RAM_MAJOR, 0), 0);
 	bp->b_flags |= B_DONE | B_DELWRI | B_AGE;
 	CHECK(bwrite(bp) == -SYS_ENOSYS);
-	CHECK(!incore(makedev(RAM_MAJOR, 0), 0));
-	CHECK(!(bfreelist.av_back->b_flags & B_DELWRI));
+	CHECK(incore(makedev(RAM_MAJOR, 0), 0));
+	CHECK(bfreelist.av_back->b_flags & B_DELWRI);
 	bdevsw[RAM_MAJOR].d_flags = BDEV_SYNC;
+	CHECK(bflush(NODEV) == 0);
+	io_writes = 0;
 	bdevsw[RAM_MAJOR].d_strategy = NULL;
 	CHECK(bread(makedev(RAM_MAJOR, 0), 0, &error) == NULL);
 	CHECK(error == -SYS_ENODEV);
@@ -606,11 +614,9 @@ static void test_io_exhaustion(void)
 		held[i] = getblk(makedev(RAM_MAJOR, 0), (unsigned long)i);
 		brelse(held[i]);
 	}
-	CHECK(bread(makedev(RAM_MAJOR, 0), NBUF, &error) == NULL);
-	CHECK(error == -SYS_EAGAIN);
-	bp = getblk(makedev(RAM_MAJOR, 0), 0);
-	CHECK(bp->b_flags & B_DELWRI);
-	bp->b_flags &= ~B_DELWRI;
+	bp = bread(makedev(RAM_MAJOR, 0), NBUF, &error);
+	CHECK(bp != NULL && error == 0);
+	CHECK(io_writes == 1);
 	brelse(bp);
 	end_io_test();
 }
@@ -625,6 +631,8 @@ static void check_write_rejected(struct buf *bp, int error)
 	memcpy(&saved_free, &bfreelist, sizeof(saved_free));
 	memcpy(saved_data, buffers, sizeof(saved_data));
 	CHECK(bwrite(bp) == error);
+	CHECK(bdwrite(bp) == error);
+	CHECK(bawrite(bp) == error);
 	CHECK(memcmp(saved, buf, sizeof(saved)) == 0);
 	CHECK(memcmp(&saved_free, &bfreelist, sizeof(saved_free)) == 0);
 	CHECK(memcmp(saved_data, buffers, sizeof(saved_data)) == 0);
@@ -661,5 +669,146 @@ static void test_write_ownership(void)
 	brelse(bp);
 	check_write_rejected(bp, -SYS_EINVAL);
 	CHECK(io_writes == 0);
+	end_io_test();
+}
+
+static void test_delayed_write(void)
+{
+	struct buf *bp;
+	struct buf *held;
+	unsigned int dev = makedev(RAM_MAJOR, 0);
+	unsigned int other = makedev(RAM_MAJOR, 1);
+	int error;
+
+	begin_io_test();
+	CHECK(bdwrite(NULL) == -SYS_EINVAL);
+	CHECK(bawrite(NULL) == -SYS_EINVAL);
+	bp = getblk(PIPEDEV, 0);
+	CHECK(bdwrite(bp) == -SYS_ENODEV);
+	CHECK(bp->b_flags & B_BUSY);
+	brelse(bp);
+	bp = getblk(dev, 0);
+	memset(bp->b_addr, 0x71, BSIZE);
+	CHECK(bdwrite(bp) == 0);
+	CHECK(io_writes == 0);
+	CHECK(bdwrite(bp) == -SYS_EINVAL);
+	CHECK(bawrite(bp) == -SYS_EINVAL);
+	held = bread(dev, 0, &error);
+	CHECK(held == bp && error == 0);
+	CHECK(io_reads == 0 && held->b_addr[0] == 0x71);
+	CHECK(bflush(dev) == -SYS_EAGAIN);
+	bp = getblk(other, 0);
+	memset(bp->b_addr, 0x92, BSIZE);
+	CHECK(bdwrite(bp) == 0);
+	CHECK(bflush(other) == 0);
+	CHECK(io_writes == 1);
+	CHECK(held->b_flags & B_DELWRI);
+	brelse(held);
+	CHECK(bflush(NODEV) == 0);
+	CHECK(io_writes == 2);
+	CHECK(bflush(NODEV) == 0 && io_writes == 2);
+	CHECK(bflush(PIPEDEV) == -SYS_ENODEV);
+	binit();
+	bp = bread(dev, 0, &error);
+	CHECK(bp != NULL && error == 0 && bp->b_addr[0] == 0x71);
+	brelse(bp);
+	bp = bread(other, 0, &error);
+	CHECK(bp != NULL && error == 0 && bp->b_addr[0] == 0x92);
+	brelse(bp);
+	end_io_test();
+}
+
+static void test_writeback_failure(void)
+{
+	struct buf *bp;
+	struct buf *held[NBUF];
+	unsigned int dev = makedev(RAM_MAJOR, 0);
+	int error;
+	int i;
+
+	begin_io_test();
+	for (i = 0; i < NBUF; i++) {
+		bp = getblk(dev, (unsigned long)i);
+		memset(bp->b_addr, 0x30 + i, BSIZE);
+		CHECK(bdwrite(bp) == 0);
+	}
+	io_fail = 1;
+	io_error_code = SYS_EIO;
+	CHECK(geteblk() == NULL);
+	CHECK(io_writes == 1);
+	CHECK(count_av_list() == NBUF);
+	CHECK(bflush(NODEV) == -SYS_EIO);
+	CHECK(io_writes == NBUF + 1);
+	for (i = 0; i < NBUF; i++) {
+		held[i] = bread(dev, (unsigned long)i, &error);
+		CHECK(held[i] != NULL && error == 0);
+		CHECK(held[i]->b_addr[0] == 0x30 + i);
+		CHECK(held[i]->b_flags & B_DELWRI);
+		CHECK(held[i]->b_error == SYS_EIO);
+	}
+	CHECK(io_reads == 0);
+	CHECK(bflush(dev) == -SYS_EAGAIN);
+	CHECK(bwrite(held[0]) == -SYS_EIO);
+	CHECK(incore(dev, 0));
+	held[0] = bread(dev, 0, &error);
+	CHECK(held[0] != NULL && held[0]->b_addr[0] == 0x30);
+	CHECK(held[0]->b_flags & B_DELWRI);
+	for (i = 0; i < NBUF; i++)
+		brelse(held[i]);
+	io_fail = 0;
+	io_reject = SYS_EAGAIN;
+	CHECK(bflush(dev) == -SYS_EAGAIN);
+	CHECK(count_av_list() == NBUF);
+	io_reject = 0;
+	CHECK(bflush(dev) == 0);
+	check_invariants();
+	binit();
+	for (i = 0; i < NBUF; i++) {
+		bp = bread(dev, (unsigned long)i, &error);
+		CHECK(bp != NULL && error == 0);
+		CHECK(bp->b_addr[0] == 0x30 + i);
+		brelse(bp);
+	}
+	end_io_test();
+}
+
+static void test_dirty_reuse(void)
+{
+	struct buf *bp;
+	unsigned int dev = makedev(RAM_MAJOR, 0);
+	int error;
+	int i;
+
+	begin_io_test();
+	for (i = 0; i < NBUF; i++) {
+		bp = getblk(dev, (unsigned long)i);
+		memset(bp->b_addr, 0x50 + i, BSIZE);
+		CHECK(bdwrite(bp) == 0);
+	}
+	bp = geteblk();
+	CHECK(bp != NULL && bp->b_dev == NODEV);
+	CHECK(io_writes == NBUF);
+	brelse(bp);
+	CHECK(bflush(NODEV) == 0);
+	for (i = 0; i < NBUF; i++) {
+		bp = bread(dev, (unsigned long)i, &error);
+		CHECK(bp != NULL && error == 0);
+		CHECK(bdwrite(bp) == 0);
+	}
+	bp = getblk(PIPEDEV, 90);
+	CHECK(bp != NULL && bp->b_dev == PIPEDEV);
+	CHECK(io_writes == NBUF * 2);
+	brelse(bp);
+	binit();
+	for (i = 0; i < NBUF; i++) {
+		bp = bread(dev, (unsigned long)i, &error);
+		CHECK(bp != NULL && error == 0);
+		CHECK(bp->b_addr[0] == 0x50 + i);
+		brelse(bp);
+	}
+	bp = getblk(dev, NBUF);
+	bp->b_addr[0] = 0xac;
+	CHECK(bawrite(bp) == 0);
+	CHECK(!(bp->b_flags & (B_BUSY | B_ASYNC | B_DELWRI)));
 	end_io_test();
 }

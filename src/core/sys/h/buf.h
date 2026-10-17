@@ -70,9 +70,16 @@ struct buf *geteblk(void);
 /* Only BDEV_SYNC drivers supported; busy hit or exhaustion is EAGAIN */
 /* Return owned buffer on success; set required error output on failure */
 struct buf *bread(unsigned int dev, unsigned long blkno, int *error);
-/* Consume owned synchronous buffer even on I/O error */
+/* Consume owned synchronous buffer; preserve existing dirty data on error */
 /* Reject ownership violations without modifying buffer */
 int bwrite(struct buf *bp);
+/* Reject invalid ownership or unsupported device without consuming buffer */
+int bdwrite(struct buf *bp);
+/* Synchronous completion; retain dirty data and association on I/O failure */
+int bawrite(struct buf *bp);
+/* NODEV selects all; zero guarantees no matching dirty buffers remain */
+/* Busy dirty buffers yield EAGAIN; I/O errors take priority and are retained */
+int bflush(unsigned int dev);
 void brelse(struct buf *bp);
 int incore(unsigned int dev, unsigned long blkno);
 void clrbuf(struct buf *bp);
