@@ -210,8 +210,7 @@ static void test_multiple_requests(void)
 		bp[i] = getblk(PIPEDEV, (unsigned long)(10 + i));
 		CHECK(bp[i] != NULL);
 		CHECK(bdev_strategy(bp[i]) == 0);
-		CHECK(bp[i]->av_forw == NULL);
-		CHECK(bp[i]->av_back == NULL);
+		CHECK(!on_av_list(bp[i]));
 	}
 	CHECK(mock_queue.dq_active == bp[0]);
 	CHECK(mock_queue.dq_head == bp[1]);

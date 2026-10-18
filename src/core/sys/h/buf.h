@@ -67,19 +67,16 @@ extern struct buf bfreelist;
 void binit(void);
 struct buf *getblk(unsigned int dev, unsigned long blkno);
 struct buf *geteblk(void);
-/* Only BDEV_SYNC drivers supported; busy hit or exhaustion is EAGAIN */
-/* Return owned buffer on success; set required error output on failure */
+/* Require valid device table and synchronous strategy for block I/O */
+/* Busy hit or exhaustion returns EAGAIN; failed read releases buffer */
 struct buf *bread(unsigned int dev, unsigned long blkno, int *error);
-/* Consume owned synchronous buffer; preserve existing dirty data on error */
-/* Reject ownership violations without modifying buffer */
+/* Submit owned buffer; failed write discards device association */
 int bwrite(struct buf *bp);
-/* Reject invalid ownership or unsupported device without consuming buffer */
+/* Mark owned buffer for delayed write without submitting I/O */
 int bdwrite(struct buf *bp);
-/* Synchronous completion; retain dirty data and association on I/O failure */
-/* Unsupported device consumes buffer but never creates new dirty state */
+/* Set B_ASYNC; iodone releases buffer, synchronous drivers required */
 int bawrite(struct buf *bp);
-/* NODEV selects all; zero guarantees no matching dirty buffers remain */
-/* Busy dirty buffers yield EAGAIN; I/O errors take priority and are retained */
+/* NODEV selects all; submit available dirty buffers, skip busy buffers */
 int bflush(unsigned int dev);
 void brelse(struct buf *bp);
 int incore(unsigned int dev, unsigned long blkno);

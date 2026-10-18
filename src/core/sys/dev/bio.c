@@ -1,4 +1,8 @@
-/* bio.c */
+/*
+ * getblk() / geteblk() => bawrite() => bwrite() => driver strategy
+ * bread() => driver strategy => iodone() => brelse() for B_ASYNC
+ * bdwrite() => brelse(); bflush() => bawrite()
+ */
 
 #include <assert.h>
 #include <string.h>
@@ -9,17 +13,6 @@
 
 unsigned char buffers[NBUF][BSIZE];
 
-static struct buf *getdev(unsigned int dev);
-static int sync_device(unsigned int dev);
-static int sync_io(struct buf *bp);
-static struct buf *available_buffer(void);
-static int write_buffer_check(struct buf *bp);
-static int write_buffer(struct buf *bp, int retain);
-static int writeback(struct buf *bp);
-static int geterror(struct buf *bp);
-static void prepare_read(struct buf *bp);
-static void prepare_write(struct buf *bp);
-static void io_error(struct buf *bp, int error);
 static void b_list_init(struct buf *head);
 static void b_list_remove(struct buf *bp);
 static void b_list_insert(struct buf *head, struct buf *bp);
@@ -31,12 +24,12 @@ static void notavail(struct buf *bp);
 static void reassociate(struct buf *bp, struct buf *head,
 			unsigned int dev, unsigned long blkno);
 
+/* Initialize buffer cache */
 void binit(void)
 {
 	struct buf *dp;
 	int i;
 
-	memset(buffers, 0, sizeof(buffers));
 	memset(buf, 0, sizeof(buf));
 	memset(&bfreelist, 0, sizeof(bfreelist));
 	b_list_init(&bfreelist);
@@ -62,166 +55,159 @@ void binit(void)
 	}
 }
 
+/* Assign cached block or reuse oldest available buffer */
 struct buf *getblk(unsigned int dev, unsigned long blkno)
 {
 	struct buf *bp;
 	struct buf *dp;
 
-	dp = getdev(dev);
-	if (!dp)
-		return NULL;
-
+	/* V7 panics on invalid major or missing device table */
+	assert(major(dev) < (unsigned int)nblkdev);
+	dp = bdevsw[major(dev)].d_tab;
+	assert(dp != NULL);
+loop:
 	for (bp = dp->b_forw; bp != dp; bp = bp->b_forw) {
 		if (bp->b_dev != dev || bp->b_blkno != blkno)
 			continue;
+		/* Return to caller until scheduler can replace V7 sleep */
 		if (bp->b_flags & B_BUSY)
 			return NULL;
 		notavail(bp);
 		return bp;
 	}
-
-	bp = available_buffer();
-	if (!bp)
+	bp = bfreelist.av_forw;
+	if (bp == &bfreelist)
 		return NULL;
-
+	notavail(bp);
+	if (bp->b_flags & B_DELWRI) {
+		bawrite(bp);
+		goto loop;
+	}
 	reassociate(bp, dp, dev, blkno);
 	return bp;
 }
 
+/* Allocate buffer without device association */
 struct buf *geteblk(void)
 {
 	struct buf *bp;
 
-	bp = available_buffer();
-	if (!bp)
+loop:
+	bp = bfreelist.av_forw;
+	if (bp == &bfreelist)
 		return NULL;
-
+	notavail(bp);
+	if (bp->b_flags & B_DELWRI) {
+		bawrite(bp);
+		goto loop;
+	}
 	reassociate(bp, &bfreelist, NODEV, 0);
 	return bp;
 }
 
+/* Read block through synchronous driver unless already cached */
 struct buf *bread(unsigned int dev, unsigned long blkno, int *error)
 {
 	struct buf *bp;
 
-	if (!error)
-		return NULL;
-	*error = sync_device(dev);
-	if (*error)
-		return NULL;
+	*error = 0;
 	bp = getblk(dev, blkno);
 	if (!bp) {
 		*error = -SYS_EAGAIN;
 		return NULL;
 	}
-	if ((bp->b_flags & B_DONE) &&
-	    (!(bp->b_flags & B_ERROR) || (bp->b_flags & B_DELWRI)))
+	if (bp->b_flags & B_DONE)
 		return bp;
-	prepare_read(bp);
-	*error = sync_io(bp);
+	bp->b_flags |= B_READ;
+	bp->b_bcount = BSIZE;
+	*error = bdevsw[major(dev)].d_strategy(bp);
+	if (!*error && (bp->b_flags & B_ERROR))
+		*error = bp->b_error ? -bp->b_error : -SYS_EIO;
+	/* Preserve MCUFW API: failed read releases buffer */
 	if (*error) {
-		io_error(bp, *error);
+		bp->b_flags |= B_ERROR;
 		brelse(bp);
 		return NULL;
 	}
 	return bp;
 }
 
+/* Write buffer and release on synchronous completion */
 int bwrite(struct buf *bp)
 {
-	int result;
+	unsigned int flag;
+	int error;
 
-	result = write_buffer_check(bp);
-	if (result)
-		return result;
-	return write_buffer(bp, bp->b_flags & B_DELWRI);
+	flag = bp->b_flags;
+	bp->b_flags &= ~(B_READ | B_DONE | B_ERROR | B_DELWRI | B_AGE);
+	bp->b_bcount = BSIZE;
+	/* Synchronous driver may release async buffer before returning */
+	if ((flag & (B_ASYNC | B_DELWRI)) == (B_ASYNC | B_DELWRI))
+		bp->b_flags |= B_AGE;
+	error = bdevsw[major(bp->b_dev)].d_strategy(bp);
+	if (!error && (bp->b_flags & B_ERROR))
+		error = bp->b_error ? -bp->b_error : -SYS_EIO;
+	/* Rejected request has no iodone to release async buffer */
+	if (error && !(bp->b_flags & B_DONE)) {
+		bp->b_flags |= B_ERROR;
+		brelse(bp);
+	} else if (!(flag & B_ASYNC)) {
+		brelse(bp);
+	}
+	return error;
 }
 
+/* Mark delayed write and release buffer */
 int bdwrite(struct buf *bp)
 {
-	int result;
-
-	result = write_buffer_check(bp);
-	if (result)
-		return result;
-	result = sync_device(bp->b_dev);
-	if (result)
-		return result;
-	bp->b_flags &= ~(B_READ | B_ERROR);
 	bp->b_flags |= B_DELWRI | B_DONE;
-	bp->b_error = 0;
-	bp->b_resid = 0;
 	brelse(bp);
 	return 0;
 }
 
+/* Release buffer through driver completion */
 int bawrite(struct buf *bp)
 {
-	int result;
-
-	result = write_buffer_check(bp);
-	if (result)
-		return result;
-	/* Synchronous drivers complete before release and error return */
-	return write_buffer(bp, 1);
+	bp->b_flags |= B_ASYNC;
+	return bwrite(bp);
 }
 
+/* Start delayed writes from available list for selected devices */
 int bflush(unsigned int dev)
 {
 	struct buf *bp;
-	int result;
-	int error;
-	int i;
 
-	if (dev != NODEV) {
-		error = sync_device(dev);
-		if (error)
-			return error;
-	}
-	result = 0;
-	for (i = 0; i < NBUF; i++) {
-		bp = &buf[i];
-		if (!(bp->b_flags & B_DELWRI) ||
-		    (dev != NODEV && bp->b_dev != dev))
-			continue;
-		if (bp->b_flags & B_BUSY) {
-			if (!result)
-				result = -SYS_EAGAIN;
-			continue;
+loop:
+	for (bp = bfreelist.av_forw; bp != &bfreelist; bp = bp->av_forw) {
+		if ((bp->b_flags & B_DELWRI) &&
+		    (dev == NODEV || bp->b_dev == dev)) {
+			notavail(bp);
+			bawrite(bp);
+			goto loop;
 		}
-		error = writeback(bp);
-		if (error && (!result || result == -SYS_EAGAIN))
-			result = error;
 	}
-	return result;
+	return 0;
 }
 
+/* Release buffer onto available list */
 void brelse(struct buf *bp)
 {
-	if (!bp || !(bp->b_flags & B_BUSY))
-		return;
-	if ((bp->b_flags & B_ERROR) && !(bp->b_flags & B_DELWRI)) {
-		b_list_remove(bp);
-		b_list_insert(&bfreelist, bp);
+	if (bp->b_flags & B_ERROR)
 		bp->b_dev = NODEV;
-		bp->b_blkno = 0;
-	}
 	if (bp->b_flags & B_AGE)
 		av_list_insert_head(bp);
 	else
 		av_list_insert_tail(bp);
 	bp->b_flags &= ~(B_WANTED | B_BUSY | B_ASYNC | B_AGE);
-	bp->b_io_next = NULL;
 }
 
+/* Find cached device block */
 int incore(unsigned int dev, unsigned long blkno)
 {
 	struct buf *bp;
 	struct buf *dp;
 
-	dp = getdev(dev);
-	if (!dp)
-		return 0;
+	dp = bdevsw[major(dev)].d_tab;
 	for (bp = dp->b_forw; bp != dp; bp = bp->b_forw) {
 		if (bp->b_dev == dev && bp->b_blkno == blkno)
 			return 1;
@@ -229,18 +215,16 @@ int incore(unsigned int dev, unsigned long blkno)
 	return 0;
 }
 
+/* Clear buffer payload */
 void clrbuf(struct buf *bp)
 {
-	if (!bp || !bp->b_addr)
-		return;
 	memset(bp->b_addr, 0, BSIZE);
 	bp->b_resid = 0;
 }
 
+/* Mark completion and release asynchronous request */
 void iodone(struct buf *bp)
 {
-	if (!bp || !(bp->b_flags & B_BUSY))
-		return;
 	bp->b_flags |= B_DONE;
 	if (bp->b_flags & B_ASYNC)
 		brelse(bp);
@@ -248,142 +232,21 @@ void iodone(struct buf *bp)
 		bp->b_flags &= ~B_WANTED;
 }
 
-static int write_buffer_check(struct buf *bp)
-{
-	if (!bp || (bp->b_flags & B_ASYNC))
-		return -SYS_EINVAL;
-	return bdev_check_buffer_available(bp);
-}
-
-/* Consume prevalidated owned buffer on every return path */
-static int write_buffer(struct buf *bp, int retain)
-{
-	int result;
-
-	result = sync_device(bp->b_dev);
-	if (result)
-		retain = bp->b_flags & B_DELWRI;
-	prepare_write(bp);
-	if (!result)
-		result = sync_io(bp);
-	if (result) {
-		io_error(bp, result);
-		if (retain)
-			bp->b_flags |= B_DELWRI | B_DONE;
-	}
-	brelse(bp);
-	return result;
-}
-
-/* Acquire available dirty buffer and release even on validation failure */
-static int writeback(struct buf *bp)
-{
-	int result;
-
-	notavail(bp);
-	result = write_buffer_check(bp);
-	if (result) {
-		brelse(bp);
-		return result;
-	}
-	return write_buffer(bp, 1);
-}
-
-static struct buf *getdev(unsigned int dev)
-{
-	struct bdevsw *dp;
-
-	dp = bdevsw_lookup(dev);
-	return dp ? dp->d_tab : NULL;
-}
-
-static struct buf *available_buffer(void)
-{
-	struct buf *bp;
-	int i;
-
-	/* Bound retries even when every available buffer needs writeback */
-	for (i = 0; i <= NBUF; i++) {
-		bp = bfreelist.av_forw;
-		if (bp == &bfreelist)
-			return NULL;
-		if (!(bp->b_flags & B_DELWRI)) {
-			notavail(bp);
-			return bp;
-		}
-		if (writeback(bp))
-			return NULL;
-	}
-	return NULL;
-}
-
-static int sync_device(unsigned int dev)
-{
-	struct bdevsw *dp;
-
-	dp = bdevsw_lookup(dev);
-	if (!dp || !dp->d_strategy)
-		return -SYS_ENODEV;
-	if (!(dp->d_flags & BDEV_SYNC))
-		return -SYS_ENOSYS;
-	return 0;
-}
-
-static int sync_io(struct buf *bp)
-{
-	int result;
-
-	result = bdev_strategy(bp);
-	if (result < 0)
-		return result;
-	/* BDEV_SYNC replaces V7 iowait sleep until asynchronous I/O support */
-	assert(bp->b_flags & B_DONE);
-	return geterror(bp);
-}
-
-static int geterror(struct buf *bp)
-{
-	if (bp->b_flags & B_ERROR)
-		return bp->b_error ? -bp->b_error : -SYS_EIO;
-	return 0;
-}
-
-static void prepare_read(struct buf *bp)
-{
-	bp->b_flags &= ~(B_DONE | B_ERROR | B_ASYNC);
-	bp->b_flags |= B_READ;
-	bp->b_bcount = BSIZE;
-	bp->b_resid = BSIZE;
-	bp->b_error = 0;
-}
-
-static void prepare_write(struct buf *bp)
-{
-	bp->b_flags &= ~(B_READ | B_DONE | B_ERROR | B_DELWRI | B_AGE);
-	bp->b_bcount = BSIZE;
-	bp->b_resid = BSIZE;
-	bp->b_error = 0;
-}
-
-static void io_error(struct buf *bp, int error)
-{
-	bp->b_flags |= B_ERROR;
-	bp->b_error = -error;
-	bp->b_resid = bp->b_bcount;
-}
-
+/* Initialize device list head */
 static void b_list_init(struct buf *head)
 {
 	head->b_forw = head;
 	head->b_back = head;
 }
 
+/* Unlink buffer from device list */
 static void b_list_remove(struct buf *bp)
 {
 	bp->b_back->b_forw = bp->b_forw;
 	bp->b_forw->b_back = bp->b_back;
 }
 
+/* Insert buffer at device list head */
 static void b_list_insert(struct buf *head, struct buf *bp)
 {
 	bp->b_forw = head->b_forw;
@@ -392,20 +255,21 @@ static void b_list_insert(struct buf *head, struct buf *bp)
 	head->b_forw = bp;
 }
 
+/* Initialize available list head */
 static void av_list_init(struct buf *head)
 {
 	head->av_forw = head;
 	head->av_back = head;
 }
 
+/* Unlink buffer from available list */
 static void av_list_remove(struct buf *bp)
 {
 	bp->av_back->av_forw = bp->av_forw;
 	bp->av_forw->av_back = bp->av_back;
-	bp->av_forw = NULL;
-	bp->av_back = NULL;
 }
 
+/* Insert buffer at oldest available position */
 static void av_list_insert_head(struct buf *bp)
 {
 	bp->av_forw = bfreelist.av_forw;
@@ -414,6 +278,7 @@ static void av_list_insert_head(struct buf *bp)
 	bfreelist.av_forw = bp;
 }
 
+/* Insert buffer at newest available position */
 static void av_list_insert_tail(struct buf *bp)
 {
 	bp->av_forw = &bfreelist;
@@ -422,12 +287,14 @@ static void av_list_insert_tail(struct buf *bp)
 	bfreelist.av_back = bp;
 }
 
+/* Remove available buffer and mark busy */
 static void notavail(struct buf *bp)
 {
 	av_list_remove(bp);
 	bp->b_flags |= B_BUSY;
 }
 
+/* Assign buffer to device and block */
 static void reassociate(struct buf *bp, struct buf *head,
 			unsigned int dev, unsigned long blkno)
 {
@@ -436,8 +303,4 @@ static void reassociate(struct buf *bp, struct buf *head,
 	bp->b_flags = B_BUSY;
 	bp->b_dev = dev;
 	bp->b_blkno = blkno;
-	bp->b_bcount = 0;
-	bp->b_resid = 0;
-	bp->b_error = 0;
-	bp->b_io_next = NULL;
 }
