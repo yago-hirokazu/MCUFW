@@ -30,6 +30,7 @@ core/						移植可能なレイヤ
 	support/				育成中のプログラム置き場
 				getopt/		組込み機器用のgetopt
 	usr/					STM32機種非依存プログラム置き場
+	sys/					UNIX V7 から移植したランタイムサービス
 		cmd/				STM32用汎用UARTコマンド
 target/						ハードウェア依存レイヤ
 	NUCLEO-U575ZI-Q/		NUCLEO-U575ZI-Q評価ボード
@@ -157,6 +158,34 @@ mingw64 シェルで `src/core/esh/test/exe` に移動し、下記を実行し�
 #endif
 ```
 
+## UNIX V7 移植時のルール
+
+### 絶対ルール
+- 可能な限りオリジナルの実装を踏襲すること。
+
+### 推奨ルール
+- code snippetを関数化して何をしている処理かを関数名で説明することを推奨する。
+例: `/c/usr/src/MCUFW/src/core/sys/dev/bio.c`の下記。
+
+``` c
+static void b_list_init(struct buf *head);
+static void b_list_remove(struct buf *bp);
+static void b_list_insert(struct buf *head, struct buf *bp);
+static void av_list_init(struct buf *head);
+static void av_list_remove(struct buf *bp);
+static void av_list_insert_head(struct buf *bp);
+static void av_list_insert_tail(struct buf *bp);
+static void reassociate(struct buf *bp, struct buf *head,
+			unsigned int dev, unsigned long blkno);
+
+```
+
+## テスト
+
+### 絶対ルール
+テストが完了したら make clean して、テスト実行時に生成した *.d, *.o, *.exe を消去すること。
+
+
 ## ターゲット別コーディングルール
 
 ### コーディングルール1 (Windows ターゲット)
@@ -246,3 +275,4 @@ struct lex {
 2. コミットメッセージ
 - NG: Fix a bug in the login screen.（冗長）
 - OK: Fix bug in login screen.
+
