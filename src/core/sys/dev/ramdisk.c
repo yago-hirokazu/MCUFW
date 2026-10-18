@@ -22,7 +22,7 @@ int ramstrategy(struct buf *bp)
 {
 	int result;
 
-	result = bdev_check_io_request_validity(bp);
+	result = bdev_check_io_request_valid(bp);
 	if (result < 0)
 		return result;
 	if (major(bp->b_dev) != RAM_MAJOR)
