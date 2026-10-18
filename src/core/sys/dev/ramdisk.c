@@ -7,7 +7,7 @@
 #include "ramdisk.h"
 #include "sys_error.h"
 
-struct bdev_queue ramqueue;
+struct bdev_io_queue ramqueue;
 
 static unsigned char ramblocks[RAM_NDEV][RAM_NBLK][BSIZE];
 

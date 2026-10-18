@@ -8,13 +8,13 @@
 #define RAM_NBLK	16UL
 
 struct buf;
-struct bdev_queue;
+struct bdev_io_queue;
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-extern struct bdev_queue ramqueue;
+extern struct bdev_io_queue ramqueue;
 
 /* Clear storage only in quiescent state; follow with binit */
 void raminit(void);

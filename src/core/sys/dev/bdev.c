@@ -17,7 +17,7 @@
  *         => iodone()：notify data transfer completion to buffer
  */
 
-static int bdev_queue_contains(struct bdev_queue *queue, struct buf *target);
+static int bdev_queue_contains(struct bdev_io_queue *queue, struct buf *target);
 
 /* Validate request and pass it to block device driver */
 int bdev_strategy(struct buf *bp)
@@ -72,7 +72,7 @@ int bdev_check_buffer_available(struct buf *bp)
 }
 
 /* Initialize queue with no outstanding requests */
-void bdev_queue_init(struct bdev_queue *queue)
+void bdev_queue_init(struct bdev_io_queue *queue)
 {
 	if (!queue)
 		return;
@@ -84,7 +84,7 @@ void bdev_queue_init(struct bdev_queue *queue)
 }
 
 /* Append owned buffer to waiting list */
-int bdev_queue_enqueue(struct bdev_queue *queue, struct buf *bp)
+int bdev_queue_enqueue(struct bdev_io_queue *queue, struct buf *bp)
 {
 	if (!queue || !bp || !(bp->b_flags & B_BUSY))
 		return -1;
@@ -103,7 +103,7 @@ int bdev_queue_enqueue(struct bdev_queue *queue, struct buf *bp)
 }
 
 /* Move oldest waiting request into active slot */
-struct buf *bdev_queue_start(struct bdev_queue *queue)
+struct buf *bdev_queue_start(struct bdev_io_queue *queue)
 {
 	struct buf *bp;
 
@@ -123,7 +123,7 @@ struct buf *bdev_queue_start(struct bdev_queue *queue)
 }
 
 /* Clear active slot and notify buffer completion */
-struct buf *bdev_queue_complete(struct bdev_queue *queue)
+struct buf *bdev_queue_complete(struct bdev_io_queue *queue)
 {
 	struct buf *bp;
 
@@ -140,7 +140,7 @@ struct buf *bdev_queue_complete(struct bdev_queue *queue)
 }
 
 /* Request retry or complete active request with error */
-int bdev_queue_error(struct bdev_queue *queue, unsigned int retry_limit,
+int bdev_queue_error(struct bdev_io_queue *queue, unsigned int retry_limit,
 		     int error)
 {
 	struct buf *bp;
@@ -164,7 +164,7 @@ int bdev_queue_error(struct bdev_queue *queue, unsigned int retry_limit,
  * Validate non-NULL queue and search active slot plus waiting list
  * Return 1 if found, 0 if absent or negative error on malformed queue
  */
-static int bdev_queue_contains(struct bdev_queue *queue, struct buf *target)
+static int bdev_queue_contains(struct bdev_io_queue *queue, struct buf *target)
 {
 	struct buf *bp;
 	struct buf *last;

@@ -648,7 +648,7 @@ static void check_write_rejected(struct buf *bp, int error)
 static void test_write_ownership(void)
 {
 	struct buf *bp;
-	struct bdev_queue other;
+	struct bdev_io_queue other;
 
 	begin_io_test();
 	bp = getblk(makedev(RAM_MAJOR, 0), 0);
@@ -929,8 +929,8 @@ static void test_dirty_registration_failure(void)
 
 static void test_writeback_rejection(void)
 {
-	struct bdev_queue other;
-	struct bdev_queue *queue;
+	struct bdev_io_queue other;
+	struct bdev_io_queue *queue;
 	struct buf dummy;
 	struct buf *bp;
 	unsigned int dev = makedev(RAM_MAJOR, 0);

@@ -20,7 +20,7 @@
 	} while (0)
 
 static int failures;
-static struct bdev_queue mock_queue;
+static struct bdev_io_queue mock_queue;
 static struct bdevsw saved_devices[2];
 static struct buf *mock_started[NBUF * 3];
 static int mock_started_count;
@@ -152,7 +152,7 @@ static void teardown(void)
 
 static void test_empty(void)
 {
-	struct bdev_queue queue;
+	struct bdev_io_queue queue;
 	struct buf free_buffer;
 
 	setup();
@@ -290,7 +290,7 @@ static void check_rejection(struct buf *bp, int error)
 	struct buf saved_buf[NBUF];
 	struct buf saved_free;
 	struct buf saved_tab[2];
-	struct bdev_queue saved_queue[2];
+	struct bdev_io_queue saved_queue[2];
 	unsigned char saved_data[NBUF][BSIZE];
 	int calls;
 	int i;
@@ -356,7 +356,7 @@ static void test_strategy_rejection(void)
 
 static void test_other_queue(void)
 {
-	struct bdev_queue other;
+	struct bdev_io_queue other;
 	struct buf *bp;
 	struct buf *active;
 
@@ -381,7 +381,7 @@ static void test_other_queue(void)
 
 static void test_invalid_queue(void)
 {
-	struct bdev_queue other;
+	struct bdev_io_queue other;
 	struct buf nodes[NBUF + 1];
 	struct buf *bp;
 	int i;

@@ -247,7 +247,7 @@ static void test_async(void)
 
 static void test_rejection(void)
 {
-	struct bdev_queue other;
+	struct bdev_io_queue other;
 	struct buf *bp;
 	struct buf saved;
 
