@@ -257,11 +257,11 @@ struct lex {
 } lex;
 ```
 
-### 絶対ルールの思想
+#### 絶対ルールの思想
  ソースコードのコメントやコミットメッセージにおいて、冠詞（a, an, the）は基本的に省略します。
 理由は、限られたスペースでコードの意図を短く、素早く伝えるためです。
 
-### コメントの記述例
+#### コメントの記述例
 省略のルールと使い分けのポイントを分かりやすく解説します。
 
 #### 冠詞を省略する主なケース
@@ -275,4 +275,58 @@ struct lex {
 2. コミットメッセージ
 - NG: Fix a bug in the login screen.（冗長）
 - OK: Fix bug in login screen.
+
+
+### 複数行のコメントを書く場合のルール
+
+- 複数行のコメントを書く場合は UNIX V7 の下記を踏襲します。
+``` c
+/*
+ * comment
+ * comment
+ * ...
+ */
+```
+
+### ソースコードの理解を助けるコメントを書く
+
+- ソースファイルの冒頭に、他の関数やソースファイルとの関係を示すダイアグラムをコメントとして記述します。このコメントはひとつにまとめる必要はありません。複数のダイアグラムが必要な場合は、複数のコメントとして記述します。
+例：
+
+``` c
+/*
+ * bio.c：bread() / bwrite() etc.
+ *   => bdev_strategy()：validation and select driver strategy function
+ *     => ramstrategy()：RAM device routine
+ *       => enqueue => start => data transfer => complete
+ *         => iodone()：notify data transfer completion to buffer
+ */
+```
+
+- 関数定義の上にその関数が何をする関数か説明するコメントを記述します。コメントの書き方はUNIX V7の場合と同様に関数処理の概要のみ記述します。
+``` c
+/*
+ * Free the specified I node
+ * on the specified device.
+ * The algorithm stores up
+ * to NICINOD I nodes in the super
+ * block and throws away any more.
+ */
+ifree(dev, ino)
+dev_t dev;
+ino_t ino;
+{
+	register struct filsys *fp;
+
+	fp = getfs(dev);
+	if(fp->s_ilock)
+		return;
+	if(fp->s_ninode >= NICINOD)
+		return;
+	fp->s_inode[fp->s_ninode++] = ino;
+	fp->s_fmod = 1;
+}
+```
+
+- 関数定義の内部に内部処理の意図を説明するコメントを記述します。
 
