@@ -147,18 +147,18 @@ int bdev_io_queue_error(struct bdev_io_queue *queue, unsigned int retry_limit,
 	struct buf *bp;
 
 	if (!queue || !queue->dq_active)
-		return BDEV_QUEUE_FAILED;
+		return BDEV_IO_QUEUE_FAILED;
 	/* Leave active request in place for caller to retry transfer */
 	if (queue->dq_errcnt < retry_limit) {
 		queue->dq_errcnt++;
-		return BDEV_QUEUE_RETRY;
+		return BDEV_IO_QUEUE_RETRY;
 	}
 	/* Report final error through normal completion path */
 	bp = queue->dq_active;
 	bp->b_flags |= B_ERROR;
 	bp->b_error = error;
 	bdev_io_queue_complete(queue);
-	return BDEV_QUEUE_DONE;
+	return BDEV_IO_QUEUE_DONE;
 }
 
 /*

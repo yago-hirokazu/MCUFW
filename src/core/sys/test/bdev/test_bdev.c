@@ -108,15 +108,15 @@ static int mock_interrupt(int error)
 	if (error) {
 		result = bdev_io_queue_error(&mock_queue, MOCK_RETRY_LIMIT,
 					  MOCK_ERROR);
-		if (result == BDEV_QUEUE_RETRY) {
+		if (result == BDEV_IO_QUEUE_RETRY) {
 			mock_started[mock_started_count++] =
 				mock_queue.dq_active;
 			return result;
 		}
 	} else {
 		if (!bdev_io_queue_complete(&mock_queue))
-			return BDEV_QUEUE_FAILED;
-		result = BDEV_QUEUE_DONE;
+			return BDEV_IO_QUEUE_FAILED;
+		result = BDEV_IO_QUEUE_DONE;
 	}
 	mock_completed_count++;
 	mock_start();
@@ -169,7 +169,7 @@ static void test_empty(void)
 	CHECK(bdev_io_queue_start(&mock_queue) == NULL);
 	CHECK(bdev_io_queue_complete(&mock_queue) == NULL);
 	CHECK(bdev_io_queue_error(&mock_queue, 0, MOCK_ERROR) ==
-	      BDEV_QUEUE_FAILED);
+	      BDEV_IO_QUEUE_FAILED);
 	free_buffer.b_flags = 0;
 	CHECK(bdev_io_queue_enqueue(&mock_queue, &free_buffer) < 0);
 	teardown();
@@ -190,7 +190,7 @@ static void test_one_request(void)
 	CHECK(mock_queue.dq_active == bp);
 	CHECK(mock_started_count == 1);
 	CHECK(bdev_io_queue_enqueue(&mock_queue, bp) < 0);
-	CHECK(mock_interrupt(0) == BDEV_QUEUE_DONE);
+	CHECK(mock_interrupt(0) == BDEV_IO_QUEUE_DONE);
 	CHECK(bp->b_flags & B_DONE);
 	CHECK(bp->b_flags & B_BUSY);
 	CHECK(!(bp->b_flags & B_WANTED));
@@ -222,7 +222,7 @@ static void test_multiple_requests(void)
 	CHECK(bdev_io_queue_enqueue(&mock_queue, bp[1]) < 0);
 	for (i = 0; i < NBUF; i++) {
 		CHECK(mock_queue.dq_active == bp[i]);
-		CHECK(mock_interrupt(0) == BDEV_QUEUE_DONE);
+		CHECK(mock_interrupt(0) == BDEV_IO_QUEUE_DONE);
 		CHECK(mock_started[i] == bp[i]);
 		CHECK(bp[i]->b_flags & B_DONE);
 		brelse(bp[i]);
@@ -243,14 +243,14 @@ static void test_error_retry(void)
 	CHECK(next != NULL);
 	CHECK(bdev_strategy(bp) == 0);
 	CHECK(bdev_strategy(next) == 0);
-	CHECK(mock_interrupt(1) == BDEV_QUEUE_RETRY);
+	CHECK(mock_interrupt(1) == BDEV_IO_QUEUE_RETRY);
 	CHECK(mock_queue.dq_active == bp);
 	CHECK(mock_queue.dq_errcnt == 1);
 	CHECK(!(bp->b_flags & (B_DONE | B_ERROR)));
-	CHECK(mock_interrupt(1) == BDEV_QUEUE_RETRY);
+	CHECK(mock_interrupt(1) == BDEV_IO_QUEUE_RETRY);
 	CHECK(mock_queue.dq_active == bp);
 	CHECK(mock_queue.dq_errcnt == MOCK_RETRY_LIMIT);
-	CHECK(mock_interrupt(1) == BDEV_QUEUE_DONE);
+	CHECK(mock_interrupt(1) == BDEV_IO_QUEUE_DONE);
 	CHECK(mock_queue.dq_active == next);
 	CHECK(mock_queue.dq_errcnt == 0);
 	CHECK(bp->b_flags & B_DONE);
@@ -258,7 +258,7 @@ static void test_error_retry(void)
 	CHECK(bp->b_error == MOCK_ERROR);
 	CHECK(mock_started_count == 4);
 	CHECK(mock_completed_count == 1);
-	CHECK(mock_interrupt(0) == BDEV_QUEUE_DONE);
+	CHECK(mock_interrupt(0) == BDEV_IO_QUEUE_DONE);
 	CHECK(mock_queue.dq_active == NULL);
 	CHECK(next->b_flags & B_DONE);
 	CHECK(mock_completed_count == 2);
@@ -276,7 +276,7 @@ static void test_async_completion(void)
 	CHECK(bp != NULL);
 	bp->b_flags |= B_ASYNC;
 	CHECK(bdev_strategy(bp) == 0);
-	CHECK(mock_interrupt(0) == BDEV_QUEUE_DONE);
+	CHECK(mock_interrupt(0) == BDEV_IO_QUEUE_DONE);
 	CHECK(bp->b_flags & B_DONE);
 	CHECK(!(bp->b_flags & B_BUSY));
 	CHECK(!(bp->b_flags & B_ASYNC));
@@ -348,7 +348,7 @@ static void test_strategy_rejection(void)
 	bp->b_dev = PIPEDEV;
 	CHECK(bdev_strategy(bp) == 0);
 	check_rejection(bp, -SYS_EAGAIN);
-	CHECK(mock_interrupt(0) == BDEV_QUEUE_DONE);
+	CHECK(mock_interrupt(0) == BDEV_IO_QUEUE_DONE);
 	brelse(bp);
 	check_rejection(bp, -SYS_EINVAL);
 	teardown();

@@ -22,9 +22,9 @@ struct bdevsw {
 /* Strategy completes accepted requests before returning */
 #define BDEV_SYNC	0x01U
 
-#define BDEV_QUEUE_FAILED	(-1)
-#define BDEV_QUEUE_DONE		0
-#define BDEV_QUEUE_RETRY	1
+#define BDEV_IO_QUEUE_FAILED	(-1)
+#define BDEV_IO_QUEUE_DONE	0
+#define BDEV_IO_QUEUE_RETRY	1
 
 extern struct bdevsw bdevsw[];
 extern int nblkdev;
