@@ -85,7 +85,7 @@ static int on_av_list(struct buf *target)
 static int mock_strategy(struct buf *bp)
 {
 	mock_calls++;
-	if (bdev_queue_enqueue(&mock_queue, bp) < 0)
+	if (bdev_io_queue_enqueue(&mock_queue, bp) < 0)
 		return -1;
 	mock_start();
 	return 0;
@@ -95,7 +95,7 @@ static void mock_start(void)
 {
 	struct buf *bp;
 
-	bp = bdev_queue_start(&mock_queue);
+	bp = bdev_io_queue_start(&mock_queue);
 	if (!bp)
 		return;
 	mock_started[mock_started_count++] = bp;
@@ -106,7 +106,7 @@ static int mock_interrupt(int error)
 	int result;
 
 	if (error) {
-		result = bdev_queue_error(&mock_queue, MOCK_RETRY_LIMIT,
+		result = bdev_io_queue_error(&mock_queue, MOCK_RETRY_LIMIT,
 					  MOCK_ERROR);
 		if (result == BDEV_QUEUE_RETRY) {
 			mock_started[mock_started_count++] =
@@ -114,7 +114,7 @@ static int mock_interrupt(int error)
 			return result;
 		}
 	} else {
-		if (!bdev_queue_complete(&mock_queue))
+		if (!bdev_io_queue_complete(&mock_queue))
 			return BDEV_QUEUE_FAILED;
 		result = BDEV_QUEUE_DONE;
 	}
@@ -160,18 +160,18 @@ static void test_empty(void)
 	queue.dq_tail = &free_buffer;
 	queue.dq_active = &free_buffer;
 	queue.dq_errcnt = 1;
-	bdev_queue_init(&queue);
+	bdev_io_queue_init(&queue);
 	CHECK(queue.dq_head == NULL);
 	CHECK(queue.dq_tail == NULL);
 	CHECK(queue.dq_active == NULL);
 	CHECK(queue.dq_errcnt == 0);
-	bdev_queue_init(NULL);
-	CHECK(bdev_queue_start(&mock_queue) == NULL);
-	CHECK(bdev_queue_complete(&mock_queue) == NULL);
-	CHECK(bdev_queue_error(&mock_queue, 0, MOCK_ERROR) ==
+	bdev_io_queue_init(NULL);
+	CHECK(bdev_io_queue_start(&mock_queue) == NULL);
+	CHECK(bdev_io_queue_complete(&mock_queue) == NULL);
+	CHECK(bdev_io_queue_error(&mock_queue, 0, MOCK_ERROR) ==
 	      BDEV_QUEUE_FAILED);
 	free_buffer.b_flags = 0;
-	CHECK(bdev_queue_enqueue(&mock_queue, &free_buffer) < 0);
+	CHECK(bdev_io_queue_enqueue(&mock_queue, &free_buffer) < 0);
 	teardown();
 }
 
@@ -189,7 +189,7 @@ static void test_one_request(void)
 	CHECK(mock_queue.dq_tail == NULL);
 	CHECK(mock_queue.dq_active == bp);
 	CHECK(mock_started_count == 1);
-	CHECK(bdev_queue_enqueue(&mock_queue, bp) < 0);
+	CHECK(bdev_io_queue_enqueue(&mock_queue, bp) < 0);
 	CHECK(mock_interrupt(0) == BDEV_QUEUE_DONE);
 	CHECK(bp->b_flags & B_DONE);
 	CHECK(bp->b_flags & B_BUSY);
@@ -219,7 +219,7 @@ static void test_multiple_requests(void)
 	CHECK(bp[1]->b_io_next == bp[2]);
 	CHECK(bp[NBUF - 1]->b_io_next == NULL);
 	check_rejection(bp[1], -SYS_EAGAIN);
-	CHECK(bdev_queue_enqueue(&mock_queue, bp[1]) < 0);
+	CHECK(bdev_io_queue_enqueue(&mock_queue, bp[1]) < 0);
 	for (i = 0; i < NBUF; i++) {
 		CHECK(mock_queue.dq_active == bp[i]);
 		CHECK(mock_interrupt(0) == BDEV_QUEUE_DONE);
@@ -361,18 +361,18 @@ static void test_other_queue(void)
 	struct buf *active;
 
 	setup();
-	bdev_queue_init(&other);
+	bdev_io_queue_init(&other);
 	bdevsw[1].d_queue = &other;
 	bp = getblk(PIPEDEV, 60);
 	active = getblk(makedev(1, 0), 61);
-	CHECK(bdev_queue_enqueue(&other, active) == 0);
-	CHECK(bdev_queue_start(&other) == active);
-	CHECK(bdev_queue_enqueue(&other, bp) == 0);
+	CHECK(bdev_io_queue_enqueue(&other, active) == 0);
+	CHECK(bdev_io_queue_start(&other) == active);
+	CHECK(bdev_io_queue_enqueue(&other, bp) == 0);
 	check_rejection(bp, -SYS_EAGAIN);
-	CHECK(bdev_queue_complete(&other) == active);
-	CHECK(bdev_queue_start(&other) == bp);
+	CHECK(bdev_io_queue_complete(&other) == active);
+	CHECK(bdev_io_queue_start(&other) == bp);
 	check_rejection(bp, -SYS_EAGAIN);
-	CHECK(bdev_queue_complete(&other) == bp);
+	CHECK(bdev_io_queue_complete(&other) == bp);
 	brelse(active);
 	brelse(bp);
 	bdevsw[1].d_queue = NULL;
@@ -393,7 +393,7 @@ static void test_invalid_queue(void)
 		if (i < NBUF)
 			nodes[i].b_io_next = &nodes[i + 1];
 	}
-	bdev_queue_init(&other);
+	bdev_io_queue_init(&other);
 	bdevsw[1].d_queue = &other;
 	bp = getblk(PIPEDEV, 70);
 	other.dq_head = nodes;

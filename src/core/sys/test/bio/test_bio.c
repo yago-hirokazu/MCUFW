@@ -655,20 +655,20 @@ static void test_write_ownership(void)
 	bp->b_flags |= B_ASYNC;
 	check_write_rejected(bp, -SYS_EINVAL);
 	bp->b_flags &= ~B_ASYNC;
-	CHECK(bdev_queue_enqueue(&ramqueue, bp) == 0);
+	CHECK(bdev_io_queue_enqueue(&ramqueue, bp) == 0);
 	check_write_rejected(bp, -SYS_EAGAIN);
 	CHECK(ramqueue.dq_head == bp && ramqueue.dq_tail == bp);
-	CHECK(bdev_queue_start(&ramqueue) == bp);
+	CHECK(bdev_io_queue_start(&ramqueue) == bp);
 	check_write_rejected(bp, -SYS_EAGAIN);
 	CHECK(ramqueue.dq_active == bp);
-	CHECK(bdev_queue_complete(&ramqueue) == bp);
-	bdev_queue_init(&other);
+	CHECK(bdev_io_queue_complete(&ramqueue) == bp);
+	bdev_io_queue_init(&other);
 	bdevsw[0].d_queue = &other;
-	CHECK(bdev_queue_enqueue(&other, bp) == 0);
+	CHECK(bdev_io_queue_enqueue(&other, bp) == 0);
 	check_write_rejected(bp, -SYS_EAGAIN);
 	CHECK(other.dq_head == bp && other.dq_tail == bp);
-	CHECK(bdev_queue_start(&other) == bp);
-	CHECK(bdev_queue_complete(&other) == bp);
+	CHECK(bdev_io_queue_start(&other) == bp);
+	CHECK(bdev_io_queue_complete(&other) == bp);
 	other.dq_tail = bp;
 	check_write_rejected(bp, -SYS_EINVAL);
 	CHECK(other.dq_head == NULL && other.dq_tail == bp);
@@ -947,7 +947,7 @@ static void test_writeback_rejection(void)
 			bp->b_flags |= B_AGE;
 			CHECK(bdwrite(bp) == 0);
 			CHECK(bfreelist.av_forw == bp);
-			bdev_queue_init(&other);
+			bdev_io_queue_init(&other);
 			queue = device == 0 ? &ramqueue : &other;
 			if (device == 1)
 				bdevsw[0].d_queue = queue;
@@ -965,7 +965,7 @@ static void test_writeback_rejection(void)
 			CHECK(count_av_list() == NBUF);
 			CHECK(io_writes == 0);
 			check_invariants();
-			bdev_queue_init(queue);
+			bdev_io_queue_init(queue);
 			bdevsw[0].d_queue = NULL;
 			bp = getblk(dev, 0);
 			CHECK(bp != NULL);

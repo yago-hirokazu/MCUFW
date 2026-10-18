@@ -17,7 +17,8 @@
  *         => iodone()：notify data transfer completion to buffer
  */
 
-static int bdev_queue_contains(struct bdev_io_queue *queue, struct buf *target);
+static int bdev_io_queue_contains(struct bdev_io_queue *queue,
+				  struct buf *target);
 
 /* Validate request and pass it to block device driver */
 int bdev_strategy(struct buf *bp)
@@ -60,7 +61,7 @@ int bdev_check_buffer_available(struct buf *bp)
 	for (i = 0; i < nblkdev; i++) {
 		if (!bdevsw[i].d_queue)
 			continue;
-		result = bdev_queue_contains(bdevsw[i].d_queue, bp);
+		result = bdev_io_queue_contains(bdevsw[i].d_queue, bp);
 		if (result < 0)
 			return result;
 		found |= result;
@@ -72,7 +73,7 @@ int bdev_check_buffer_available(struct buf *bp)
 }
 
 /* Initialize queue with no outstanding requests */
-void bdev_queue_init(struct bdev_io_queue *queue)
+void bdev_io_queue_init(struct bdev_io_queue *queue)
 {
 	if (!queue)
 		return;
@@ -84,12 +85,12 @@ void bdev_queue_init(struct bdev_io_queue *queue)
 }
 
 /* Append owned buffer to waiting list */
-int bdev_queue_enqueue(struct bdev_io_queue *queue, struct buf *bp)
+int bdev_io_queue_enqueue(struct bdev_io_queue *queue, struct buf *bp)
 {
 	if (!queue || !bp || !(bp->b_flags & B_BUSY))
 		return -1;
 	/* Reject duplicate request or malformed destination queue */
-	if (bdev_queue_contains(queue, bp))
+	if (bdev_io_queue_contains(queue, bp))
 		return -1;
 
 	/* Append at tail to preserve FIFO order */
@@ -103,7 +104,7 @@ int bdev_queue_enqueue(struct bdev_io_queue *queue, struct buf *bp)
 }
 
 /* Move oldest waiting request into active slot */
-struct buf *bdev_queue_start(struct bdev_io_queue *queue)
+struct buf *bdev_io_queue_start(struct bdev_io_queue *queue)
 {
 	struct buf *bp;
 
@@ -123,7 +124,7 @@ struct buf *bdev_queue_start(struct bdev_io_queue *queue)
 }
 
 /* Clear active slot and notify buffer completion */
-struct buf *bdev_queue_complete(struct bdev_io_queue *queue)
+struct buf *bdev_io_queue_complete(struct bdev_io_queue *queue)
 {
 	struct buf *bp;
 
@@ -140,8 +141,8 @@ struct buf *bdev_queue_complete(struct bdev_io_queue *queue)
 }
 
 /* Request retry or complete active request with error */
-int bdev_queue_error(struct bdev_io_queue *queue, unsigned int retry_limit,
-		     int error)
+int bdev_io_queue_error(struct bdev_io_queue *queue, unsigned int retry_limit,
+			int error)
 {
 	struct buf *bp;
 
@@ -156,7 +157,7 @@ int bdev_queue_error(struct bdev_io_queue *queue, unsigned int retry_limit,
 	bp = queue->dq_active;
 	bp->b_flags |= B_ERROR;
 	bp->b_error = error;
-	bdev_queue_complete(queue);
+	bdev_io_queue_complete(queue);
 	return BDEV_QUEUE_DONE;
 }
 
@@ -164,7 +165,8 @@ int bdev_queue_error(struct bdev_io_queue *queue, unsigned int retry_limit,
  * Validate non-NULL queue and search active slot plus waiting list
  * Return 1 if found, 0 if absent or negative error on malformed queue
  */
-static int bdev_queue_contains(struct bdev_io_queue *queue, struct buf *target)
+static int bdev_io_queue_contains(struct bdev_io_queue *queue,
+				  struct buf *target)
 {
 	struct buf *bp;
 	struct buf *last;

@@ -29,9 +29,9 @@ int ramstrategy(struct buf *bp)
 		return -SYS_ENODEV;
 	if (ramqueue.dq_active || ramqueue.dq_head)
 		return -SYS_EAGAIN;
-	if (bdev_queue_enqueue(&ramqueue, bp) < 0)
+	if (bdev_io_queue_enqueue(&ramqueue, bp) < 0)
 		return -SYS_EINVAL;
-	bp = bdev_queue_start(&ramqueue);
+	bp = bdev_io_queue_start(&ramqueue);
 	bp->b_flags &= ~(B_DONE | B_ERROR | B_DELWRI);
 	bp->b_error = 0;
 	bp->b_resid = bp->b_bcount;
@@ -42,7 +42,7 @@ int ramstrategy(struct buf *bp)
 	} else {
 		bp->b_resid = 0;
 	}
-	bdev_queue_complete(&ramqueue);
+	bdev_io_queue_complete(&ramqueue);
 	return 0;
 }
 

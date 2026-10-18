@@ -38,11 +38,11 @@ int bdev_check_io_request_valid(struct buf *bp);
 /* Return 0 on acceptance; rejection leaves buffer and queues unchanged */
 int bdev_strategy(struct buf *bp);
 
-void bdev_queue_init(struct bdev_io_queue *queue);
-int bdev_queue_enqueue(struct bdev_io_queue *queue, struct buf *bp);
-struct buf *bdev_queue_start(struct bdev_io_queue *queue);
-struct buf *bdev_queue_complete(struct bdev_io_queue *queue);
-int bdev_queue_error(struct bdev_io_queue *queue, unsigned int retry_limit,
-		     int error);
+void bdev_io_queue_init(struct bdev_io_queue *queue);
+int bdev_io_queue_enqueue(struct bdev_io_queue *queue, struct buf *bp);
+struct buf *bdev_io_queue_start(struct bdev_io_queue *queue);
+struct buf *bdev_io_queue_complete(struct bdev_io_queue *queue);
+int bdev_io_queue_error(struct bdev_io_queue *queue, unsigned int retry_limit,
+			int error);
 
 #endif
