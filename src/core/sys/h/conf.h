@@ -32,7 +32,7 @@ extern int nblkdev;
 /* Caller holds kernel lock; no internal lock or wait */
 struct bdevsw *bdevsw_lookup(unsigned int dev);
 /* Validate ownership independently of device registration */
-int bdev_check_buffer_availabe(struct buf *bp);
+int bdev_check_buffer_available(struct buf *bp);
 /* Validate request without submission or state change */
 int bdev_check_io_request_valid(struct buf *bp);
 /* Return 0 on acceptance; rejection leaves buffer and queues unchanged */

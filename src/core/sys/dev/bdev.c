@@ -43,11 +43,11 @@ int bdev_check_io_request_valid(struct buf *bp)
 	if (!dp || !dp->d_strategy)
 		return -SYS_ENODEV;
 	/* Check queue ownership independently of device registration */
-	return bdev_check_buffer_availabe(bp);
+	return bdev_check_buffer_available(bp);
 }
 
 /* Check buffer ownership across registered queues */
-int bdev_check_buffer_availabe(struct buf *bp)
+int bdev_check_buffer_available(struct buf *bp)
 {
 	int found;
 	int result;
