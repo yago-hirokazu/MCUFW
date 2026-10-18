@@ -23,7 +23,7 @@ struct bdevsw bdevsw[] = {
 
 int nblkdev = sizeof(bdevsw) / sizeof(bdevsw[0]);
 
-struct bdevsw *bdev_get(unsigned int dev)
+struct bdevsw *bdevsw_lookup(unsigned int dev)
 {
 	unsigned int maj;
 

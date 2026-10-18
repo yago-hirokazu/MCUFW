@@ -30,7 +30,7 @@ extern struct bdevsw bdevsw[];
 extern int nblkdev;
 
 /* Caller holds kernel lock; no internal lock or wait */
-struct bdevsw *bdev_get(unsigned int dev);
+struct bdevsw *bdevsw_lookup(unsigned int dev);
 /* Validate ownership independently of device registration */
 int bdev_buffer_check(struct buf *bp);
 /* Validate request without submission or state change */

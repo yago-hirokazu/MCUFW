@@ -356,13 +356,13 @@ static void test_devices(void)
 
 	binit();
 	for (i = 0; i < sizeof(invalid) / sizeof(invalid[0]); i++) {
-		CHECK(bdev_get(invalid[i]) == NULL);
+		CHECK(bdevsw_lookup(invalid[i]) == NULL);
 		CHECK(getblk(invalid[i], 0) == NULL);
 		CHECK(!incore(invalid[i], 0));
 	}
 	head = bdevsw[1].d_tab;
 	bdevsw[1].d_tab = NULL;
-	CHECK(bdev_get(makedev(1, 0)) == NULL);
+	CHECK(bdevsw_lookup(makedev(1, 0)) == NULL);
 	CHECK(getblk(makedev(1, 0), 0) == NULL);
 	bdevsw[1].d_tab = head;
 	first = getblk(makedev(1, 0), 7);
@@ -378,7 +378,7 @@ static void test_devices(void)
 	CHECK(second->b_addr[0] == 0x79);
 	brelse(first);
 	brelse(second);
-	CHECK(bdev_get(makedev(1, 255)) == &bdevsw[1]);
+	CHECK(bdevsw_lookup(makedev(1, 255)) == &bdevsw[1]);
 	check_invariants();
 }
 

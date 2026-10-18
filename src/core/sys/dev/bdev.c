@@ -40,7 +40,7 @@ int bdev_request_check(struct buf *bp)
 	/* Require owned buffer and registered strategy */
 	if (!bp || !(bp->b_flags & B_BUSY))
 		return -SYS_EINVAL;
-	dp = bdev_get(bp->b_dev);
+	dp = bdevsw_lookup(bp->b_dev);
 	if (!dp || !dp->d_strategy)
 		return -SYS_ENODEV;
 	/* Check queue ownership independently of device registration */

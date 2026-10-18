@@ -608,14 +608,14 @@ branch: `feature/mrunsv`
 
 - buf.hのmakedevをstatic inline関数にし、引数の単一評価と8 bit範囲検査を追加
 - conf.cへRAM予約用sentinelとmajor 1の未登録entryを追加
-- bdev_get(dev)で符号化、major範囲、d_tabを共通検査
-- bio.cのcache取得とincoreもbdev_getを使用
+- bdevsw_lookup(dev)で符号化、major範囲、d_tabを共通検査
+- bio.cのcache取得とincoreもbdevsw_lookupを使用
 - bdev_strategy(bp)で所有状態、dev、strategy登録、全登録queueを検査して提出
 - 不正queueはEINVAL、既存queue内の二重提出はEAGAINで拒否し、完了させない
 - queue走査をNBUFで制限し、循環、head/tail不整合、active重複等を拒否
 - SYS_ENODEV=9、SYS_EIO=10を末尾へ追加し、既存error番号を維持
 
-bdev_getの配置はconf.cとした。既存のbio/confだけをlinkする試験やtargetに
+bdevsw_lookupの配置はconf.cとした。既存のbio/confだけをlinkする試験やtargetに
 bdev.cへの新たなlink依存を作らず、cache取得と提出で同じ検査を再利用できる。
 この関数はstrategyやminorの有効性を検査しない。PIPEDEVとRAM予約entryの
 cache取得は可能だが、strategy未登録のI/O提出はENODEVとなる。
@@ -807,7 +807,7 @@ Windows mainのbuild・対話試験、TDM-GCC toolchainのbuild、par、STM32実
 次はStep 3のbread/bwrite。RAM側は要求ごとにB_DONE/B_ERROR/B_DELWRIを整理するが、
 利用側もread/writeのflag、b_bcount、所有権を正しく設定すること。
 read成功のbufferはcaller所有、bwriteの同期完了は内部解放という契約を守る。
-共通I/O提出はbdev_strategy、dev検査はbdev_getを使用できる。
+共通I/O提出はbdev_strategy、dev検査はbdevsw_lookupを使用できる。
 raminitを通常のcache取得やbinitから呼ばない。保存内容が消えるためである。
 BSIZE=256、NBUF=3、既存pipeの寿命中保持、callerによるkernel lockは維持した。
 共存時のNBUF変更はStep 4、遅延書込みはStep 5、起動接続と全回帰はStep 6。

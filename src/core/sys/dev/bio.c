@@ -293,7 +293,7 @@ static struct buf *getdev(unsigned int dev)
 {
 	struct bdevsw *dp;
 
-	dp = bdev_get(dev);
+	dp = bdevsw_lookup(dev);
 	return dp ? dp->d_tab : NULL;
 }
 
@@ -321,7 +321,7 @@ static int sync_device(unsigned int dev)
 {
 	struct bdevsw *dp;
 
-	dp = bdev_get(dev);
+	dp = bdevsw_lookup(dev);
 	if (!dp || !dp->d_strategy)
 		return -SYS_ENODEV;
 	if (!(dp->d_flags & BDEV_SYNC))
