@@ -252,7 +252,7 @@ static int write_buffer_check(struct buf *bp)
 {
 	if (!bp || (bp->b_flags & B_ASYNC))
 		return -SYS_EINVAL;
-	return bdev_buffer_check(bp);
+	return bdev_check_buffer_availability(bp);
 }
 
 /* Consume prevalidated owned buffer on every return path */

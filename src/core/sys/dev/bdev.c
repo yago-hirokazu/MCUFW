@@ -26,14 +26,14 @@ int bdev_strategy(struct buf *bp)
 	int result;
 
 	/* Reject invalid or already submitted buffer before driver call */
-	result = bdev_request_check(bp);
+	result = bdev_check_io_request_validity(bp);
 	if (result < 0)
 		return result;
 	return bdevsw[major(bp->b_dev)].d_strategy(bp);
 }
 
 /* Check request without changing buffer or queues */
-int bdev_request_check(struct buf *bp)
+int bdev_check_io_request_validity(struct buf *bp)
 {
 	struct bdevsw *dp;
 
@@ -44,11 +44,11 @@ int bdev_request_check(struct buf *bp)
 	if (!dp || !dp->d_strategy)
 		return -SYS_ENODEV;
 	/* Check queue ownership independently of device registration */
-	return bdev_buffer_check(bp);
+	return bdev_check_buffer_availability(bp);
 }
 
 /* Check buffer ownership across registered queues */
-int bdev_buffer_check(struct buf *bp)
+int bdev_check_buffer_availability(struct buf *bp)
 {
 	int found;
 	int result;
