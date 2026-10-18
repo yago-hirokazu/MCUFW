@@ -6,7 +6,7 @@
 
 /*
  * This file consolidates codes previously found in `bio.c` and other
- * block device drivers into a set of common routines.
+ * block device drivers of UNIX V7 into a set of common routines.
  */
 
 /*
@@ -17,10 +17,9 @@
  *         => iodone()：notify data transfer completion to buffer
  */
 
-
 static int bdev_queue_contains(struct bdev_queue *queue, struct buf *target);
 
-/* Validate request and dispatch to block device driver */
+/* Validate request and pass it to block device driver */
 int bdev_strategy(struct buf *bp)
 {
 	int result;
