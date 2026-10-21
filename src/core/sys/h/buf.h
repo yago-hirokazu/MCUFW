@@ -68,16 +68,21 @@ void binit(void);
 struct buf *getblk(unsigned int dev, unsigned long blkno);
 struct buf *geteblk(void);
 /* Require valid device table and synchronous strategy for block I/O */
-/* Busy hit or exhaustion returns EAGAIN; failed read releases buffer */
-struct buf *bread(unsigned int dev, unsigned long blkno, int *error);
+/* Strategy reports I/O errors through B_ERROR, b_error and iodone */
+/* Caller clears own u.u_error before operation; sleep preserves it */
+/* Busy hit or exhaustion returns NULL and sets u.u_error to SYS_EAGAIN */
+/* I/O error returns busy buffer; caller checks u.u_error and releases it */
+struct buf *bread(unsigned int dev, unsigned long blkno);
 /* Submit owned buffer; failed write discards device association */
-int bwrite(struct buf *bp);
+void bwrite(struct buf *bp);
 /* Mark owned buffer for delayed write without submitting I/O */
-int bdwrite(struct buf *bp);
+void bdwrite(struct buf *bp);
 /* Set B_ASYNC; iodone releases buffer, synchronous drivers required */
-int bawrite(struct buf *bp);
+void bawrite(struct buf *bp);
 /* NODEV selects all; submit available dirty buffers, skip busy buffers */
-int bflush(unsigned int dev);
+void bflush(unsigned int dev);
+/* Set u.u_error from B_ERROR and b_error; preserve it on success */
+void geterror(struct buf *bp);
 void brelse(struct buf *bp);
 int incore(unsigned int dev, unsigned long blkno);
 void clrbuf(struct buf *bp);

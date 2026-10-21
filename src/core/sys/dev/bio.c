@@ -2,6 +2,7 @@
  * getblk() / geteblk() => bawrite() => bwrite() => driver strategy
  * bread() => driver strategy => iodone() => brelse() for B_ASYNC
  * bdwrite() => brelse(); bflush() => bawrite()
+ * bread() / bwrite() => geterror() => u.u_error
  */
 
 #include <assert.h>
@@ -10,6 +11,7 @@
 #include "buf.h"
 #include "conf.h"
 #include "sys_error.h"
+#include "user.h"
 
 unsigned char buffers[NBUF][BSIZE];
 
@@ -21,8 +23,8 @@ static void av_list_remove(struct buf *bp);
 static void av_list_insert_head(struct buf *bp);
 static void av_list_insert_tail(struct buf *bp);
 static void notavail(struct buf *bp);
-static void reassociate(struct buf *bp, struct buf *head,
-			unsigned int dev, unsigned long blkno);
+static void assign_buffer_to_block(struct buf *bp, struct buf *head,
+				   unsigned int dev, unsigned long blkno);
 
 /* Initialize buffer cache */
 void binit(void)
@@ -83,7 +85,7 @@ loop:
 		bawrite(bp);
 		goto loop;
 	}
-	reassociate(bp, dp, dev, blkno);
+	assign_buffer_to_block(bp, dp, dev, blkno);
 	return bp;
 }
 
@@ -101,42 +103,34 @@ loop:
 		bawrite(bp);
 		goto loop;
 	}
-	reassociate(bp, &bfreelist, NODEV, 0);
+	assign_buffer_to_block(bp, &bfreelist, NODEV, 0);
 	return bp;
 }
 
 /* Read block through synchronous driver unless already cached */
-struct buf *bread(unsigned int dev, unsigned long blkno, int *error)
+struct buf *bread(unsigned int dev, unsigned long blkno)
 {
 	struct buf *bp;
 
-	*error = 0;
 	bp = getblk(dev, blkno);
 	if (!bp) {
-		*error = -SYS_EAGAIN;
+		u.u_error = SYS_EAGAIN;
 		return NULL;
 	}
 	if (bp->b_flags & B_DONE)
 		return bp;
 	bp->b_flags |= B_READ;
 	bp->b_bcount = BSIZE;
-	*error = bdevsw[major(dev)].d_strategy(bp);
-	if (!*error && (bp->b_flags & B_ERROR))
-		*error = bp->b_error ? -bp->b_error : -SYS_EIO;
-	/* Preserve MCUFW API: failed read releases buffer */
-	if (*error) {
-		bp->b_flags |= B_ERROR;
-		brelse(bp);
-		return NULL;
-	}
+	bdevsw[major(dev)].d_strategy(bp);
+	/* Synchronous strategy completes I/O before error collection */
+	geterror(bp);
 	return bp;
 }
 
 /* Write buffer and release on synchronous completion */
-int bwrite(struct buf *bp)
+void bwrite(struct buf *bp)
 {
 	unsigned int flag;
-	int error;
 
 	flag = bp->b_flags;
 	bp->b_flags &= ~(B_READ | B_DONE | B_ERROR | B_DELWRI | B_AGE);
@@ -144,36 +138,30 @@ int bwrite(struct buf *bp)
 	/* Synchronous driver may release async buffer before returning */
 	if ((flag & (B_ASYNC | B_DELWRI)) == (B_ASYNC | B_DELWRI))
 		bp->b_flags |= B_AGE;
-	error = bdevsw[major(bp->b_dev)].d_strategy(bp);
-	if (!error && (bp->b_flags & B_ERROR))
-		error = bp->b_error ? -bp->b_error : -SYS_EIO;
-	/* Rejected request has no iodone to release async buffer */
-	if (error && !(bp->b_flags & B_DONE)) {
-		bp->b_flags |= B_ERROR;
+	bdevsw[major(bp->b_dev)].d_strategy(bp);
+	if (!(flag & B_ASYNC)) {
+		geterror(bp);
 		brelse(bp);
-	} else if (!(flag & B_ASYNC)) {
-		brelse(bp);
-	}
-	return error;
+	} else if (!(flag & B_DELWRI))
+		geterror(bp);
 }
 
 /* Mark delayed write and release buffer */
-int bdwrite(struct buf *bp)
+void bdwrite(struct buf *bp)
 {
 	bp->b_flags |= B_DELWRI | B_DONE;
 	brelse(bp);
-	return 0;
 }
 
 /* Release buffer through driver completion */
-int bawrite(struct buf *bp)
+void bawrite(struct buf *bp)
 {
 	bp->b_flags |= B_ASYNC;
-	return bwrite(bp);
+	bwrite(bp);
 }
 
 /* Start delayed writes from available list for selected devices */
-int bflush(unsigned int dev)
+void bflush(unsigned int dev)
 {
 	struct buf *bp;
 
@@ -186,7 +174,16 @@ loop:
 			goto loop;
 		}
 	}
-	return 0;
+}
+
+/* Copy device error to user context, defaulting to generic I/O error */
+void geterror(struct buf *bp)
+{
+	if (bp->b_flags & B_ERROR) {
+		u.u_error = bp->b_error;
+		if (!u.u_error)
+			u.u_error = SYS_EIO;
+	}
 }
 
 /* Release buffer onto available list */
@@ -295,8 +292,8 @@ static void notavail(struct buf *bp)
 }
 
 /* Assign buffer to device and block */
-static void reassociate(struct buf *bp, struct buf *head,
-			unsigned int dev, unsigned long blkno)
+static void assign_buffer_to_block(struct buf *bp, struct buf *head,
+				   unsigned int dev, unsigned long blkno)
 {
 	b_list_remove(bp);
 	b_list_insert(head, bp);

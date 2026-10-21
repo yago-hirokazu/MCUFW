@@ -28,7 +28,7 @@ static int mock_completed_count;
 static int mock_calls;
 
 static int on_av_list(struct buf *target);
-static int mock_strategy(struct buf *bp);
+static void mock_strategy(struct buf *bp);
 static void mock_start(void);
 static int mock_interrupt(int error);
 static void setup(void);
@@ -43,8 +43,8 @@ static void test_strategy_rejection(void);
 static void test_other_queue(void);
 static void test_invalid_queue(void);
 static void test_driver_result(void);
-static int reject_strategy(struct buf *bp);
-static int error_strategy(struct buf *bp);
+static void reject_strategy(struct buf *bp);
+static void error_strategy(struct buf *bp);
 
 int main(void)
 {
@@ -82,13 +82,14 @@ static int on_av_list(struct buf *target)
 	return 0;
 }
 
-static int mock_strategy(struct buf *bp)
+static void mock_strategy(struct buf *bp)
 {
 	mock_calls++;
-	if (bdev_io_queue_enqueue(&mock_queue, bp) < 0)
-		return -1;
+	if (bdev_io_queue_enqueue(&mock_queue, bp) < 0) {
+		bdev_io_error(bp, SYS_EINVAL);
+		return;
+	}
 	mock_start();
-	return 0;
 }
 
 static void mock_start(void)
@@ -184,7 +185,7 @@ static void test_one_request(void)
 	CHECK(bp != NULL);
 	CHECK(!on_av_list(bp));
 	bp->b_flags |= B_WANTED;
-	CHECK(bdev_strategy(bp) == 0);
+	bdev_strategy(bp);
 	CHECK(mock_queue.dq_head == NULL);
 	CHECK(mock_queue.dq_tail == NULL);
 	CHECK(mock_queue.dq_active == bp);
@@ -209,7 +210,7 @@ static void test_multiple_requests(void)
 	for (i = 0; i < NBUF; i++) {
 		bp[i] = getblk(PIPEDEV, (unsigned long)(10 + i));
 		CHECK(bp[i] != NULL);
-		CHECK(bdev_strategy(bp[i]) == 0);
+		bdev_strategy(bp[i]);
 		CHECK(!on_av_list(bp[i]));
 	}
 	CHECK(mock_queue.dq_active == bp[0]);
@@ -240,8 +241,8 @@ static void test_error_retry(void)
 	next = getblk(PIPEDEV, 31);
 	CHECK(bp != NULL);
 	CHECK(next != NULL);
-	CHECK(bdev_strategy(bp) == 0);
-	CHECK(bdev_strategy(next) == 0);
+	bdev_strategy(bp);
+	bdev_strategy(next);
 	CHECK(mock_interrupt(1) == BDEV_IO_QUEUE_RETRY);
 	CHECK(mock_queue.dq_active == bp);
 	CHECK(mock_queue.dq_errcnt == 1);
@@ -274,7 +275,7 @@ static void test_async_completion(void)
 	bp = getblk(PIPEDEV, 40);
 	CHECK(bp != NULL);
 	bp->b_flags |= B_ASYNC;
-	CHECK(bdev_strategy(bp) == 0);
+	bdev_strategy(bp);
 	CHECK(mock_interrupt(0) == BDEV_IO_QUEUE_DONE);
 	CHECK(bp->b_flags & B_DONE);
 	CHECK(!(bp->b_flags & B_BUSY));
@@ -307,7 +308,7 @@ static void check_rejection(struct buf *bp, int error)
 			       sizeof(saved_queue[i]));
 	}
 	calls = mock_calls;
-	CHECK(bdev_strategy(bp) == error);
+	CHECK(bdev_check_io_request_valid(bp) == error);
 	CHECK(mock_calls == calls);
 	CHECK(memcmp(saved_buf, buf, sizeof(saved_buf)) == 0);
 	CHECK(memcmp(&saved_free, &bfreelist, sizeof(saved_free)) == 0);
@@ -345,7 +346,7 @@ static void test_strategy_rejection(void)
 	bdevsw[1].d_tab = head;
 	bdevsw[1].d_strategy = NULL;
 	bp->b_dev = PIPEDEV;
-	CHECK(bdev_strategy(bp) == 0);
+	bdev_strategy(bp);
 	check_rejection(bp, -SYS_EAGAIN);
 	CHECK(mock_interrupt(0) == BDEV_IO_QUEUE_DONE);
 	brelse(bp);
@@ -414,37 +415,33 @@ static void test_invalid_queue(void)
 	teardown();
 }
 
-static int reject_strategy(struct buf *bp)
+/* Device rejects request through normal error completion */
+static void reject_strategy(struct buf *bp)
 {
-	(void)bp;
 	mock_calls++;
-	return -SYS_EIO;
+	bdev_io_error(bp, SYS_EIO);
 }
 
-static int error_strategy(struct buf *bp)
+static void error_strategy(struct buf *bp)
 {
 	mock_calls++;
-	bp->b_flags |= B_ERROR;
-	bp->b_error = SYS_EIO;
-	bp->b_resid = bp->b_bcount;
-	iodone(bp);
-	return 0;
+	bdev_io_error(bp, SYS_EIO);
 }
 
 static void test_driver_result(void)
 {
 	struct buf *bp;
-	struct buf saved;
 
 	setup();
 	bp = getblk(PIPEDEV, 80);
-	memcpy(&saved, bp, sizeof(saved));
 	bdevsw[0].d_strategy = reject_strategy;
-	CHECK(bdev_strategy(bp) == -SYS_EIO);
-	CHECK(memcmp(&saved, bp, sizeof(saved)) == 0);
+	bdev_strategy(bp);
+	CHECK(bp->b_flags & B_DONE);
+	CHECK(bp->b_flags & B_ERROR);
+	CHECK(bp->b_error == SYS_EIO);
 	CHECK(mock_calls == 1);
 	bdevsw[0].d_strategy = error_strategy;
-	CHECK(bdev_strategy(bp) == 0);
+	bdev_strategy(bp);
 	CHECK(bp->b_flags & B_DONE);
 	CHECK(bp->b_flags & B_ERROR);
 	CHECK(bp->b_flags & B_BUSY);
@@ -453,7 +450,7 @@ static void test_driver_result(void)
 	brelse(bp);
 	bp = getblk(makedev(1, 255), 81);
 	bdevsw[1].d_strategy = error_strategy;
-	CHECK(bdev_strategy(bp) == 0);
+	bdev_strategy(bp);
 	CHECK(bp->b_dev == makedev(1, 255));
 	CHECK(bp->b_flags & B_DONE);
 	CHECK(bp->b_error == SYS_EIO);

@@ -9,6 +9,8 @@ CFLAGS += -Wall -Wextra -Werror -pedantic -I../../h
 OBJS = $(OUTDIR)/test_ramdisk.o $(OUTDIR)/ramdisk.o
 OBJS += $(OUTDIR)/bdev.o $(OUTDIR)/bio.o $(OUTDIR)/conf.o
 
+OBJS += $(OUTDIR)/sched_stub.o
+
 .PHONY: all clean
 
 all: $(OUTDIR) $(TARGET)
@@ -35,6 +37,9 @@ $(OUTDIR)/conf.o: ../../conf/conf.c
 	$(CC) $(CFLAGS) -MMD -MP -c $< -o $@
 
 -include $(OBJS:.o=.d)
+
+$(OUTDIR)/sched_stub.o: ../stub/sched_stub.c
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(OUTDIR) $(TARGET)

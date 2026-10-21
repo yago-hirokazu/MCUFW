@@ -1,8 +1,10 @@
 /* sched_stub.c */
 
+#include <assert.h>
 #include <stddef.h>
 
 #include "sched.h"
+#include "user.h"
 #include "sched_stub.h"
 
 #define WAKE_RECORD_MAX	8
@@ -13,6 +15,7 @@ struct wake_record {
 };
 
 static struct proc *stub_current;
+static struct user base_user;
 static void (*stub_sleep_hook)(struct wait_chan *chan,
 			       enum wait_reason reason);
 static struct wake_record wake_record[WAKE_RECORD_MAX];
@@ -113,4 +116,13 @@ void sched_wakeup(struct wait_chan *chan)
 struct proc *current_proc(void)
 {
 	return stub_current;
+}
+
+/* Standalone cache tests execute in single host context */
+struct user *current_user(void)
+{
+	if (!stub_current)
+		return &base_user;
+	assert(stub_current->p_addr != NULL);
+	return stub_current->p_addr;
 }

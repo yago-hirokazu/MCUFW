@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stddef.h>
 
 #include "buf.h"
@@ -21,15 +22,32 @@ static int bdev_io_queue_contains(struct bdev_io_queue *queue,
 				  struct buf *target);
 
 /* Validate request and pass it to block device driver */
-int bdev_strategy(struct buf *bp)
+void bdev_strategy(struct buf *bp)
 {
 	int result;
 
-	/* Reject invalid or already submitted buffer before driver call */
+	/* Never complete buffer still owned by another request */
+	result = bdev_check_buffer_available(bp);
+	if (result < 0) {
+		assert(result == 0);
+		return;
+	}
 	result = bdev_check_io_request_valid(bp);
-	if (result < 0)
-		return result;
-	return bdevsw[major(bp->b_dev)].d_strategy(bp);
+	if (result < 0) {
+		bdev_io_error(bp, -result);
+		return;
+	}
+	bdevsw[major(bp->b_dev)].d_strategy(bp);
+}
+
+/* Report failed request through same completion path as device I/O */
+void bdev_io_error(struct buf *bp, int error)
+{
+	assert(bp != NULL && (bp->b_flags & B_BUSY));
+	bp->b_flags |= B_ERROR;
+	bp->b_error = error;
+	bp->b_resid = bp->b_bcount;
+	iodone(bp);
 }
 
 /* Check request without changing buffer or queues */

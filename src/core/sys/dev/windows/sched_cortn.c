@@ -5,6 +5,7 @@
 #include "cortn.h"
 #include "sched_backend.h"
 #include "sys_error.h"
+#include "user.h"
 
 struct sched_cortn_slot {
 	struct cortn cs_cortn;
@@ -17,9 +18,16 @@ struct sched_cortn_slot {
 
 static unsigned char kernel_lock_held;
 static struct proc *current;
+static struct user base_user;
 static struct sched_cortn_slot cortn_slots[PIPELINE_MAX];
 
 static void sched_cortn_entry(struct cortn *cortn, void *arg);
+
+/* Host-side operations retain separate error state from workers */
+struct user *sched_backend_base_user(void)
+{
+	return &base_user;
+}
 
 struct proc *sched_backend_current(void)
 {

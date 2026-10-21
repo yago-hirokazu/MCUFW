@@ -21,6 +21,7 @@
 #endif
 
 #include "ramdisk.h"
+#include "user.h"
 
 #if defined(__cplusplus)
 #define STATIC_ASSERT(condition, message) static_assert(condition, message)

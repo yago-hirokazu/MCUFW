@@ -13,7 +13,7 @@ struct bdev_io_queue {
 };
 
 struct bdevsw {
-	int (*d_strategy)(struct buf *bp);
+	void (*d_strategy)(struct buf *bp);
 	struct buf *d_tab;
 	struct bdev_io_queue *d_queue;
 	unsigned int d_flags;
@@ -35,8 +35,11 @@ struct bdevsw *bdevsw_lookup(unsigned int dev);
 int bdev_check_buffer_available(struct buf *bp);
 /* Validate request without submission or state change */
 int bdev_check_io_request_valid(struct buf *bp);
-/* Return 0 on acceptance; rejection leaves buffer and queues unchanged */
-int bdev_strategy(struct buf *bp);
+/* Submit owned, unqueued buffer; errors complete through buffer state */
+/* NULL, unowned or already queued buffer violates submission contract */
+void bdev_strategy(struct buf *bp);
+/* Complete rejected, owned and unqueued request with positive error */
+void bdev_io_error(struct buf *bp, int error);
 
 void bdev_io_queue_init(struct bdev_io_queue *queue);
 int bdev_io_queue_enqueue(struct bdev_io_queue *queue, struct buf *bp);

@@ -1,5 +1,6 @@
 /* ramdisk.c */
 
+#include <assert.h>
 #include <string.h>
 
 #include "buf.h"
@@ -18,19 +19,32 @@ void raminit(void)
 	memset(ramblocks, 0, sizeof(ramblocks));
 }
 
-int ramstrategy(struct buf *bp)
+/* Complete every submitted request, including validation failures */
+void ramstrategy(struct buf *bp)
 {
 	int result;
 
+	/* Duplicate submission must not complete original queued request */
+	result = bdev_check_buffer_available(bp);
+	if (result < 0) {
+		assert(result == 0);
+		return;
+	}
 	result = bdev_check_io_request_valid(bp);
 	if (result < 0)
-		return result;
-	if (major(bp->b_dev) != RAM_MAJOR)
-		return -SYS_ENODEV;
-	if (ramqueue.dq_active || ramqueue.dq_head)
-		return -SYS_EAGAIN;
-	if (bdev_io_queue_enqueue(&ramqueue, bp) < 0)
-		return -SYS_EINVAL;
+		goto error;
+	if (major(bp->b_dev) != RAM_MAJOR) {
+		result = -SYS_ENODEV;
+		goto error;
+	}
+	if (ramqueue.dq_active || ramqueue.dq_head) {
+		result = -SYS_EAGAIN;
+		goto error;
+	}
+	if (bdev_io_queue_enqueue(&ramqueue, bp) < 0) {
+		result = -SYS_EINVAL;
+		goto error;
+	}
 	bp = bdev_io_queue_start(&ramqueue);
 	bp->b_flags &= ~(B_DONE | B_ERROR | B_DELWRI);
 	bp->b_error = 0;
@@ -43,7 +57,10 @@ int ramstrategy(struct buf *bp)
 		bp->b_resid = 0;
 	}
 	bdev_io_queue_complete(&ramqueue);
-	return 0;
+	return;
+
+error:
+	bdev_io_error(bp, -result);
 }
 
 static int ramtransfer(struct buf *bp)

@@ -10,6 +10,7 @@
 #include "pipe.h"
 #include "sched.h"
 #include "sched_stub.h"
+#include "user.h"
 #include "sys_error.h"
 
 #define CHECK(condition) \
@@ -27,7 +28,7 @@ static struct file *hook_file;
 static struct inode *hook_inode;
 static ptrdiff_t hook_result;
 
-static void init_proc(struct proc *proc);
+static void init_proc(struct proc *proc, struct user *user);
 static ptrdiff_t call_read(struct proc *proc, int fd, void *buf,
 			   size_t count);
 static ptrdiff_t call_write(struct proc *proc, int fd, const void *buf,
@@ -66,9 +67,11 @@ int main(void)
 	return 0;
 }
 
-static void init_proc(struct proc *proc)
+static void init_proc(struct proc *proc, struct user *user)
 {
 	memset(proc, 0, sizeof(*proc));
+	memset(user, 0, sizeof(*user));
+	proc->p_addr = user;
 	proc->p_state = PROC_NEW;
 }
 
@@ -143,12 +146,13 @@ static void unlock_hook(struct wait_chan *chan, enum wait_reason reason)
 static void test_zero_length_and_validation(void)
 {
 	struct proc proc;
+	struct user proc_user;
 	char data;
 	int fd[2];
 
 	binit();
 	finit();
-	init_proc(&proc);
+	init_proc(&proc, &proc_user);
 	sched_stub_reset(&proc);
 	CHECK(readp(NULL, NULL, NULL, 0) == 0);
 	CHECK(writep(NULL, NULL, NULL, 0) == 0);
@@ -169,6 +173,7 @@ static void test_zero_length_and_validation(void)
 static void test_create_and_data_path(void)
 {
 	struct proc proc;
+	struct user proc_user;
 	struct inode *ip;
 	struct file *rf;
 	struct file *wf;
@@ -177,7 +182,7 @@ static void test_create_and_data_path(void)
 
 	binit();
 	finit();
-	init_proc(&proc);
+	init_proc(&proc, &proc_user);
 	sched_stub_reset(&proc);
 	CHECK(sys_pipe(fd) == 0);
 	CHECK(fd[0] == 0);
@@ -219,6 +224,7 @@ static void test_full_and_offset_reset(void)
 	unsigned char input[PIPSIZ + 1];
 	unsigned char output[PIPSIZ];
 	struct proc proc;
+	struct user proc_user;
 	struct inode *ip;
 	struct file *rf;
 	int fd[2];
@@ -226,7 +232,7 @@ static void test_full_and_offset_reset(void)
 
 	binit();
 	finit();
-	init_proc(&proc);
+	init_proc(&proc, &proc_user);
 	sched_stub_reset(&proc);
 	CHECK(sys_pipe(fd) == 0);
 	rf = getf(&proc, fd[0]);
@@ -251,13 +257,14 @@ static void test_full_and_offset_reset(void)
 static void test_eof_epipe_and_close_wakeup(void)
 {
 	struct proc proc;
+	struct user proc_user;
 	struct inode *ip;
 	char data;
 	int fd[2];
 
 	binit();
 	finit();
-	init_proc(&proc);
+	init_proc(&proc, &proc_user);
 	sched_stub_reset(&proc);
 	CHECK(sys_pipe(fd) == 0);
 	ip = getf(&proc, fd[0])->f_inode;
@@ -270,7 +277,7 @@ static void test_eof_epipe_and_close_wakeup(void)
 
 	binit();
 	finit();
-	init_proc(&proc);
+	init_proc(&proc, &proc_user);
 	sched_stub_reset(&proc);
 	CHECK(sys_pipe(fd) == 0);
 	CHECK(call_close(&proc, fd[0]) == 0);
@@ -283,13 +290,14 @@ static void test_wait_rechecks(void)
 {
 	unsigned char data[PIPSIZ];
 	struct proc proc;
+	struct user proc_user;
 	struct file *rf;
 	char byte;
 	int fd[2];
 
 	binit();
 	finit();
-	init_proc(&proc);
+	init_proc(&proc, &proc_user);
 	proc.p_backend = &proc;
 	sched_stub_reset(&proc);
 	CHECK(sys_pipe(fd) == 0);
@@ -319,12 +327,13 @@ static void test_wait_rechecks(void)
 static void test_pipe_lock(void)
 {
 	struct proc proc;
+	struct user proc_user;
 	struct inode *ip;
 	int fd[2];
 
 	binit();
 	finit();
-	init_proc(&proc);
+	init_proc(&proc, &proc_user);
 	proc.p_backend = &proc;
 	sched_stub_reset(&proc);
 	CHECK(sys_pipe(fd) == 0);
@@ -373,7 +382,9 @@ static void test_resource_rollback(void)
 {
 	struct inode *ips[NINODE];
 	struct proc caller;
+	struct user caller_user;
 	struct proc owner;
+	struct user owner_user;
 	int pipes[NINODE][2];
 	int fd[2];
 	int item;
@@ -381,7 +392,7 @@ static void test_resource_rollback(void)
 
 	binit();
 	finit();
-	init_proc(&caller);
+	init_proc(&caller, &caller_user);
 	sched_stub_reset(&caller);
 	for (i = 0; i < NOFILE - 1; i++)
 		CHECK(falloc(&caller, &item) != NULL);
@@ -392,7 +403,7 @@ static void test_resource_rollback(void)
 
 	binit();
 	finit();
-	init_proc(&caller);
+	init_proc(&caller, &caller_user);
 	sched_stub_reset(&caller);
 	for (i = 0; i < NOFILE; i++)
 		CHECK(falloc(&caller, &item) != NULL);
@@ -403,8 +414,8 @@ static void test_resource_rollback(void)
 
 	binit();
 	finit();
-	init_proc(&caller);
-	init_proc(&owner);
+	init_proc(&caller, &caller_user);
+	init_proc(&owner, &owner_user);
 	sched_stub_reset(&caller);
 	for (i = 0; i < NFILE; i++)
 		CHECK(falloc(&owner, &item) != NULL);
@@ -415,8 +426,8 @@ static void test_resource_rollback(void)
 
 	binit();
 	finit();
-	init_proc(&caller);
-	init_proc(&owner);
+	init_proc(&caller, &caller_user);
+	init_proc(&owner, &owner_user);
 	sched_stub_reset(&caller);
 	for (i = 0; i < NFILE - 1; i++)
 		CHECK(falloc(&owner, &item) != NULL);
@@ -428,7 +439,7 @@ static void test_resource_rollback(void)
 
 	binit();
 	finit();
-	init_proc(&caller);
+	init_proc(&caller, &caller_user);
 	sched_stub_reset(&caller);
 	for (i = 0; i < NINODE; i++) {
 		ips[i] = ialloc();
@@ -442,7 +453,7 @@ static void test_resource_rollback(void)
 
 	binit();
 	finit();
-	init_proc(&caller);
+	init_proc(&caller, &caller_user);
 	sched_stub_reset(&caller);
 	for (i = 0; i < NINODE; i++)
 		CHECK(sys_pipe(pipes[i]) == 0);

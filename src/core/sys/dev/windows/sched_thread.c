@@ -10,6 +10,7 @@
 
 #include "sched_backend.h"
 #include "sys_error.h"
+#include "user.h"
 
 struct sched_thread_slot {
 	HANDLE ts_thread;
@@ -27,10 +28,17 @@ struct sched_thread_slot {
 static SRWLOCK kernel_mutex = SRWLOCK_INIT;
 static _Thread_local int kernel_lock_held;
 static _Thread_local struct proc *current;
+static _Thread_local struct user base_user;
 static struct sched_thread_slot thread_slots[PIPELINE_MAX];
 
 static int sched_thread_wait(CONDITION_VARIABLE *cv);
 static unsigned __stdcall sched_thread_entry(void *arg);
+
+/* Host-side operations retain separate error state from workers */
+struct user *sched_backend_base_user(void)
+{
+	return &base_user;
+}
 
 struct proc *sched_backend_current(void)
 {

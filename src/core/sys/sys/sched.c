@@ -1,10 +1,15 @@
-/* sched.c */
+/*
+ * current_user() => current_proc() => p_addr => dedicated user area
+ * Host without proc => backend-local base user area
+ */
 
+#include <assert.h>
 #include <string.h>
 
 #include "sched.h"
 #include "sched_backend.h"
 #include "sys_error.h"
+#include "user.h"
 
 #ifdef SCHED_TEST
 static int test_fail_yield;
@@ -112,17 +117,31 @@ struct proc *current_proc(void)
 	return sched_backend_current();
 }
 
-void proc_init(struct proc *proc)
+/* Select user area through current proc, without copying on switches */
+struct user *current_user(void)
 {
+	struct proc *proc;
+
+	proc = current_proc();
 	if (!proc)
-		return;
+		return sched_backend_base_user();
+	assert(proc->p_addr != NULL);
+	return proc->p_addr;
+}
+
+/* Bind caller-owned user area before descriptors or backend setup */
+void proc_init(struct proc *proc, struct user *user)
+{
+	assert(proc != NULL && user != NULL);
 	memset(proc, 0, sizeof(*proc));
+	memset(user, 0, sizeof(*user));
+	proc->p_addr = user;
 	proc->p_state = PROC_NEW;
 }
 
 int proc_bind_backend(struct proc *proc, void *backend)
 {
-	if (!proc || !backend || proc->p_state != PROC_NEW)
+	if (!proc || !proc->p_addr || !backend || proc->p_state != PROC_NEW)
 		return -SYS_EINVAL;
 	proc->p_backend = backend;
 	proc->p_state = PROC_RUNNABLE;
@@ -133,7 +152,7 @@ int sched_prepare(struct proc *proc, void (*entry)(void *arg), void *arg)
 {
 	void *backend;
 
-	if (!proc || !entry || proc->p_state != PROC_NEW)
+	if (!proc || !proc->p_addr || !entry || proc->p_state != PROC_NEW)
 		return -SYS_EINVAL;
 	backend = sched_backend_prepare(entry, arg);
 	if (!backend)

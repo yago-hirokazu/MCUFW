@@ -69,7 +69,7 @@ static void complete(struct buf *bp, int error)
 		return;
 	if (bp->b_addr)
 		memcpy(saved, bp->b_addr, BSIZE);
-	CHECK(bdev_strategy(bp) == 0);
+	bdev_strategy(bp);
 	CHECK(bp->b_flags & B_DONE);
 	CHECK(bp->b_flags & B_BUSY);
 	CHECK(!!(bp->b_flags & B_ERROR) == !!error);
@@ -222,7 +222,7 @@ static void test_async(void)
 	memset(bp->b_addr, 0x96, BSIZE);
 	index = (int)(bp - buf);
 	bp->b_flags |= B_ASYNC;
-	CHECK(bdev_strategy(bp) == 0);
+	bdev_strategy(bp);
 	/* Inspect pool after completion without retaining caller ownership */
 	CHECK(buf[index].b_flags & B_DONE);
 	CHECK(!(buf[index].b_flags & (B_BUSY | B_ASYNC | B_ERROR)));
@@ -236,7 +236,7 @@ static void test_async(void)
 	bp = request(0, RAM_NBLK, 1);
 	index = (int)(bp - buf);
 	bp->b_flags |= B_ASYNC;
-	CHECK(bdev_strategy(bp) == 0);
+	bdev_strategy(bp);
 	CHECK(buf[index].b_flags & B_DONE);
 	CHECK(buf[index].b_flags & B_ERROR);
 	CHECK(buf[index].b_error == SYS_EIO);
@@ -245,39 +245,65 @@ static void test_async(void)
 	check_idle();
 }
 
+/* Rejection completes detached request without touching queued owner */
 static void test_rejection(void)
 {
 	struct bdev_io_queue other;
 	struct buf *bp;
+	struct buf *blocked;
 	struct buf saved;
 
 	raminit();
 	binit();
-	CHECK(ramstrategy(NULL) == -SYS_EINVAL);
+	CHECK(bdev_check_io_request_valid(NULL) == -SYS_EINVAL);
 	bp = request(0, 0, 1);
 	bp->b_dev = PIPEDEV;
-	memcpy(&saved, bp, sizeof(saved));
-	CHECK(ramstrategy(bp) == -SYS_ENODEV);
-	CHECK(memcmp(&saved, bp, sizeof(saved)) == 0);
-	bp->b_dev = makedev(RAM_MAJOR, 0);
+	ramstrategy(bp);
+	CHECK((bp->b_flags & (B_DONE | B_ERROR)) == (B_DONE | B_ERROR));
+	CHECK(bp->b_error == SYS_ENODEV);
+	brelse(bp);
+	bp = request(0, 0, 1);
 	CHECK(bdev_io_queue_enqueue(&ramqueue, bp) == 0);
 	memcpy(&saved, bp, sizeof(saved));
-	CHECK(ramstrategy(bp) == -SYS_EAGAIN);
+	CHECK(bdev_check_io_request_valid(bp) == -SYS_EAGAIN);
+#ifdef NDEBUG
+	/* Release build must not complete duplicate queued request */
+	ramstrategy(bp);
+#endif
 	CHECK(memcmp(&saved, bp, sizeof(saved)) == 0);
+	blocked = request(0, 1, 1);
+	ramstrategy(blocked);
+	CHECK(blocked->b_flags & B_DONE);
+	CHECK(blocked->b_error == SYS_EAGAIN);
+	CHECK(blocked->b_flags & B_BUSY);
+	CHECK(blocked->b_resid == BSIZE);
+	CHECK(ramqueue.dq_head == bp && ramqueue.dq_tail == bp);
+	brelse(blocked);
+	blocked = request(0, 2, 0);
+	blocked->b_flags |= B_ASYNC;
+	ramstrategy(blocked);
+	CHECK(blocked->b_flags & B_DONE);
+	CHECK(blocked->b_error == SYS_EAGAIN);
+	CHECK(!(blocked->b_flags & (B_BUSY | B_ASYNC)));
+	CHECK(ramqueue.dq_head == bp);
 	CHECK(bdev_io_queue_start(&ramqueue) == bp);
 	CHECK(bdev_io_queue_complete(&ramqueue) == bp);
 	bdev_io_queue_init(&other);
 	bdevsw[0].d_queue = &other;
 	CHECK(bdev_io_queue_enqueue(&other, bp) == 0);
 	memcpy(&saved, bp, sizeof(saved));
-	CHECK(ramstrategy(bp) == -SYS_EAGAIN);
+	CHECK(bdev_check_io_request_valid(bp) == -SYS_EAGAIN);
+#ifdef NDEBUG
+	/* Release build must not complete duplicate queued request */
+	ramstrategy(bp);
+#endif
 	CHECK(memcmp(&saved, bp, sizeof(saved)) == 0);
 	CHECK(bdev_io_queue_start(&other) == bp);
 	CHECK(bdev_io_queue_complete(&other) == bp);
 	bdevsw[0].d_queue = NULL;
 	brelse(bp);
 	memcpy(&saved, bp, sizeof(saved));
-	CHECK(ramstrategy(bp) == -SYS_EINVAL);
+	CHECK(bdev_check_io_request_valid(bp) == -SYS_EINVAL);
 	CHECK(memcmp(&saved, bp, sizeof(saved)) == 0);
 	check_idle();
 }

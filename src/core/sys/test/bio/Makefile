@@ -13,6 +13,8 @@ OBJS += $(OUTDIR)/conf.o
 OBJS += $(OUTDIR)/ramdisk.o
 OBJS += $(OUTDIR)/bdev.o
 
+OBJS += $(OUTDIR)/sched_stub.o
+
 .PHONY: all clean
 
 all: $(OUTDIR) $(TARGET)
@@ -36,6 +38,9 @@ $(OUTDIR)/bdev.o: ../../dev/bdev.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OUTDIR)/ramdisk.o: ../../dev/ramdisk.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OUTDIR)/sched_stub.o: ../stub/sched_stub.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

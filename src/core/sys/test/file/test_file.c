@@ -10,6 +10,7 @@
 #include "param.h"
 #include "sched.h"
 #include "sys_error.h"
+#include "user.h"
 
 #define CHECK(condition) \
 	do { \
@@ -22,7 +23,7 @@
 
 static int failures;
 
-static void init_proc(struct proc *proc);
+static void init_proc(struct proc *proc, struct user *user);
 static void test_file_allocation(void);
 static void test_descriptor_helpers(void);
 static void test_fd_exhaustion(void);
@@ -50,20 +51,23 @@ int main(void)
 	return 0;
 }
 
-static void init_proc(struct proc *proc)
+static void init_proc(struct proc *proc, struct user *user)
 {
 	memset(proc, 0, sizeof(*proc));
+	memset(user, 0, sizeof(*user));
+	proc->p_addr = user;
 }
 
 static void test_file_allocation(void)
 {
 	struct proc proc;
+	struct user proc_user;
 	struct file *fp;
 	int fd;
 
 	binit();
 	finit();
-	init_proc(&proc);
+	init_proc(&proc, &proc_user);
 	CHECK(file_in_use() == 0);
 	CHECK(getf(&proc, -1) == NULL);
 	CHECK(getf(&proc, NOFILE) == NULL);
@@ -90,13 +94,14 @@ static void test_file_allocation(void)
 static void test_descriptor_helpers(void)
 {
 	struct proc proc;
+	struct user proc_user;
 	struct file *fp;
 	int fd;
 	int copy;
 
 	binit();
 	finit();
-	init_proc(&proc);
+	init_proc(&proc, &proc_user);
 	fp = falloc(&proc, &fd);
 	CHECK(fp != NULL);
 	copy = fd_install(&proc, fp);
@@ -123,6 +128,7 @@ static void test_descriptor_helpers(void)
 static void test_fd_exhaustion(void)
 {
 	struct proc proc;
+	struct user proc_user;
 	struct file *fp;
 	size_t used;
 	int fd;
@@ -130,7 +136,7 @@ static void test_fd_exhaustion(void)
 
 	binit();
 	finit();
-	init_proc(&proc);
+	init_proc(&proc, &proc_user);
 	for (i = 0; i < NOFILE; i++) {
 		fp = falloc(&proc, &fd);
 		CHECK(fp != NULL);
@@ -147,14 +153,16 @@ static void test_fd_exhaustion(void)
 static void test_file_exhaustion(void)
 {
 	struct proc owner;
+	struct user owner_user;
 	struct proc waiter;
+	struct user waiter_user;
 	int fd;
 	int i;
 
 	binit();
 	finit();
-	init_proc(&owner);
-	init_proc(&waiter);
+	init_proc(&owner, &owner_user);
+	init_proc(&waiter, &waiter_user);
 	for (i = 0; i < NFILE; i++)
 		CHECK(falloc(&owner, &fd) != NULL);
 	CHECK(ufalloc(&waiter) == 0);
@@ -169,6 +177,7 @@ static void test_file_exhaustion(void)
 static void test_inode_lifecycle(void)
 {
 	struct proc proc;
+	struct user proc_user;
 	struct inode *ip;
 	struct file *fp;
 	struct buf *bp;
@@ -177,7 +186,7 @@ static void test_inode_lifecycle(void)
 
 	binit();
 	finit();
-	init_proc(&proc);
+	init_proc(&proc, &proc_user);
 	ip = ialloc();
 	CHECK(ip == &inode[0]);
 	CHECK(ip->i_count == 1);
@@ -241,6 +250,7 @@ static void test_buffer_failure(void)
 static void test_reuse_after_close_all(void)
 {
 	struct proc proc;
+	struct user proc_user;
 	struct inode *ip;
 	struct file *fp;
 	struct buf *bp;
@@ -248,7 +258,7 @@ static void test_reuse_after_close_all(void)
 
 	binit();
 	finit();
-	init_proc(&proc);
+	init_proc(&proc, &proc_user);
 	ip = ialloc();
 	fp = falloc(&proc, &fd);
 	CHECK(ip != NULL);
