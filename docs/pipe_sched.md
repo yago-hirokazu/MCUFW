@@ -1,6 +1,6 @@
 # sys pipe sleep・wakeup
 
-更新日: 2026-10-13
+更新日: 2026-10-22
 
 ## 役割
 
@@ -73,6 +73,12 @@ backendをbindしていないprocessでは、待機が必要な場合に`-SYS_EA
 `current_proc()`はcoroutineではbackend global、threadではTLSからcurrent
 processを返す。runnable processがなく未完了processが残る場合、executorは
 idleまたはdeadlockとして扱う。
+
+processは`proc_init(proc, user)`で初期化する。`p_addr`は呼出元所有userを指し、
+`current_user()`と`u`マクロはcurrent procからその参照先を求める。currentが
+なければbackend-local base userを使い、thread backendではTLSに置く。
+sleep/wakeupで`u_error`を初期化しない。fd tableは引き続き`p_ofile[]`にある。
+専用userはbackendのrelease/join完了まで生存させる。
 
 `sched_release()`はprocessをwait listから外し、backend handleをkernel lock外で
 解放する。thread join中にworkerがlockを必要とするため、lock内でjoinしない。

@@ -1,6 +1,9 @@
 # sys pipe移行回帰試験
 
-更新日: 2026-10-13
+更新日: 2026-10-22
+
+本書は現行ソース・試験コードとの静的照合に基づく。今回の文書整備では
+回帰試験を再実行していない。過去のwarning・sanitizer記録は末尾を参照する。
 
 ## Windows対話入力
 
@@ -14,6 +17,7 @@ MSYS2 MINGW64 shellでbuildと実行を行う。PowerShellからgccを直接起�
 cd src/target/windows
 make -B SCHED_BACKEND=cortn
 ./main.exe
+make clean
 ```
 
 thread backendは`SCHED_BACKEND=thread`で選ぶ。確認入力は次のとおり。
@@ -48,8 +52,8 @@ sys層では`struct proc.p_ofile[]`が`struct file`を参照し、read/write end
 inode lock、参照数、wait listを保護する。process終了時はfdをcloseしてから
 lock外でbackendをreleaseまたはjoinする。
 
-詳細は`esh_pipe_api.md`、`esh_pipe_core.md`、`esh_pipe_sched.md`、
-`esh_pipe_thread.md`、`esh_pipe_stdio.md`を参照する。
+詳細は`pipe_api.md`、`pipe_core.md`、`pipe_sched.md`、
+`pipe_thread.md`、`pipe_stdio.md`を参照する。
 
 ## Pipe意味の回帰点
 
@@ -63,7 +67,33 @@ lock外でbackendをreleaseまたはjoinする。
 - 全data読取後に`f_offset`と`i_size`を0へ戻してbufferを再利用する
 - coroutine/threadで同じ転送結果、EOF、EPIPE、終了statusを返す
 
+## RAM I/Oとuserの回帰点
+
+- Windowsのeshinitはraminit、binit、finitの順で初期化する
+- NBUFの既定値は5。3本のpipeとRAM block I/Oでcacheを共有する
+- RAMは2 device、各16 block、block sizeは256 byteである
+- breadは2引数、書込み・flush APIとstrategyは戻り値なし
+- buffer I/Oはcurrent userの正のu_error、pipe APIは負のSYS_E*でerrorを渡す
+- geterrorは成功時に以前のerrorを消さない。呼出元が操作前に0へ戻す
+- proc_init(proc, user)はp_addrを設定し、sleep/wakeupでuserを保持する
+- 単一commandもcurrent procを設定・復元し、専用userで動作する
+- host/worker、thread backendのcurrentなしnative thread間でerrorを分離する
+- fd table、buffer/count/offsetはまだuserへ移していない
+
+[RAM I/O](ram_block_device.md)の前提・所有権と[pipe core](pipe_core.md)も参照する。
+
 ## 回帰試験
+
+以下に加え、RAM導入後のheader/table/bdev/ramdisk suiteも対象にする。
+各directoryでMSYS2 MINGW64 shellからbash ./run_test.shを実行する。
+
+| Directory | 主な確認内容 |
+|---|---|
+| src/core/sys/test/header | 公開headerの単独include、C/C++、user.h |
+| src/core/sys/test/table | device登録、固定table、初期化 |
+| src/core/sys/test/bdev | 要求検査、queue、strategy、error completion |
+| src/core/sys/test/ramdisk | minor・block境界、read/write、資源とerror |
+
 
 ```sh
 cd src/core/sys/test/bio
@@ -121,9 +151,10 @@ console自動試験は4段、while/if、変数と引用変数、数値command su
 - pipe stdinへ`scanf`を使用できない
 - STM32/Cortex-M/RTOS移植は未着手
 
-## 既存warning
+## 過去のwarning記録（今回未再確認）
 
-strictなsys、pipe、scheduler、coroutine suiteにはwarningがない。pipeline、
+以下は2026-10-13時点の記録。strictなsys、pipe、scheduler、coroutine suiteには
+warningがなかった。pipeline、
 executor、Windows targetの広いbuildには移行前から次が残る。
 
 - `help.c`: 未使用`argc`、`argv`
@@ -132,7 +163,25 @@ executor、Windows targetの広いbuildには移行前から次が残る。
 - `test.c`: 未使用static関数
 
 これらはgeneric sys移行による新規warningではない。試験中に出るlexer/parser
-error表示はerror pathを確認する意図された診断で、suiteは成功する。
+error表示はerror pathを確認する意図された診断で、当時のsuiteは成功した。
+
+## 試験後のclean
+
+上記のscriptはすべてが終了時cleanを行うとは限らない。実行したrun_test.shの
+OUTDIR・TARGETに合わせてmake cleanを実行し、生成した.d、.o、.exeを残さない。
+O0/O2、cortn/thread、small構成がある場合は全構成を対象にする。
+例えばbdev suiteは次の2組を実行後にcleanする。
+
+```sh
+cd src/core/sys/test/bdev
+bash ./run_test.sh
+make clean OUTDIR=_output_O0 TARGET=test_bdev_O0.exe
+make clean OUTDIR=_output_O2 TARGET=test_bdev_O2.exe
+```
+
+header suiteはOUTDIR=_output_O0と_output_O2をそれぞれcleanする。
+par、exe、cquote、Windows本体も使用したdirectoryでmake cleanを実行する。
+既存の未追跡DLL・STM32 treeや、今回生成していないファイルは削除しない。
 
 ## Sanitizer
 

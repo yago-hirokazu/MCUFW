@@ -1,5 +1,13 @@
 # UNIX V7風汎用file pipe scheduler移行 引継ぎ書
 
+## 現況（2026-10-22）
+
+汎用sys移行は実装済み。以後、coroutine本体もcore/sys/dev/windowsへ移動し、finitからbinitを分離した。RAM I/Oとp_addr経由の専用user参照も追加済み。
+
+現行仕様は[文書案内](README.md)、[pipe core](pipe_core.md)、
+[RAM block I/O](ram_block_device.md)を参照する。以下の計画・試験結果は記載当時の記録で、
+今回の文書整備では試験を再実行していない。
+
 作成日: 2026-10-12
 対象リポジトリ: `C:\usr\src\MCUFW`
 作成時ブランチ: `feature/mrunsv`
@@ -1486,11 +1494,11 @@ pipelineには従来のhelp、lex、par、test由来warningと意図されたpar
 
 最低限、次を現行の型名、path、pipe意味へ更新する。
 
-- `docs/esh_pipe_api.md`
-- `docs/esh_pipe_core.md`
-- `docs/esh_pipe_sched.md`
-- `docs/esh_pipe_thread.md`
-- `docs/esh_pipe_regression.md`
+- `docs/pipe_api.md`
+- `docs/pipe_core.md`
+- `docs/pipe_sched.md`
+- `docs/pipe_thread.md`
+- `docs/pipe_regression.md`
 - `docs/cortn_windows.md`
 - 本引継ぎ書の全Step状態
 
@@ -1518,12 +1526,12 @@ pipelineには従来のhelp、lex、par、test由来warningと意図されたpar
 
 次の文書を現行の型名、path、V7型offset方式、buffer cache構成へ更新した。
 
-- `docs/esh_pipe_api.md`
-- `docs/esh_pipe_core.md`
-- `docs/esh_pipe_sched.md`
-- `docs/esh_pipe_thread.md`
-- `docs/esh_pipe_stdio.md`
-- `docs/esh_pipe_regression.md`
+- `docs/pipe_api.md`
+- `docs/pipe_core.md`
+- `docs/pipe_sched.md`
+- `docs/pipe_thread.md`
+- `docs/pipe_stdio.md`
+- `docs/pipe_regression.md`
 - `docs/cortn_windows.md`
 - 本引継ぎ書のStep状態と完了記録
 

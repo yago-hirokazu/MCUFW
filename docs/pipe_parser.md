@@ -1,8 +1,10 @@
 # ESH pipeline parser
 
+更新日: 2026-10-22
+
 ## Syntax
 
-Milestone 5 adds pipeline syntax to lexer and parser. Whitespace around `|` is
+Lexer and parser support pipeline syntax. Whitespace around `|` is
 optional.
 
 ```sh
@@ -40,5 +42,7 @@ OP_CMD_EXE
 
 Number of `OP_PIPE_NEXT` instructions plus one gives command count. Each
 instruction connects preceding command stdout to following command stdin.
-Executor handling is deferred to Milestone 6. Existing non-pipeline bytecode
-is unchanged.
+`src/core/esh/exe.c` handles these instructions through `exe_run_pipeline()`.
+Pipeline supports up to `PIPELINE_MAX` (4) commands. Existing non-pipeline
+bytecode is unchanged. See [executor](pipe_executor.md) and
+[regression tests](pipe_regression.md).

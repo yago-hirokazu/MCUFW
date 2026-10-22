@@ -1,5 +1,13 @@
 # esh pipe Milestone 1〜9 review & refactoring 初期レビュー結果
 
+## 現況（2026-10-22）
+
+初期レビュー時点の記録。file・pipe・schedulerはcore/sysへ移行済み。stackは64 KiB、stdioとthread backendは実装済み。
+
+現行仕様は[文書案内](README.md)、[pipe core](pipe_core.md)、
+[RAM block I/O](ram_block_device.md)を参照する。以下の計画・試験結果は記載当時の記録で、
+今回の文書整備では試験を再実行していない。
+
 作成日: 2026-10-03
 対象リポジトリ: `C:\usr\src\MCUFW`
 対象ブランチ: `feature/pipe`
@@ -36,7 +44,7 @@ Baseline 試験は元の作業ツリーを変更しない独立スナップシ�
 
 - 現行 `AGENTS.md`
 - `docs/coding_style_summary_linux_kernel.md`
-- `docs/esh_pipe_review_refactoring_handoff.md`
+- `docs/pipe_review_refactoring_handoff.md`
 - `.agents/skills/esh_pipe/references/esh_pipe_coroutine_summary.md`
 - pipe 関連設計文書と回帰試験文書
 
@@ -87,7 +95,7 @@ Pipe、scheduler、coroutine の厳格buildではwarningは発生しなかった
 
 #### 4.1.2 設計文書と実装のstack容量不一致
 
-`docs/esh_pipe_api.md` は Windows coroutine stack初期容量を16 KiBと記載する。
+`docs/pipe_api.md` は Windows coroutine stack初期容量を16 KiBと記載する。
 現行実装は `src/core/esh/include/cortn.h` で64 KiBを使用する。
 
 16 KiBでCRT formatting結合試験に問題が発生し、64 KiBへ変更した経緯は
@@ -261,4 +269,4 @@ I/O契約を維持したまま終了処理とexecutor検査を小さく整理す
 Milestone 10 は本レビューおよびrefactoring完了後も未着手として残す。
 
 具体的な実行単位、依存関係、選別実行方法は
-`docs/esh_pipe_review_refactoring_plan.md` に記録する。
+`docs/pipe_review_refactoring_plan.md` に記録する。

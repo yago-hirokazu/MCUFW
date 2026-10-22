@@ -1,6 +1,6 @@
 # Windows stdioとsys pipe接続
 
-更新日: 2026-10-13
+更新日: 2026-10-22
 
 Windows buildは`ESH_STDIO_PIPE`でprocess stdio routingを有効にする。parser-only、
 quote-only buildはconsole-only adapterを使用する。
@@ -35,3 +35,8 @@ stdout/stderr分離、scanf拒否、resource cleanup、executor pipelineをO0/O2
 - read errorとEOFはmapped `getchar()`では区別できない
 - pipe stdinへ`scanf`を使用できない
 - portable sys層はformattingやhost allocationを担当しない
+
+単一commandもexecutorがcurrent procを設定するため、command内のu.u_errorは
+専用userを参照する。current procがないhost処理はbackendのbase userを使う。
+stdio mappingはsys_read/sys_writeの転送量・負のerrorを扱い、buffer I/Oの
+u_error契約とは分ける。

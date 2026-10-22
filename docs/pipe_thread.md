@@ -1,6 +1,6 @@
 # Windows thread scheduler backend
 
-更新日: 2026-10-13
+更新日: 2026-10-22
 
 ## Backend選択
 
@@ -17,6 +17,7 @@ cd src/target/windows
 make -B SCHED_BACKEND=thread main.exe
 ./main.exe
 make -B SCHED_BACKEND=cortn main.exe
+make clean
 ```
 
 backendごとに`OUTDIR`と`TARGET`を分ければ両buildを保持できる。回帰scriptは
@@ -31,6 +32,7 @@ coroutine/threadをO0/O2の別directoryへbuildする。
 - resumeは選択processがI/O待ちになるかreturnするまで待つ
 - wakeupはprocessをrunnableにし、executorが次のtokenを与える
 - TLSがthreadごとのcurrent processとkernel lock所有状態を保持する
+- `current_user()`はcurrentの`p_addr`を返し、currentなしではTLSのbase userを使う
 - workerはapplet呼出し前に自身をcurrent processへ設定する
 - entry returnは`PROC_FINISHED`を通知する
 - releaseはthreadをjoinし、handleを閉じ、slotを再利用可能にする
@@ -76,6 +78,8 @@ pipeline suiteは2/3/4段、stdio routing、部分準備失敗のrollbackを確�
 
 native scheduler試験はexternal waker raceを100回実行し、sleep前後のTLS、worker
 thread identity、check/register/waitの不可分性、終了後のhandle数を確認する。
+専用userのerrorがsleep/wakeupをまたいで保持されること、hostとworkerの分離、
+current procのないnative thread間のbase user分離も試験する。
 
 ## V7との差分
 

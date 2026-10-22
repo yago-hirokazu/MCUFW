@@ -1,6 +1,6 @@
 # Windows stackful coroutine
 
-更新日: 2026-10-15
+更新日: 2026-10-22
 
 ## 役割
 
@@ -95,3 +95,9 @@ MCU stack容量と配置はSTM32移植時に決定する。
 
 `src/core/sys/test/sched`とesh pipe/pipeline suiteがscheduler backendとの結合を
 coroutine/thread双方で確認する。
+
+## User参照
+
+専用userはcoroutine slotではなくprocの所有者が保持し、p_addrで参照する。
+current_user()はcurrent procからuserを選び、currentなしではbackend base userを
+使う。yield/wakeupではu_errorを初期化せず、backend release完了までuserを保持する。

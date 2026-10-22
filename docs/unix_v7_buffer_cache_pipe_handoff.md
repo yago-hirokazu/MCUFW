@@ -1,5 +1,13 @@
 # UNIX V7風buffer cacheによるpipe格納方式 実装引継ぎ書
 
+## 現況（2026-10-22）
+
+buffer cache導入と汎用sys移行は実装済み。現行pipeはstruct inodeのi_bufを使い、ringではなくoffset方式。NBUFの既定値は5、BSIZEは256。schedulerもcore/sysにある。
+
+現行仕様は[文書案内](README.md)、[pipe core](pipe_core.md)、
+[RAM block I/O](ram_block_device.md)を参照する。以下の計画・試験結果は記載当時の記録で、
+今回の文書整備では試験を再実行していない。
+
 作成日: 2026-10-11
 対象リポジトリ: `C:\usr\src\MCUFW`
 最終更新時ブランチ: `feature/mrunsv`

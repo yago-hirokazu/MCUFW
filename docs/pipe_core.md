@@ -1,6 +1,6 @@
 # sys file・fd・pipeコア
 
-更新日: 2026-10-15
+更新日: 2026-10-22
 
 ## 役割
 
@@ -19,14 +19,15 @@ struct proc p_ofile[]
 
 `fio.c`はfdとfile lifecycle、`alloc.c`と`iget.c`はinode lifecycle、`pipe.c`は
 pipe作成・待機条件・inode lock、`rdwri.c`はinode data転送、`sys2.c`はcurrent
-process向けread/write/close入口を担当する。`bio.c`は固定長buffer cacheを持つ。
+process向けread/write/close入口を担当する。`bio.c`は固定長buffer cacheを持ち、
+pipeとRAM block I/Oで共有する。
 
 ## 固定長pool
 
 - process当たりfd: `NOFILE` = 12
 - global file entry: `NFILE` = 12
 - pipe inode: `NINODE` = 3
-- buffer cache entry: `NBUF` = 3
+- buffer cache entry: `NBUF` = 5（既定値）
 - pipe data: `PIPSIZ` = `BSIZE` = 256 byte
 
 `binit()`はbuffer cache、`finit()`はfile tableとinode tableを初期化する。
@@ -39,6 +40,11 @@ finit();
 
 `finit()`は`binit()`を内部で呼ばない。所有中のfile、inode、buffer、実行中
 processがある状態では完全初期化しない。
+
+Windows shell起動時は`eshinit()`が`raminit(); binit(); finit();`の順で呼ぶ。
+RAM内容も消去する場合は、停止状態で`raminit()`を先に呼ぶ。
+3本のpipeが3個のbufferを保持すると、既定構成ではRAM I/O用に2個が残る。
+専用予約はなく、busy hit・空きなしでは`getblk()`が待機せずNULLを返す。
 
 ## 所有権
 
@@ -65,8 +71,10 @@ readまたはwrite endpointが閉じた状態は`i_count < 2`で判定する。�
 - `PIPE_IO_BROKEN`: readerが存在しない
 - `PIPE_IO_ERROR`: 不正fd、方向違反、不正引数
 
-`readi()`はread fileの`f_offset`から`i_size`までを読み取る。全dataを読み切ると
-read offsetと`i_size`を0へ戻す。`writei()`は`i_size`から`PIPSIZ`までへ追記する。
+`readi()`はread fileの`f_offset`から`i_size`までを読み取る。全data読取後の
+read offsetと`i_size`の0への復帰は`readp()`が行う。
+`writei()`は渡されたoffsetから`PIPSIZ`までへ書き、`writep()`が追記位置に
+`i_size`を使う。
 未読dataが残る間はbuffer先頭へ回り込まない。
 
 `readp()`は現在取得可能なdataを返す。`writep()`は要求全体を完了するまで部分
@@ -89,5 +97,18 @@ file offset、`FREAD/FWRITE/FPIPE`、`falloc/getf/closef`、`readp/writep`、
 `readi/writei`、inode lock、sleep/wakeupである。
 
 省略した要素はdisk inode、directory、mount、block mapping、physical device I/O、
-user address space copy、trap dispatch、signal deliveryである。buffer cache APIは
-残すが、pipe bufferはmemory-only anonymous blockとして使用する。
+user address space copy、trap dispatch、signal deliveryである。pipe bufferは
+`getblk(PIPEDEV, inode番号)`で取得し、寿命中はbusyで保持する。
+RAM driverのblock I/O、遅延書込み、flushは実装済みである。
+
+## User areaとbuffer error
+
+`proc_init(proc, user)`はprocと呼出元所有userを初期化し、`p_addr`を設定する。
+`current_user()`はcurrent procの`p_addr`を返す。current procがなければbackendの
+base userを使う。Windows thread backendではbase userもTLSで分離する。
+
+`struct user`の現行メンバは`u_error`だけである。fd tableは`p_ofile[]`、inode
+転送のbuffer/count/offsetは明示引数のままで、userへの全面移行は未完了である。
+buffer I/Oの呼出元は操作前に`u.u_error = 0`とし、操作後にerrorを確認する。
+成功時の`geterror()`は以前のerrorを消さない。pipeの公開APIは従来どおり転送量
+または負の`SYS_E*`を返す。RAM APIの詳細は[RAM block I/O](ram_block_device.md)参照。

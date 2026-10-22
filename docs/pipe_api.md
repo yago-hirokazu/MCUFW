@@ -1,6 +1,6 @@
 # sys pipe API・データモデル
 
-更新日: 2026-10-13
+更新日: 2026-10-22
 
 ## 対象範囲
 
@@ -19,7 +19,7 @@ dataはmemory-only buffer cache上の1 blockへ格納し、物理deviceへは送
 | process当たりfd | 12 | `NOFILE` |
 | global file entry | 12 | `NFILE` |
 | pipe inode | 3 | `NINODE` |
-| buffer cache entry | 3 | `NBUF` |
+| buffer cache entry | 5 | `NBUF`（既定値） |
 | pipe data | 256 byte/pipe | `PIPSIZ` = `BSIZE` |
 
 4段pipelineに必要なpipeは最大3本である。全tableとpoolは固定長配列とし、
@@ -30,6 +30,7 @@ errorにする。
 
 ```text
 struct proc
+  -> p_addr -> struct user（現在はu_errorのみ）
   -> p_ofile[NOFILE]
        -> struct file
             -> struct inode
@@ -62,7 +63,8 @@ sys層内部とesh executorは、明示的な`struct proc *`を受け取る
 - 作成とcloseは成功時0、失敗時は負の`SYS_E*`を返す
 - read/writeは転送byte数、EOFの0、または負の`SYS_E*`を返す
 - `count == 0`はfd、buffer、peer状態を検査せず0を返す
-- global `errno`は使用しない
+- pipe APIは負の`SYS_E*`を返し、global `errno`は使用しない
+- buffer I/Oは`current_user()`が選ぶ`u.u_error`へ正のerrorを設定する
 - readは取得可能なdataを返し、空かつwriterありの場合だけ待機する
 - writeは空きへ書ける分を転送し、残量があれば待機して要求全体を完了する
 - 最終writer close後は残存dataを読み切ってからEOFを返す
@@ -82,7 +84,9 @@ readerが`i_size`まで読み切った時点でread offsetと`i_size`を0へ戻�
 
 ## Processとwait channel
 
-`struct proc`はfd table、実行状態、待機先、backend、終了statusを所有する。
+`struct proc`はfd table、実行状態、待機先、backend、終了statusを所有し、
+`p_addr`で呼出元所有の`struct user`を参照する。`proc_init(proc, user)`で両者を
+初期化し、userはbackendのunwindとrelease/join完了まで保持する。
 esh executor用processはこれを`p_exec`として埋め込み、command引数等のshell
 固有情報とportable scheduler状態を分離する。
 
@@ -103,10 +107,11 @@ pipeline全体の終了statusは最後のcommandのstatusとする。途中comma
 
 ## V7との差分
 
-- trapとglobal user area `u`を使わず、current processまたは明示引数を使う
-- disk block、device strategy、MMU user copyを使わない
+- trapとMMU user copyは使わない。`u`は`(*current_user())`マクロである
+- fdとpipe I/Oはcurrent processまたは明示引数を使う。fd tableはまだprocにある
+- pipeはdevice strategyを呼ばない。別用途のRAM block I/Oはstrategyを使う
 - inodeはdirectoryやmodeを持たず、pipeに必要なstateだけを持つ
-- buffer cache entryはmemory-onlyで、pipe当たり1 blockに固定する
+- buffer cacheはRAM block I/Oと共有し、pipe当たり1 blockに固定する
 - V7 signal相当の`SIGPIPE`を送らず、`-SYS_EPIPE`だけを返す
 - coroutine/thread backendを選択でき、両者で同じpipe結果を返す
 - dynamic allocationを使わず、上限をcompile時定数で固定する

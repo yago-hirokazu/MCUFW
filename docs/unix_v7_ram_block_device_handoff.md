@@ -1,5 +1,24 @@
 # UNIX V7方式のRAMブロックデバイス実装 引継ぎ書
 
+## 現行APIへの更新（2026-10-22）
+
+Step 0〜6とレビュー修正の記録は当時の仕様として保存する。その後のbio変更により、
+本文中の旧signature・error処理・書戻し失敗時の契約には次の差分がある。
+
+- bread(dev, blkno)からint *error引数を除去した
+- bwrite、bdwrite、bawrite、bflush、geterror、strategyは戻り値を返さない
+- geterrorはB_ERROR/b_errorからcurrent userのu_errorへ正のerrorを設定する
+- 呼出元が操作前にu_errorを0にする。成功時は以前のerrorを消さない
+- proc.p_addrとcurrent_user()で実行単位ごとにu_errorを分離する
+- bioは有効な同期strategyを前提にd_strategyを直接呼ぶ。bio入口でのENOSYS拒否はない
+- error付きbufferのbrelseはb_devをNODEVにする。dirty保持・再試行保証はない
+- bflushは戻り値でerrorを集約しない
+- reassociateはassign_buffer_to_blockへ改名し、I/O補助fieldの0初期化を除去した
+- queue型はstruct bdev_io_queue、定数prefixはBDEV_IO_QUEUEである
+
+現在のAPI・使用例は[RAM block I/O](ram_block_device.md)を優先する。
+以下の試験結果は当時の記録であり、今回の文書整備では再実行していない。
+
 作成日: 2026-10-16
 
 対象: `C:\usr\src\MCUFW`

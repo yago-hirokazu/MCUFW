@@ -1,12 +1,20 @@
 # esh pipe review & refactoring 実行計画
 
+## 現況（2026-10-22）
+
+Review Milestoneと当時の実施結果を保存する。以後、汎用sys移行、coroutine移動、RAM I/O、専用user参照が追加されている。未完了表記は当時の計画状態である。
+
+現行仕様は[文書案内](README.md)、[pipe core](pipe_core.md)、
+[RAM block I/O](ram_block_device.md)を参照する。以下の計画・試験結果は記載当時の記録で、
+今回の文書整備では試験を再実行していない。
+
 作成日: 2026-10-03
 対象: 実装 Milestone 1〜9
 対象外: 実装 Milestone 10 Cortex-M/RTOS 移植
 
 ## 1. 目的
 
-`docs/esh_pipe_review_results.md` の整理方針を、順次実行と選別実行の両方が
+`docs/pipe_review_results.md` の整理方針を、順次実行と選別実行の両方が
 できる小さな Review Milestone に分割する。
 
 元の実装 Milestone と区別するため、本計画では `R0`〜`R10` を使用する。
@@ -78,7 +86,7 @@ R6とR7は調査結果により修正が不要な場合、試験追加だけで`
 
 #### 成果物
 
-- `docs/esh_pipe_review_results.md`
+- `docs/pipe_review_results.md`
 - 本実行計画
 
 ### R1: 追加ファイルのコーディング規約整備
@@ -265,7 +273,7 @@ Test code:
 
 #### 対象
 
-- `docs/esh_pipe_api.md`
+- `docs/pipe_api.md`
 - 必要に応じてpipe関連文書
 
 #### 作業
@@ -288,7 +296,7 @@ Test code:
 
 #### 実施結果
 
-- `esh_pipe_api.md` と `cortn_windows.md` の16 KiB記述を64 KiBへ訂正
+- `pipe_api.md` と `cortn_windows.md` の16 KiB記述を64 KiBへ訂正
 - 16 KiBでのCRT formatting結合試験失敗と64 KiBへの拡大理由を記録
 - 64 KiBがWindows coroutine backend専用値であることを明記
 - MCU stack容量はMilestone 10で決定する未確定事項として維持
