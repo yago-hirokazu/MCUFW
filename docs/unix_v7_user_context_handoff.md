@@ -2,8 +2,10 @@
 
 ## 現行コードとの差分（2026-10-22）
 
-以下の本文は2026-10-20の全面移行計画として保存する。現行実装は部分導入済みで、
-「設計のみ」「全Step pending」「グローバルu」という記述は作成時点の状態である。
+Step 0 の確定事項は [Step 0 設計決定](unix_v7_user_context_step0.md) を参照する。
+後続実装では同文書の API・型・エラー契約と、下記の現行実装を基準とする。
+以下の全面移行計画に残る「設計のみ」「全Step pending」「グローバルu」は
+2026-10-20 作成時点の記述であり、現在の状態を示さない。
 
 | 項目 | 現在の実装 |
 |---|---|
@@ -276,8 +278,8 @@ scheduler をリンクしていない。current user のスタブ等を追加す
 
 | Step | 作業 | 完了条件 | 状態 |
 |---|---|---|---|
-| 0 | 原典・既存差分を確認し、未確定の API・型・エラー契約を決定 | 所有関係と代表的な戻り値を記録 | pending |
-| 1 | `p_addr` と専用 user、current user、基底 context を導入 | 両 backend で分離・保持・寿命が成立 | pending |
+| 0 | 原典・既存差分を確認し、未確定の API・型・エラー契約を決定 | [設計決定](unix_v7_user_context_step0.md)に記録 | done |
+| 1 | `p_addr` と専用 user、current user、基底 context を導入 | 既存コードに導入済み。Step 0 で現行実装と照合 | done |
 | 2 | `p_ofile` を `u_ofile` へ移し、executor と管理 helper を更新 | 接続・close・再利用と参照数が正常 | pending |
 | 3 | `fio.c` を V7 型へ移行し、pipe 作成経路を適合 | fd/file 枯渇と途中失敗が漏れなく復旧 | pending |
 | 4 | `rdwri.c` と `iomove()` に user 状態を導入 | 転送量・残量・offset・容量境界が正常 | pending |
@@ -358,4 +360,7 @@ user 導入が完了してから必要な範囲を別途検討する。
 - 試験コマンド、backend、最適化・容量構成、結果、clean の結果。
 - 既存変更との関係、残る問題、次に進める Step。
 
-本書作成時点: 全 Step が pending。新規作成は本書のみ。
+2026-10-22 Step 0: API・型・所有関係・エラー契約を
+[Step 0 設計決定](unix_v7_user_context_step0.md)に確定。
+Step 1 の基盤は既存コードに導入済みのため再実装しない。
+次は Step 2 の `u_ofile[]` 移行。Step 0 ではソースコードを変更しない。
