@@ -1,4 +1,7 @@
-/* fio.c */
+/*
+ * fd helpers => proc.p_addr => user.u_ofile[] => file => inode
+ * close_all() => fd_close() => closef() => iput()
+ */
 
 #include <limits.h>
 #include <string.h>
@@ -8,6 +11,7 @@
 #include "param.h"
 #include "sched.h"
 #include "sys_error.h"
+#include "user.h"
 
 void finit(void)
 {
@@ -17,19 +21,19 @@ void finit(void)
 
 struct file *getf(struct proc *proc, int fd)
 {
-	if (!proc || fd < 0 || fd >= NOFILE)
+	if (!proc || !proc->p_addr || fd < 0 || fd >= NOFILE)
 		return NULL;
-	return proc->p_ofile[fd];
+	return proc->p_addr->u_ofile[fd];
 }
 
 int ufalloc(struct proc *proc)
 {
 	int fd;
 
-	if (!proc)
+	if (!proc || !proc->p_addr)
 		return -SYS_EINVAL;
 	for (fd = 0; fd < NOFILE; fd++) {
-		if (!proc->p_ofile[fd])
+		if (!proc->p_addr->u_ofile[fd])
 			return fd;
 	}
 	return -SYS_EMFILE;
@@ -43,7 +47,7 @@ struct file *falloc(struct proc *proc, int *fd)
 
 	if (!fd)
 		return NULL;
-	if (!proc) {
+	if (!proc || !proc->p_addr) {
 		*fd = -SYS_EINVAL;
 		return NULL;
 	}
@@ -58,7 +62,7 @@ struct file *falloc(struct proc *proc, int *fd)
 			continue;
 		memset(fp, 0, sizeof(*fp));
 		fp->f_count = 1;
-		proc->p_ofile[new_fd] = fp;
+		proc->p_addr->u_ofile[new_fd] = fp;
 		*fd = new_fd;
 		return fp;
 	}
@@ -91,27 +95,28 @@ int fd_install(struct proc *proc, struct file *fp)
 {
 	int fd;
 
-	if (!proc || !fp || !fp->f_count)
+	if (!proc || !proc->p_addr || !fp || !fp->f_count)
 		return -SYS_EINVAL;
 	if (fp->f_count == UCHAR_MAX)
 		return -SYS_ENFILE;
 	fd = ufalloc(proc);
 	if (fd < 0)
 		return fd;
-	proc->p_ofile[fd] = fp;
+	proc->p_addr->u_ofile[fd] = fp;
 	fp->f_count++;
 	return fd;
 }
 
 int fd_install_at(struct proc *proc, int fd, struct file *fp)
 {
-	if (!proc || fd < 0 || fd >= NOFILE || !fp || !fp->f_count)
+	if (!proc || !proc->p_addr || fd < 0 || fd >= NOFILE ||
+	    !fp || !fp->f_count)
 		return -SYS_EINVAL;
-	if (proc->p_ofile[fd])
+	if (proc->p_addr->u_ofile[fd])
 		return -SYS_EMFILE;
 	if (fp->f_count == UCHAR_MAX)
 		return -SYS_ENFILE;
-	proc->p_ofile[fd] = fp;
+	proc->p_addr->u_ofile[fd] = fp;
 	fp->f_count++;
 	return fd;
 }
@@ -123,7 +128,7 @@ int fd_close(struct proc *proc, int fd)
 	fp = getf(proc, fd);
 	if (!fp)
 		return -SYS_EBADF;
-	proc->p_ofile[fd] = NULL;
+	proc->p_addr->u_ofile[fd] = NULL;
 	closef(fp);
 	return 0;
 }
@@ -132,10 +137,10 @@ void close_all(struct proc *proc)
 {
 	int fd;
 
-	if (!proc)
+	if (!proc || !proc->p_addr)
 		return;
 	for (fd = 0; fd < NOFILE; fd++) {
-		if (proc->p_ofile[fd])
+		if (proc->p_addr->u_ofile[fd])
 			fd_close(proc, fd);
 	}
 }

@@ -3,13 +3,23 @@
 #ifndef __USER_H__
 #define __USER_H__
 
+#include "param.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* Execution owner keeps storage alive through backend release */
+struct proc;
+struct file;
+
+/*
+ * proc.p_addr => user => u_ofile[] => file => inode
+ * Execution owner keeps user alive through backend release
+ */
 struct user {
 	int u_error;		/* Error code; caller clears before I/O */
+	struct proc *u_procp;	/* Owning process; NULL for host context */
+	struct file *u_ofile[NOFILE]; /* Open file references */
 };
 
 /* Current proc selects p_addr; host context uses backend-local storage */

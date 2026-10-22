@@ -69,9 +69,7 @@ int main(void)
 
 static void init_proc(struct proc *proc, struct user *user)
 {
-	memset(proc, 0, sizeof(*proc));
-	memset(user, 0, sizeof(*user));
-	proc->p_addr = user;
+	proc_init(proc, user);
 	proc->p_state = PROC_NEW;
 }
 
@@ -434,7 +432,7 @@ static void test_resource_rollback(void)
 	CHECK(sys_pipe(fd) == -SYS_ENFILE);
 	CHECK(file_in_use() == NFILE - 1);
 	CHECK(inode_in_use() == 0);
-	CHECK(caller.p_ofile[0] == NULL);
+	CHECK(caller.p_addr->u_ofile[0] == NULL);
 	call_close_all(&owner);
 
 	binit();

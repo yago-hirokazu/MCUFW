@@ -1,6 +1,6 @@
 # sys file・fd・pipeコア
 
-更新日: 2026-10-22
+更新日: 2026-10-23
 
 ## 役割
 
@@ -11,7 +11,7 @@ schedulerをeshから独立して提供する。通常ファイル、path、disk
 UNIX V7の次の関係を最小構成で維持する。
 
 ```text
-struct proc p_ofile[]
+struct proc p_addr -> struct user u_ofile[]
   -> global struct file table
        -> shared struct inode table
             -> memory-only struct buf table
@@ -103,12 +103,12 @@ RAM driverのblock I/O、遅延書込み、flushは実装済みである。
 
 ## User areaとbuffer error
 
-`proc_init(proc, user)`はprocと呼出元所有userを初期化し、`p_addr`を設定する。
+`proc_init(proc, user)`はprocと呼出元所有userを初期化し、`p_addr`と`u_procp`を設定する。
 `current_user()`はcurrent procの`p_addr`を返す。current procがなければbackendの
 base userを使う。Windows thread backendではbase userもTLSで分離する。
 
-`struct user`の現行メンバは`u_error`だけである。fd tableは`p_ofile[]`、inode
-転送のbuffer/count/offsetは明示引数のままで、userへの全面移行は未完了である。
+`struct user`は`u_error`、所有procへの`u_procp`、fd tableの`u_ofile[]`を保持する。
+inode転送のbuffer/count/offsetは明示引数のままで、userへの全面移行は未完了である。
 buffer I/Oの呼出元は操作前に`u.u_error = 0`とし、操作後にerrorを確認する。
 成功時の`geterror()`は以前のerrorを消さない。pipeの公開APIは従来どおり転送量
 または負の`SYS_E*`を返す。RAM APIの詳細は[RAM block I/O](ram_block_device.md)参照。

@@ -26,7 +26,6 @@ enum wait_reason {
 	WAIT_WRITE
 };
 
-struct file;
 struct user;
 struct wait_chan;
 
@@ -34,7 +33,6 @@ struct wait_chan;
 struct proc {
 	enum proc_state p_state;
 	struct user *p_addr;	/* Dedicated user area owned by caller */
-	struct file *p_ofile[NOFILE];
 	struct wait_chan *p_wait_chan;
 	struct proc *p_wait_next;
 	void *p_backend;

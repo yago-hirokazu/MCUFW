@@ -46,8 +46,8 @@ STATIC_ASSERT(RAM_MAJOR == 1U, "RAM major");
 STATIC_ASSERT(RAM_NDEV == 2U, "RAM device count");
 STATIC_ASSERT(RAM_NBLK == 16UL, "RAM block count");
 STATIC_ASSERT(PIPE_IO_PROGRESS == 0, "Pipe I/O result base");
-STATIC_ASSERT(sizeof(((struct proc *)0)->p_ofile) /
-	      sizeof(((struct proc *)0)->p_ofile[0]) == NOFILE,
+STATIC_ASSERT(sizeof(((struct user *)0)->u_ofile) /
+	      sizeof(((struct user *)0)->u_ofile[0]) == NOFILE,
 	      "Descriptor count");
 STATIC_ASSERT(sizeof(((struct file *)0)->f_offset) == sizeof(size_t),
 	      "File offset type");

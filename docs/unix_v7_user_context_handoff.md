@@ -1,6 +1,6 @@
 # UNIX V7 user 構造体導入 引き継ぎ書
 
-## 現行コードとの差分（2026-10-22）
+## 現行コードとの差分（2026-10-23）
 
 Step 0 の確定事項は [Step 0 設計決定](unix_v7_user_context_step0.md) を参照する。
 後続実装では同文書の API・型・エラー契約と、下記の現行実装を基準とする。
@@ -9,26 +9,26 @@ Step 0 の確定事項は [Step 0 設計決定](unix_v7_user_context_step0.md) �
 
 | 項目 | 現在の実装 |
 |---|---|
-| user領域 | struct userのメンバはu_errorのみ |
+| user領域 | u_error、u_procp、u_ofile[NOFILE] |
 | procからの参照 | struct user *p_addrを実装済み |
-| 初期化 | proc_init(proc, user)が両者を初期化してp_addrを設定 |
+| 初期化 | proc_init(proc, user)が両者を初期化してp_addrとu_procpを設定 |
 | 所有者 | exe_proc.p_user、または呼出元の固定・局所領域 |
 | current参照 | current_user()とuマクロを実装済み |
 | currentなし | coroutineはbackend base user、threadはTLS base user |
 | 単一command | currentを設定して直接実行し、fd close後に元へ戻す |
 | 寿命 | backendの停止・unwind・join完了までuserを保持 |
 | buffer error | geterror()が正のerrorをu_errorへ設定。成功時は以前の値を保持 |
-| fd table | proc.p_ofile[]のまま。u_ofile[]は未導入 |
+| fd table | proc.p_addr->u_ofile[]へ移行 |
 | inode/pipe I/O | buffer/count/offsetは明示引数のまま |
 | 公開sys API | 転送量または負のSYS_E*を返す契約を維持 |
-| 未導入userメンバ | u_base、u_count、u_offset、u_r、u_procp等 |
+| 未導入userメンバ | u_base、u_count、u_offset、u_r等 |
 
 src/core/sys/test/schedにはsleep/wakeup前後とhost/worker間のerror分離、
 thread backendのbase user分離を確認する試験がある。
 src/core/esh/test/pipeline_execには単一commandのcurrent設定・復元・user再初期化の
-試験がある。今回は試験コードとの静的照合だけを行い、試験は再実行していない。
+試験がある。Step 2の変更内容と試験結果は末尾の作業記録を参照する。
 
-後続作業はu_ofile等の未導入部分を再設計して着手する。導入済みの基盤を再実装しない。
+後続作業はStep 3のV7型file API移行から着手する。導入済みの基盤を再実装しない。
 [pipe core](pipe_core.md)、[scheduler](pipe_sched.md)、[RAM I/O](ram_block_device.md)参照。
 
 作成日: 2026-10-20
@@ -280,7 +280,7 @@ scheduler をリンクしていない。current user のスタブ等を追加す
 |---|---|---|---|
 | 0 | 原典・既存差分を確認し、未確定の API・型・エラー契約を決定 | [設計決定](unix_v7_user_context_step0.md)に記録 | done |
 | 1 | `p_addr` と専用 user、current user、基底 context を導入 | 既存コードに導入済み。Step 0 で現行実装と照合 | done |
-| 2 | `p_ofile` を `u_ofile` へ移し、executor と管理 helper を更新 | 接続・close・再利用と参照数が正常 | pending |
+| 2 | `p_ofile` を `u_ofile` へ移し、executor と管理 helper を更新 | 接続・close・再利用と参照数が正常 | done |
 | 3 | `fio.c` を V7 型へ移行し、pipe 作成経路を適合 | fd/file 枯渇と途中失敗が漏れなく復旧 | pending |
 | 4 | `rdwri.c` と `iomove()` に user 状態を導入 | 転送量・残量・offset・容量境界が正常 | pending |
 | 5 | pipe 転送と `sys2.c` を V7 型へ移行 | 待機・部分転送・EOF・EPIPE が正常 | pending |
@@ -363,4 +363,66 @@ user 導入が完了してから必要な範囲を別途検討する。
 2026-10-22 Step 0: API・型・所有関係・エラー契約を
 [Step 0 設計決定](unix_v7_user_context_step0.md)に確定。
 Step 1 の基盤は既存コードに導入済みのため再実装しない。
-次は Step 2 の `u_ofile[]` 移行。Step 0 ではソースコードを変更しない。
+Step 0 時点の次作業は Step 2 の `u_ofile[]` 移行。Step 0 ではソースコードを変更していない。
+
+## Step 2 作業記録
+
+実施日: 2026-10-23
+
+`struct proc.p_ofile[]` を削除し、`struct user.u_ofile[NOFILE]` へ移した。
+userには所有procへの`u_procp`も追加した。実体は従来どおりexecutorまたは呼出し元が
+保持し、`p_addr`で参照する。動的確保やbackend slotへの移動は行わない。
+
+`proc_init(proc, user)`はuser全体を初期化し、`p_addr`と`u_procp`を設定する。
+standalone試験のscheduler stubにも同じ初期化を追加し、file/pipe試験の初期化は
+stubの`proc_init()`を使う。base userはstatic/TLS初期化により`u_procp == NULL`、
+fd tableも空のままである。sleep/wakeupやreleaseでuserを初期化しない。
+
+`fio.c`の全fd操作と直接参照する試験を`p_addr->u_ofile[]`へ更新した。
+未bindのprocはfd操作で失敗またはno-opとし、NULL userを参照しない。
+APIの引数・戻り値、file/inodeの参照数、kernel lockとbackend寿命の契約は維持する。
+executorとWindows stdioは既存fd helperを通して新しいtableを使用する。
+
+変更対象はuser/scheduler header、`sys/sched.c`、`sys/fio.c`、scheduler stub、
+file/pipe/header/scheduler試験、現行のpipe関連ガイドと本書。
+V7型current APIへの変更や`u_r`追加はStep 3、inode I/O状態の移行はStep 4以降とする。
+
+追加した確認:
+
+- 別userの同じfd番号が異なるfileを指す
+- file参照を別procへ渡し、元fdのclose後も受取先の参照が残る
+- 管理操作の失敗・closeがcurrentや両userのerrorを変更しない
+- 初期化・再利用でfd tableを空にし、所有procを設定する
+- coroutine/threadのsleep/wakeup前後で所有procとfd tableを維持する
+- currentなしのhost/native threadのu_procpはNULLとなる
+- p_addrのないprocに対するfd操作で資源を確保せず失敗する
+
+### Step 2 検証結果
+
+MSYS2 MINGW64 shellで既存の`run_test.sh`を実行した。parserは同ディレクトリで
+`run_test1.sh`と`run_test2.sh`を実行した。各試験後は対象の`make clean`を実施した。
+
+| 試験 | 構成 | 結果 |
+|---|---|---|
+| sys header | C/C++、単独/順序入替え、O0/O2 | passed |
+| sys file/pipe/bio/bdev/ramdisk/table | O0/O2 | passed |
+| sys scheduler | cortn/thread、O0/O2、既定/NBUF=3 | passed |
+| esh pipe | cortn/thread、O0/O2 | passed |
+| pipeline executor | cortn/thread、O0/O2、既存30秒制限 | passed |
+| esh exe | 既存10スクリプト | passed |
+| parser | run_test1.sh、run_test2.sh | passed |
+| Windows本体 | cortn/thread、sam1・sam2・sam3 | passed |
+
+最初の並行実行でpipeline executorのcortn/O0は`all tests passed`出力後に
+timeout終了した。既存の30秒制限を変更せず、他のビルドがない状態で全4構成を
+単独再実行し、全構成の正常終了を確認した。ソースを変更せず再実行した結果、
+タイムアウトは再現しなかった。
+
+Windows本体はbackendごとに一時OUTDIR/TARGETを指定してビルドし、対話コンソールで
+`sam1`、`sam2 1 10 100`、`sam3 -a -b string`を実行した。
+両backendで`sample1 applet`、`arg1=1`、`arg2=10`、`arg3=0x00000064`、
+`-a option`、`-b option with string`を確認し、Ctrl-Dで正常終了した。
+既存のDLLは変更していない。
+
+Step 2完了。次はStep 3の`u_r`追加とV7型file API・pipe作成への移行。
+実装コミットはGit履歴を参照する。

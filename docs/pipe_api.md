@@ -1,6 +1,6 @@
 # sys pipe API・データモデル
 
-更新日: 2026-10-22
+更新日: 2026-10-23
 
 ## 対象範囲
 
@@ -30,15 +30,16 @@ errorにする。
 
 ```text
 struct proc
-  -> p_addr -> struct user（現在はu_errorのみ）
-  -> p_ofile[NOFILE]
-       -> struct file
-            -> struct inode
-                 -> struct buf
-                 -> lock/read/write wait channel
+  -> p_addr -> struct user
+       -> u_procp（所有procへの逆参照）
+       -> u_ofile[NOFILE]
+            -> struct file
+                 -> struct inode
+                      -> struct buf
+                      -> lock/read/write wait channel
 ```
 
-- `p_ofile[]` entryはfile entryを1回参照する
+- `u_ofile[]` entryはfile entryを1回参照する
 - file entryは`FREAD|FPIPE`または`FWRITE|FPIPE`のendpointを表す
 - `f_count`が0になると対応endpointを閉じる
 - read/write fileは同じinodeを参照し、`i_count`で生存endpointを数える
@@ -84,9 +85,10 @@ readerが`i_size`まで読み切った時点でread offsetと`i_size`を0へ戻�
 
 ## Processとwait channel
 
-`struct proc`はfd table、実行状態、待機先、backend、終了statusを所有し、
-`p_addr`で呼出元所有の`struct user`を参照する。`proc_init(proc, user)`で両者を
-初期化し、userはbackendのunwindとrelease/join完了まで保持する。
+`struct proc`は実行状態、待機先、backend、終了statusを所有し、`p_addr`で
+呼出元所有の`struct user`を参照する。fd tableはuserの`u_ofile[]`に置く。
+`proc_init(proc, user)`で両者を初期化し、`user.u_procp`も設定する。
+userはbackendのunwindとrelease/join完了まで保持する。
 esh executor用processはこれを`p_exec`として埋め込み、command引数等のshell
 固有情報とportable scheduler状態を分離する。
 
@@ -108,7 +110,7 @@ pipeline全体の終了statusは最後のcommandのstatusとする。途中comma
 ## V7との差分
 
 - trapとMMU user copyは使わない。`u`は`(*current_user())`マクロである
-- fdとpipe I/Oはcurrent processまたは明示引数を使う。fd tableはまだprocにある
+- fdとpipe I/Oはcurrent processまたは明示引数を使う。fd tableはuserに置く
 - pipeはdevice strategyを呼ばない。別用途のRAM block I/Oはstrategyを使う
 - inodeはdirectoryやmodeを持たず、pipeに必要なstateだけを持つ
 - buffer cacheはRAM block I/Oと共有し、pipe当たり1 blockに固定する

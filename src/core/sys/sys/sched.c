@@ -136,6 +136,7 @@ void proc_init(struct proc *proc, struct user *user)
 	memset(proc, 0, sizeof(*proc));
 	memset(user, 0, sizeof(*user));
 	proc->p_addr = user;
+	user->u_procp = proc;
 	proc->p_state = PROC_NEW;
 }
 

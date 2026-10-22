@@ -1,9 +1,10 @@
 # MCUFW 文書案内
 
-更新日: 2026-10-22
+更新日: 2026-10-23
 
 現行ソースに基づく仕様と、過去の依頼・作業記録を案内する。
-今回の確認はソースと試験コードの静的照合であり、回帰試験の再実行結果ではない。
+user移行の段階別の実装・試験結果は
+[引き継ぎ書](unix_v7_user_context_handoff.md)を参照する。
 
 ## 現行仕様
 
@@ -23,8 +24,8 @@
 
 現在は`core/sys`にfile・inode・pipe・scheduler・buffer cacheを配置する。
 既定cache数は5、pipeは最大3本、pipelineは最大4段である。
-`struct proc.p_addr`で専用userを参照するが、userの現行メンバは`u_error`だけ。
-fd tableとpipe I/O引数のuserへの移行は未実装である。
+`struct proc.p_addr`で専用userを参照し、userは`u_error`、`u_procp`、`u_ofile[]`を持つ。
+fd tableはuserへ移行済み。pipe I/O引数のuserへの移行は後続Stepで実施する。
 
 ## 作業記録・計画
 

@@ -1,6 +1,6 @@
 # sys pipe sleep・wakeup
 
-更新日: 2026-10-22
+更新日: 2026-10-23
 
 ## 役割
 
@@ -77,7 +77,8 @@ idleまたはdeadlockとして扱う。
 processは`proc_init(proc, user)`で初期化する。`p_addr`は呼出元所有userを指し、
 `current_user()`と`u`マクロはcurrent procからその参照先を求める。currentが
 なければbackend-local base userを使い、thread backendではTLSに置く。
-sleep/wakeupで`u_error`を初期化しない。fd tableは引き続き`p_ofile[]`にある。
+sleep/wakeupでuserを初期化しない。fd tableは`p_addr->u_ofile[]`にあり、
+`u_procp`は所有procを指す。currentなしのbase userでは`u_procp`はNULLとなる。
 専用userはbackendのrelease/join完了まで生存させる。
 
 `sched_release()`はprocessをwait listから外し、backend handleをkernel lock外で

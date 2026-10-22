@@ -2,6 +2,7 @@
 
 #include <assert.h>
 #include <stddef.h>
+#include <string.h>
 
 #include "sched.h"
 #include "user.h"
@@ -23,6 +24,17 @@ static enum wait_reason last_reason;
 static int sleep_result;
 static int sleep_count;
 static int lock_count;
+
+/* Bind caller-owned user with same initialization as scheduler */
+void proc_init(struct proc *proc, struct user *user)
+{
+	assert(proc != NULL && user != NULL);
+	memset(proc, 0, sizeof(*proc));
+	memset(user, 0, sizeof(*user));
+	proc->p_addr = user;
+	user->u_procp = proc;
+	proc->p_state = PROC_NEW;
+}
 
 void sched_stub_reset(struct proc *proc)
 {

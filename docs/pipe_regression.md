@@ -1,9 +1,10 @@
 # sys pipe移行回帰試験
 
-更新日: 2026-10-22
+更新日: 2026-10-23
 
-本書は現行ソース・試験コードとの静的照合に基づく。今回の文書整備では
-回帰試験を再実行していない。過去のwarning・sanitizer記録は末尾を参照する。
+現行の試験入口と回帰点を示す。user移行Step 2の実行結果は
+[引き継ぎ書](unix_v7_user_context_handoff.md)を参照する。
+過去のwarning・sanitizer記録は末尾を参照する。
 
 ## Windows対話入力
 
@@ -47,7 +48,7 @@ lexer、parser、console sessionはsingletonで、再入・並列利用は禁止
 parserが`PARINVLD`を返したcodeは実行せず、`par_init()`と`code_init()`で再初期化
 する。consoleはerror時も変数tableを保持する。
 
-sys層では`struct proc.p_ofile[]`が`struct file`を参照し、read/write endpointが
+sys層では`proc.p_addr->u_ofile[]`が`struct file`を参照し、read/write endpointが
 共有`struct inode`とmemory-only `struct buf`を参照する。kernel lockはpipe条件、
 inode lock、参照数、wait listを保護する。process終了時はfdをcloseしてから
 lock外でbackendをreleaseまたはjoinする。
@@ -78,7 +79,9 @@ lock外でbackendをreleaseまたはjoinする。
 - proc_init(proc, user)はp_addrを設定し、sleep/wakeupでuserを保持する
 - 単一commandもcurrent procを設定・復元し、専用userで動作する
 - host/worker、thread backendのcurrentなしnative thread間でerrorを分離する
-- fd table、buffer/count/offsetはまだuserへ移していない
+- fd tableはuser.u_ofile[]に移行済み。buffer/count/offsetは明示引数のまま
+- 同一fd番号の分離、別procへのfd受渡し、close後の参照数と再利用を確認する
+- u_procpの初期化・再利用、sleep/wakeup前後のfd tableと所有procを確認する
 
 [RAM I/O](ram_block_device.md)の前提・所有権と[pipe core](pipe_core.md)も参照する。
 

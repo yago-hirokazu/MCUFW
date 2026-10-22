@@ -954,6 +954,8 @@ static void user_wait_entry(void *arg)
 
 	kernel_lock();
 	CHECK(current_user() == current_proc()->p_addr);
+	CHECK(u.u_procp == current_proc());
+	CHECK(u.u_ofile[0] != NULL && u.u_ofile[0]->f_offset == 1);
 	u.u_error = 0;
 	bp = bread(makedev(RAM_MAJOR, 0), RAM_NBLK);
 	CHECK(bp != NULL);
@@ -961,6 +963,8 @@ static void user_wait_entry(void *arg)
 	brelse(bp);
 	CHECK(sched_sleep(waiter->chan, WAIT_READ) == 0);
 	CHECK(current_user() == current_proc()->p_addr);
+	CHECK(u.u_procp == current_proc());
+	CHECK(u.u_ofile[0] != NULL && u.u_ofile[0]->f_offset == 1);
 	waiter->after = u.u_error;
 	kernel_unlock();
 }
@@ -973,6 +977,8 @@ static void user_peer_entry(void *arg)
 
 	kernel_lock();
 	CHECK(u.u_error == 0);
+	CHECK(u.u_procp == current_proc());
+	CHECK(u.u_ofile[0] != NULL && u.u_ofile[0]->f_offset == 2);
 	bp = bread(makedev(RAM_MAJOR, 0), 0);
 	CHECK(bp != NULL && u.u_error == 0);
 	brelse(bp);
@@ -985,33 +991,59 @@ static void test_user_isolation(void)
 {
 	struct proc procs[2];
 	struct user users[2];
+	struct file *files[2];
 	struct user *host;
 	struct wait_chan chan = { 0 };
 	struct user_wait_arg waiter = { &chan, 0, 0 };
+	int fd;
 	int i;
+	int j;
 
 	raminit();
 	binit();
+	finit();
 	host = current_user();
+	CHECK(host->u_procp == NULL);
+	for (j = 0; j < NOFILE; j++)
+		CHECK(host->u_ofile[j] == NULL);
 	host->u_error = SYS_EINVAL;
 	for (i = 0; i < 2; i++) {
 		users[i].u_error = SYS_EPIPE;
+		users[i].u_ofile[NOFILE - 1] = &file[0];
 		proc_init(&procs[i], &users[i]);
 		CHECK(procs[i].p_addr == &users[i]);
+		CHECK(users[i].u_procp == &procs[i]);
 		CHECK(users[i].u_error == 0);
 		CHECK(procs[i].p_addr != host);
+		for (j = 0; j < NOFILE; j++)
+			CHECK(users[i].u_ofile[j] == NULL);
+		kernel_lock();
+		files[i] = falloc(&procs[i], &fd);
+		CHECK(files[i] != NULL && fd == 0);
+		if (files[i])
+			files[i]->f_offset = (size_t)i + 1;
+		kernel_unlock();
 	}
+	CHECK(files[0] != files[1]);
 	CHECK(sched_prepare(&procs[0], user_wait_entry, &waiter) == 0);
 	CHECK(sched_prepare(&procs[1], user_peer_entry, &chan) == 0);
 	CHECK(run_scheduler(procs, 2) == 0);
 	CHECK(waiter.before == SYS_EIO && waiter.after == SYS_EIO);
 	CHECK(users[0].u_error == SYS_EIO && users[1].u_error == 0);
 	CHECK(current_user() == host && host->u_error == SYS_EINVAL);
+	kernel_lock();
+	for (i = 0; i < 2; i++)
+		close_all(&procs[i]);
+	kernel_unlock();
 	for (i = 0; i < 2; i++)
 		sched_release(&procs[i]);
 	CHECK(users[0].u_error == SYS_EIO);
+	CHECK(users[0].u_procp == &procs[0]);
 	proc_init(&procs[0], &users[0]);
 	CHECK(users[0].u_error == 0);
+	CHECK(users[0].u_procp == &procs[0]);
+	for (j = 0; j < NOFILE; j++)
+		CHECK(users[0].u_ofile[j] == NULL);
 	host->u_error = 0;
 	check_resources();
 }
@@ -1023,7 +1055,7 @@ static unsigned __stdcall native_user_entry(void *arg)
 	struct native_user_arg *worker = arg;
 
 	kernel_lock();
-	if (current_proc() || u.u_error) {
+	if (current_proc() || u.u_error || u.u_procp) {
 		kernel_unlock();
 		return 1;
 	}

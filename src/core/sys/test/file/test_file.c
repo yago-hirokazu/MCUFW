@@ -9,6 +9,7 @@
 #include "inode.h"
 #include "param.h"
 #include "sched.h"
+#include "sched_stub.h"
 #include "sys_error.h"
 #include "user.h"
 
@@ -26,6 +27,7 @@ static int failures;
 static void init_proc(struct proc *proc, struct user *user);
 static void test_file_allocation(void);
 static void test_descriptor_helpers(void);
+static void test_user_descriptors(void);
 static void test_fd_exhaustion(void);
 static void test_file_exhaustion(void);
 static void test_inode_lifecycle(void);
@@ -37,6 +39,7 @@ int main(void)
 {
 	test_file_allocation();
 	test_descriptor_helpers();
+	test_user_descriptors();
 	test_fd_exhaustion();
 	test_file_exhaustion();
 	test_inode_lifecycle();
@@ -53,14 +56,13 @@ int main(void)
 
 static void init_proc(struct proc *proc, struct user *user)
 {
-	memset(proc, 0, sizeof(*proc));
-	memset(user, 0, sizeof(*user));
-	proc->p_addr = user;
+	proc_init(proc, user);
 }
 
 static void test_file_allocation(void)
 {
 	struct proc proc;
+	struct proc unbound = { 0 };
 	struct user proc_user;
 	struct file *fp;
 	int fd;
@@ -76,7 +78,7 @@ static void test_file_allocation(void)
 	fp = falloc(&proc, &fd);
 	CHECK(fp == &file[0]);
 	CHECK(fd == 0);
-	CHECK(proc.p_ofile[0] == fp);
+	CHECK(proc.p_addr->u_ofile[0] == fp);
 	CHECK(fp->f_count == 1);
 	CHECK(fp->f_flag == 0);
 	CHECK(fp->f_inode == NULL);
@@ -89,6 +91,15 @@ static void test_file_allocation(void)
 	CHECK(falloc(NULL, &fd) == NULL);
 	CHECK(fd == -SYS_EINVAL);
 	CHECK(falloc(&proc, NULL) == NULL);
+	CHECK(getf(&unbound, 0) == NULL);
+	CHECK(ufalloc(&unbound) == -SYS_EINVAL);
+	CHECK(falloc(&unbound, &fd) == NULL);
+	CHECK(fd == -SYS_EINVAL);
+	CHECK(fd_install(&unbound, &file[0]) == -SYS_EINVAL);
+	CHECK(fd_install_at(&unbound, 0, &file[0]) == -SYS_EINVAL);
+	CHECK(fd_close(&unbound, 0) == -SYS_EBADF);
+	close_all(&unbound);
+	CHECK(file_in_use() == 0);
 }
 
 static void test_descriptor_helpers(void)
@@ -123,6 +134,44 @@ static void test_descriptor_helpers(void)
 	CHECK(fd_install(&proc, fp) == -SYS_ENFILE);
 	CHECK(fd_install_at(&proc, 3, fp) == -SYS_ENFILE);
 	memset(fp, 0, sizeof(*fp));
+}
+
+/* Keep same fd independent while transferring shared file reference */
+static void test_user_descriptors(void)
+{
+	struct proc procs[2];
+	struct user users[2];
+	struct file *files[2];
+	int fd;
+	int i;
+
+	binit();
+	finit();
+	for (i = 0; i < 2; i++) {
+		init_proc(&procs[i], &users[i]);
+		CHECK(users[i].u_procp == &procs[i]);
+		files[i] = falloc(&procs[i], &fd);
+		CHECK(files[i] != NULL && fd == 0);
+	}
+	CHECK(files[0] != files[1]);
+	sched_stub_reset(&procs[0]);
+	users[0].u_error = SYS_EIO;
+	users[1].u_error = SYS_EPIPE;
+	CHECK(fd_install_at(&procs[1], 0, files[0]) == -SYS_EMFILE);
+	CHECK(fd_install(&procs[1], files[0]) == 1);
+	CHECK(files[0]->f_count == 2);
+	CHECK(fd_close(&procs[0], 0) == 0);
+	CHECK(getf(&procs[0], 0) == NULL);
+	CHECK(getf(&procs[1], 0) == files[1]);
+	CHECK(getf(&procs[1], 1) == files[0]);
+	CHECK(files[0]->f_count == 1);
+	CHECK(current_user() == &users[0]);
+	CHECK(users[0].u_error == SYS_EIO && users[1].u_error == SYS_EPIPE);
+	close_all(&procs[1]);
+	CHECK(ufalloc(&procs[1]) == 0);
+	CHECK(file_in_use() == 0);
+	CHECK(users[0].u_error == SYS_EIO && users[1].u_error == SYS_EPIPE);
+	sched_stub_reset(NULL);
 }
 
 static void test_fd_exhaustion(void)
@@ -168,7 +217,7 @@ static void test_file_exhaustion(void)
 	CHECK(ufalloc(&waiter) == 0);
 	CHECK(falloc(&waiter, &fd) == NULL);
 	CHECK(fd == -SYS_ENFILE);
-	CHECK(waiter.p_ofile[0] == NULL);
+	CHECK(waiter.p_addr->u_ofile[0] == NULL);
 	CHECK(file_in_use() == NFILE);
 	close_all(&owner);
 	CHECK(file_in_use() == 0);
