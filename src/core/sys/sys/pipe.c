@@ -1,4 +1,7 @@
-/* pipe.c */
+/*
+ * sys_pipe() => pipe_create() => pipe_alloc() => inode and file allocation
+ * pipe_for_proc() => pipe_alloc() with explicit target user
+ */
 
 #include "file.h"
 #include "inode.h"
@@ -6,7 +9,9 @@
 #include "pipe.h"
 #include "sched.h"
 #include "sys_error.h"
+#include "user.h"
 
+static void pipe_alloc(struct user *user);
 static struct pipe_io_status pipe_status(enum pipe_io_result result,
 					 ptrdiff_t count, int error);
 static struct pipe_io_status pipe_read_once(struct file *fp, void *buf,
@@ -15,55 +20,49 @@ static struct pipe_io_status pipe_write_once(struct file *fp,
 					     const void *buf,
 					     size_t count);
 
-int pipe_for_proc(struct proc *proc, int fd[2])
+/* Return pipe descriptors through current user results */
+void pipe_create(void)
 {
-	struct inode *ip;
-	struct file *rf;
-	struct file *wf;
-	int read_fd;
-	int write_fd;
-	int error;
-
-	if (!proc || !fd)
-		return -SYS_EINVAL;
-	ip = ialloc();
-	if (!ip)
-		return -SYS_ENFILE;
-	rf = falloc(proc, &read_fd);
-	if (!rf) {
-		error = read_fd;
-		goto put_inode;
-	}
-	wf = falloc(proc, &write_fd);
-	if (!wf) {
-		error = write_fd;
-		goto close_read;
-	}
-
-	rf->f_flag = FREAD | FPIPE;
-	rf->f_inode = ip;
-	rf->f_offset = 0;
-	wf->f_flag = FWRITE | FPIPE;
-	wf->f_inode = ip;
-	wf->f_offset = 0;
-	ip->i_count = 2;
-	fd[0] = read_fd;
-	fd[1] = write_fd;
-	return 0;
-
-close_read:
-	fd_close(proc, read_fd);
-put_inode:
-	iput(ip);
-	return error;
+	pipe_alloc(&u);
 }
 
+/* Prepare inactive target without changing calling user */
+int pipe_for_proc(struct proc *proc, int fd[2])
+{
+	struct user *user;
+
+	if (!proc || !proc->p_addr || !fd)
+		return -SYS_EINVAL;
+	user = proc->p_addr;
+	user->u_error = 0;
+	user->u_r.r_val1 = 0;
+	user->u_r.r_val2 = 0;
+	pipe_alloc(user);
+	if (user->u_error)
+		return -user->u_error;
+	fd[0] = (int)user->u_r.r_val1;
+	fd[1] = (int)user->u_r.r_val2;
+	return 0;
+}
+
+/* Translate user error/results into public pipe API */
 int sys_pipe(int fd[2])
 {
 	int result;
 
 	kernel_lock();
-	result = pipe_for_proc(current_proc(), fd);
+	u.u_error = 0;
+	u.u_r.r_val1 = 0;
+	u.u_r.r_val2 = 0;
+	if (!fd || !current_proc())
+		u.u_error = SYS_EINVAL;
+	else
+		pipe_create();
+	result = -u.u_error;
+	if (!result) {
+		fd[0] = (int)u.u_r.r_val1;
+		fd[1] = (int)u.u_r.r_val2;
+	}
 	kernel_unlock();
 	return result;
 }
@@ -251,4 +250,45 @@ static struct pipe_io_status pipe_write_once(struct file *fp,
 		return pipe_status(PIPE_IO_ERROR, 0, (int)transferred);
 	sched_wakeup(&ip->i_read_chan);
 	return pipe_status(PIPE_IO_PROGRESS, transferred, 0);
+}
+
+/* Allocate complete pipe or release only resources acquired here */
+static void pipe_alloc(struct user *user)
+{
+	struct inode *ip;
+	struct file *rf;
+	struct file *wf;
+	int read_fd;
+	int error = 0;
+
+	if (!user->u_procp) {
+		user->u_error = SYS_EINVAL;
+		return;
+	}
+	ip = ialloc_error(&error);
+	if (!ip) {
+		user->u_error = error;
+		return;
+	}
+	rf = falloc_for_user(user);
+	if (!rf)
+		goto put_inode;
+	read_fd = (int)user->u_r.r_val1;
+	wf = falloc_for_user(user);
+	if (!wf) {
+		user->u_ofile[read_fd] = NULL;
+		closef(rf);
+		goto put_inode;
+	}
+	user->u_r.r_val2 = user->u_r.r_val1;
+	user->u_r.r_val1 = read_fd;
+	rf->f_flag = FREAD | FPIPE;
+	rf->f_inode = ip;
+	wf->f_flag = FWRITE | FPIPE;
+	wf->f_inode = ip;
+	ip->i_count = 2;
+	return;
+
+put_inode:
+	iput(ip);
 }

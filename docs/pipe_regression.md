@@ -191,3 +191,13 @@ par、exe、cquote、Windows本体も使用したdirectoryでmake cleanを実行
 2026-10-03のMSYS2 MinGW64環境では`-lasan`と`-lubsan`がなく、sanitizer実行は
 できなかった。coroutineの手動stack切替にはsanitizer fiber対応も未実装である。
 利用可能なhostでsanitizerを使う場合はthread backendを対象にする。
+
+## User移行 Step 3の検証項目
+
+- `proc_init()`による`u_r`のゼロ初期化
+- current file APIのfd結果、EBADF/EMFILE/ENFILE、成功時のerror保持
+- 管理用lookup/install/closeによる対象・呼出し元のerror/result保持
+- pipe作成の両端fd結果と、公開API入口のerror/result初期化
+- 別userのpipe準備でcurrentと呼出し元error/resultを保持
+- fd/file/inode/buffer枯渇、片端確保後のrollback、失敗時のfd配列保持
+- coroutine/thread双方のsleep/wakeup前後における`u_r`の独立性

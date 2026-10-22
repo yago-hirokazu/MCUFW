@@ -31,6 +31,8 @@ extern struct inode inode[];
 
 /* ialloc returns one construction reference; iput consumes one reference */
 struct inode *ialloc(void);
+/* Internal allocator reports error without changing current user */
+struct inode *ialloc_error(int *error);
 void iput(struct inode *ip);
 ptrdiff_t readi(struct inode *ip, size_t *offset, void *buf, size_t count);
 ptrdiff_t writei(struct inode *ip, size_t *offset, const void *buf,

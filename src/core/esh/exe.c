@@ -275,8 +275,8 @@ static int exe_connect_proc(struct exe_proc *writer, struct exe_proc *reader)
 	result = pipe_for_proc(&owner, fd);
 	if (result < 0)
 		goto out;
-	read_file = getf(&owner, fd[0]);
-	write_file = getf(&owner, fd[1]);
+	read_file = getf_for_proc(&owner, fd[0]);
+	write_file = getf_for_proc(&owner, fd[1]);
 	result = fd_install_at(&writer->p_exec, FD_STDOUT, write_file);
 	if (result < 0)
 		goto out;

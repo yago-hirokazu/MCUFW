@@ -17,7 +17,7 @@ ptrdiff_t sys_read(int fd, void *buf, size_t count)
 		return -SYS_EINVAL;
 	proc = current_proc();
 	kernel_lock();
-	fp = getf(proc, fd);
+	fp = getf(fd);
 	if (!fp || !(fp->f_flag & FREAD)) {
 		result = -SYS_EBADF;
 		goto out;
@@ -40,7 +40,7 @@ ptrdiff_t sys_write(int fd, const void *buf, size_t count)
 		return -SYS_EINVAL;
 	proc = current_proc();
 	kernel_lock();
-	fp = getf(proc, fd);
+	fp = getf(fd);
 	if (!fp || !(fp->f_flag & FWRITE)) {
 		result = -SYS_EBADF;
 		goto out;

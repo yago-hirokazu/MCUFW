@@ -12,7 +12,7 @@ static int win_pipe_fd(int fd)
 {
 	struct proc *proc = current_proc();
 
-	return proc && getf(proc, fd);
+	return proc && getf_for_proc(proc, fd);
 }
 #else
 static int win_pipe_fd(int fd)

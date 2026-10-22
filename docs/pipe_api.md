@@ -58,8 +58,14 @@ struct proc
 - `sys_close()`：fdを閉じる
 
 sys層内部とesh executorは、明示的な`struct proc *`を受け取る
-`pipe_for_proc()`、`getf()`、`fd_install_at()`、`fd_close()`、`close_all()`も
-使用する。
+`pipe_for_proc()`、`getf_for_proc()`、`fd_install_at()`、`fd_close()`、`close_all()`も
+使用する。管理用fd操作は対象・呼出し元のerror/resultを変更しない。
+`pipe_for_proc()`だけは実行前の対象userのerror/resultを準備・設定する。
+
+current用内部APIは`getf(fd)`、`ufalloc()`、`falloc()`、`pipe_create()`。
+失敗は正の`u_error`、fd結果は`u_r.r_val1/r_val2`で受け渡す。
+内部成功では以前のerrorを消さない。`sys_pipe()`は入口でerror/resultを初期化し、
+成功時だけfd配列へコピーする。
 
 - 作成とcloseは成功時0、失敗時は負の`SYS_E*`を返す
 - read/writeは転送byte数、EOFの0、または負の`SYS_E*`を返す

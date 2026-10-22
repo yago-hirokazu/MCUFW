@@ -38,6 +38,7 @@ struct inode;
 struct proc;
 
 int pipe_for_proc(struct proc *proc, int fd[2]);
+void pipe_create(void);
 ptrdiff_t readp(struct proc *proc, struct file *fp, void *buf,
 		size_t count);
 ptrdiff_t writep(struct proc *proc, struct file *fp, const void *buf,

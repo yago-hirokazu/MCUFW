@@ -101,7 +101,7 @@ static int connect_pipe(struct proc *writer, struct proc *reader,
 	result = pipe_for_proc(writer, fd);
 	if (result < 0)
 		goto out;
-	read_file = getf(writer, fd[0]);
+	read_file = getf_for_proc(writer, fd[0]);
 	*read_fd = fd_install(reader, read_file);
 	if (*read_fd < 0) {
 		result = *read_fd;
@@ -188,8 +188,8 @@ static void test_public_api(void)
 	proc_init(&proc, &proc_user);
 	sched_set_current_proc(&proc);
 	CHECK(sys_pipe(fd) == 0);
-	rf = getf(&proc, fd[0]);
-	wf = getf(&proc, fd[1]);
+	rf = getf_for_proc(&proc, fd[0]);
+	wf = getf_for_proc(&proc, fd[1]);
 	CHECK(rf && rf->f_flag == (FREAD | FPIPE));
 	CHECK(wf && wf->f_flag == (FWRITE | FPIPE));
 	CHECK(rf->f_inode == wf->f_inode);
@@ -232,7 +232,7 @@ static void test_v7_offset(void)
 	CHECK(sys_pipe(fd) == 0);
 	CHECK(sys_write(fd[1], data, sizeof(data)) == PIPSIZ);
 	CHECK(sys_read(fd[0], &byte, 1) == 1);
-	rf = getf(&proc, fd[0]);
+	rf = getf_for_proc(&proc, fd[0]);
 	CHECK(rf->f_offset == 1);
 	CHECK(rf->f_inode->i_size == PIPSIZ);
 	CHECK(sys_write(fd[1], &byte, 1) == -SYS_EAGAIN);

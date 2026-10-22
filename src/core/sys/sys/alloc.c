@@ -1,12 +1,30 @@
-/* alloc.c */
+/*
+ * ialloc() => ialloc_error() => getblk()
+ * Pipe preparation uses explicit error output for target user
+ */
 
 #include <string.h>
 
 #include "buf.h"
 #include "inode.h"
 #include "param.h"
+#include "sys_error.h"
+#include "user.h"
 
+/* Allocate inode and report failure in current user */
 struct inode *ialloc(void)
+{
+	struct inode *ip;
+	int error = 0;
+
+	ip = ialloc_error(&error);
+	if (!ip)
+		u.u_error = error;
+	return ip;
+}
+
+/* Allocate in-core inode and buffer without changing current user */
+struct inode *ialloc_error(int *error)
 {
 	struct inode *ip;
 	struct buf *bp;
@@ -25,6 +43,7 @@ struct inode *ialloc(void)
 		ip->i_buf = bp;
 		return ip;
 	}
+	*error = SYS_ENFILE;
 	return NULL;
 }
 

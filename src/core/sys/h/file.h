@@ -19,6 +19,7 @@ extern "C" {
 
 struct inode;
 struct proc;
+struct user;
 
 /* Entry represents open pipe endpoint */
 struct file {
@@ -36,10 +37,13 @@ ptrdiff_t sys_write(int fd, const void *buf, size_t count);
 int sys_close(int fd);
 
 void finit(void);
-struct file *getf(struct proc *proc, int fd);
-int ufalloc(struct proc *proc);
-/* Success installs fd-owned reference; failure stores negative error in fd */
-struct file *falloc(struct proc *proc, int *fd);
+struct file *getf(int fd);
+int ufalloc(void);
+struct file *falloc(void);
+/* Internal allocator sets target user error/result; caller holds kernel lock */
+struct file *falloc_for_user(struct user *user);
+/* Management lookup leaves user error/result unchanged */
+struct file *getf_for_proc(struct proc *proc, int fd);
 /* closef consumes one file reference */
 void closef(struct file *fp);
 int fd_install(struct proc *proc, struct file *fp);

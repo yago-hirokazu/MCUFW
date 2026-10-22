@@ -24,8 +24,8 @@ user移行の段階別の実装・試験結果は
 
 現在は`core/sys`にfile・inode・pipe・scheduler・buffer cacheを配置する。
 既定cache数は5、pipeは最大3本、pipelineは最大4段である。
-`struct proc.p_addr`で専用userを参照し、userは`u_error`、`u_procp`、`u_ofile[]`を持つ。
-fd tableはuserへ移行済み。pipe I/O引数のuserへの移行は後続Stepで実施する。
+`struct proc.p_addr`で専用userを参照し、userは`u_error`、`u_r`、`u_procp`、`u_ofile[]`を持つ。
+fd table、file割当とpipe作成の結果はuserへ移行済み。pipe I/O引数のuserへの移行は後続Stepで実施する。
 
 ## 作業記録・計画
 

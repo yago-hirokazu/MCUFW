@@ -3,6 +3,8 @@
 #ifndef __USER_H__
 #define __USER_H__
 
+#include <stddef.h>
+
 #include "param.h"
 
 #ifdef __cplusplus
@@ -18,6 +20,10 @@ struct file;
  */
 struct user {
 	int u_error;		/* Error code; caller clears before I/O */
+	struct {
+		ptrdiff_t r_val1;
+		ptrdiff_t r_val2;
+	} u_r;			/* System call results */
 	struct proc *u_procp;	/* Owning process; NULL for host context */
 	struct file *u_ofile[NOFILE]; /* Open file references */
 };

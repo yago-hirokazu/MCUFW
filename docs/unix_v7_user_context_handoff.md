@@ -9,7 +9,7 @@ Step 0 の確定事項は [Step 0 設計決定](unix_v7_user_context_step0.md) �
 
 | 項目 | 現在の実装 |
 |---|---|
-| user領域 | u_error、u_procp、u_ofile[NOFILE] |
+| user領域 | u_error、u_r（ptrdiff_tのr_val1/r_val2）、u_procp、u_ofile[NOFILE] |
 | procからの参照 | struct user *p_addrを実装済み |
 | 初期化 | proc_init(proc, user)が両者を初期化してp_addrとu_procpを設定 |
 | 所有者 | exe_proc.p_user、または呼出元の固定・局所領域 |
@@ -21,14 +21,15 @@ Step 0 の確定事項は [Step 0 設計決定](unix_v7_user_context_step0.md) �
 | fd table | proc.p_addr->u_ofile[]へ移行 |
 | inode/pipe I/O | buffer/count/offsetは明示引数のまま |
 | 公開sys API | 転送量または負のSYS_E*を返す契約を維持 |
-| 未導入userメンバ | u_base、u_count、u_offset、u_r等 |
+| file/pipe作成 | current APIと管理APIを分離。結果はu_r、失敗はu_error |
+| 未導入userメンバ | u_base、u_count、u_offset等 |
 
 src/core/sys/test/schedにはsleep/wakeup前後とhost/worker間のerror分離、
 thread backendのbase user分離を確認する試験がある。
 src/core/esh/test/pipeline_execには単一commandのcurrent設定・復元・user再初期化の
-試験がある。Step 2の変更内容と試験結果は末尾の作業記録を参照する。
+試験がある。Step 2・3の変更内容と試験結果は末尾の作業記録を参照する。
 
-後続作業はStep 3のV7型file API移行から着手する。導入済みの基盤を再実装しない。
+後続作業はStep 4のinode I/O移行から着手する。導入済みの基盤を再実装しない。
 [pipe core](pipe_core.md)、[scheduler](pipe_sched.md)、[RAM I/O](ram_block_device.md)参照。
 
 作成日: 2026-10-20
@@ -426,3 +427,64 @@ Windows本体はbackendごとに一時OUTDIR/TARGETを指定してビルドし�
 
 Step 2完了。次はStep 3の`u_r`追加とV7型file API・pipe作成への移行。
 実装コミットはGit履歴を参照する。
+
+
+## Step 3 作業記録
+
+実施日: 2026-10-23
+
+`struct user`に`u_r.r_val1/r_val2`を追加した。型はStep 0で確定した`ptrdiff_t`、
+未使用のunionは導入しない。`proc_init()`の全体初期化で結果も0へ戻る。
+userの所有者・寿命と`struct user *p_addr`による参照方法はStep 2から変更しない。
+
+`getf(int fd)`、`ufalloc(void)`、`falloc(void)`をcurrent user用へ移行した。
+失敗は正の`u_error`、fd結果は`u_r.r_val1`を使う。getf/fallocはpointer、ufallocは
+fdまたは-1を返す。内部成功では以前のerrorを消さない。
+空きfd検索とfile割当は共有し、別userの準備用に`falloc_for_user()`を宣言した。
+
+明示proc指定のlookupは`getf_for_proc()`へ改名した。executor、Windows stdio、
+管理用途の試験も更新した。fd install/close/close_allと管理用lookupは、対象・
+呼出し元のerror/resultを変更しない。sys_read/writeはcurrent用getfを使うが、
+転送処理と公開戻り値の全面移行はStep 5で行う。
+
+`pipe_create()`を導入し、両端fdを`u_r`へ設定する。`pipe_for_proc()`は共通の
+明示user割当処理を使い、実行前の対象userのerror/resultを準備する。対象が別userなら
+currentを変更せず、呼出し元のerror/resultも保持する。inode、read file、write fileの
+順に割り当て、途中失敗では今回確保した資源だけを戻す。出力fd配列は成功時だけ更新する。
+
+`sys_pipe()`は入口でcurrent userのerror/resultを初期化し、NULL出力先または
+current procなしをEINVALとする。pipe_createのerrorを負の公開戻り値へ変換する。
+`ialloc()`は失敗時current userへENFILEを設定する。別user準備用`ialloc_error()`と
+同じinode確保ロジックを共有する。fd枯渇はEMFILE、file/inode/buffer枯渇はENFILE。
+
+追加試験はcurrent APIの結果・sticky error、管理操作のerror/result保持、
+別userへのpipe作成と失敗時の呼出し元保持、fd配列の成功時のみの更新、
+片端確保後のrollback、u_r初期化とsleep/wakeup前後の独立性を確認する。
+
+`u_base/u_count/u_offset`、iomove、inode I/Oの引数変更はStep 4、
+readp/writep/plock/sys2の一括移行はStep 5の範囲とし、今回は導入していない。
+
+
+### Step 3 検証結果
+
+MSYS2 MINGW64 shellから実行し、各試験後は対象の`make clean`を実行した。
+
+| 試験 | 構成 | 結果 |
+|---|---|---|
+| sys header | C/C++、単独/順序入替え、O0/O2 | passed |
+| sys file/pipe | O0/O2、資源枯渇・rollbackを含む | passed |
+| sys scheduler | cortn/thread、O0/O2、既定/NBUF=3 | passed |
+| esh pipe | cortn/thread、O0/O2 | passed |
+| pipeline executor | cortn/thread、O0/O2、既存30秒制限 | passed |
+| esh exe | 既存10スクリプト | passed |
+| parser | run_test1.sh、run_test2.sh | passed |
+| Windows本体 | 既定cortn、sam1・sam2・sam3 | passed |
+
+Windows本体は一時OUTDIR/TARGETでビルドし、対話コンソールで`sam1`、
+`sam2 1 10 100`、`sam3 -a -b string`を実行した。`sample1 applet`、
+`arg1=1`、`arg2=10`、`arg3=0x00000064`、`-a option`、
+`-b option with string`を確認した。
+
+
+Step 3完了。次はStep 4のu_base/u_count/u_offsetとinode I/O移行。
+試験用の一時スクリプトを削除し、生成したd/o/exeの清掃と`git diff --check`を確認した。

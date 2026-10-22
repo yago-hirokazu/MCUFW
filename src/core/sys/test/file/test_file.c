@@ -25,6 +25,7 @@
 static int failures;
 
 static void init_proc(struct proc *proc, struct user *user);
+static void test_current_file_api(void);
 static void test_file_allocation(void);
 static void test_descriptor_helpers(void);
 static void test_user_descriptors(void);
@@ -35,8 +36,25 @@ static void test_inode_exhaustion(void);
 static void test_buffer_failure(void);
 static void test_reuse_after_close_all(void);
 
+/* Prepare file for explicit test owner */
+static struct file *allocate_file(struct proc *proc, int *fd)
+{
+	struct file *fp;
+
+	if (!fd)
+		return NULL;
+	if (!proc || !proc->p_addr) {
+		*fd = -SYS_EINVAL;
+		return NULL;
+	}
+	fp = falloc_for_user(proc->p_addr);
+	*fd = fp ? (int)proc->p_addr->u_r.r_val1 : -proc->p_addr->u_error;
+	return fp;
+}
+
 int main(void)
 {
+	test_current_file_api();
 	test_file_allocation();
 	test_descriptor_helpers();
 	test_user_descriptors();
@@ -71,11 +89,10 @@ static void test_file_allocation(void)
 	finit();
 	init_proc(&proc, &proc_user);
 	CHECK(file_in_use() == 0);
-	CHECK(getf(&proc, -1) == NULL);
-	CHECK(getf(&proc, NOFILE) == NULL);
-	CHECK(getf(NULL, 0) == NULL);
-	CHECK(ufalloc(NULL) == -SYS_EINVAL);
-	fp = falloc(&proc, &fd);
+	CHECK(getf_for_proc(&proc, -1) == NULL);
+	CHECK(getf_for_proc(&proc, NOFILE) == NULL);
+	CHECK(getf_for_proc(NULL, 0) == NULL);
+	fp = allocate_file(&proc, &fd);
 	CHECK(fp == &file[0]);
 	CHECK(fd == 0);
 	CHECK(proc.p_addr->u_ofile[0] == fp);
@@ -83,17 +100,16 @@ static void test_file_allocation(void)
 	CHECK(fp->f_flag == 0);
 	CHECK(fp->f_inode == NULL);
 	CHECK(fp->f_offset == 0);
-	CHECK(getf(&proc, fd) == fp);
+	CHECK(getf_for_proc(&proc, fd) == fp);
 	CHECK(file_in_use() == 1);
 	CHECK(fd_close(&proc, fd) == 0);
 	CHECK(fd_close(&proc, fd) == -SYS_EBADF);
 	CHECK(file_in_use() == 0);
-	CHECK(falloc(NULL, &fd) == NULL);
+	CHECK(allocate_file(NULL, &fd) == NULL);
 	CHECK(fd == -SYS_EINVAL);
-	CHECK(falloc(&proc, NULL) == NULL);
-	CHECK(getf(&unbound, 0) == NULL);
-	CHECK(ufalloc(&unbound) == -SYS_EINVAL);
-	CHECK(falloc(&unbound, &fd) == NULL);
+	CHECK(allocate_file(&proc, NULL) == NULL);
+	CHECK(getf_for_proc(&unbound, 0) == NULL);
+	CHECK(allocate_file(&unbound, &fd) == NULL);
 	CHECK(fd == -SYS_EINVAL);
 	CHECK(fd_install(&unbound, &file[0]) == -SYS_EINVAL);
 	CHECK(fd_install_at(&unbound, 0, &file[0]) == -SYS_EINVAL);
@@ -113,7 +129,7 @@ static void test_descriptor_helpers(void)
 	binit();
 	finit();
 	init_proc(&proc, &proc_user);
-	fp = falloc(&proc, &fd);
+	fp = allocate_file(&proc, &fd);
 	CHECK(fp != NULL);
 	copy = fd_install(&proc, fp);
 	CHECK(copy == 1);
@@ -150,7 +166,7 @@ static void test_user_descriptors(void)
 	for (i = 0; i < 2; i++) {
 		init_proc(&procs[i], &users[i]);
 		CHECK(users[i].u_procp == &procs[i]);
-		files[i] = falloc(&procs[i], &fd);
+		files[i] = allocate_file(&procs[i], &fd);
 		CHECK(files[i] != NULL && fd == 0);
 	}
 	CHECK(files[0] != files[1]);
@@ -161,14 +177,14 @@ static void test_user_descriptors(void)
 	CHECK(fd_install(&procs[1], files[0]) == 1);
 	CHECK(files[0]->f_count == 2);
 	CHECK(fd_close(&procs[0], 0) == 0);
-	CHECK(getf(&procs[0], 0) == NULL);
-	CHECK(getf(&procs[1], 0) == files[1]);
-	CHECK(getf(&procs[1], 1) == files[0]);
+	CHECK(getf_for_proc(&procs[0], 0) == NULL);
+	CHECK(getf_for_proc(&procs[1], 0) == files[1]);
+	CHECK(getf_for_proc(&procs[1], 1) == files[0]);
 	CHECK(files[0]->f_count == 1);
 	CHECK(current_user() == &users[0]);
 	CHECK(users[0].u_error == SYS_EIO && users[1].u_error == SYS_EPIPE);
 	close_all(&procs[1]);
-	CHECK(ufalloc(&procs[1]) == 0);
+	CHECK(procs[1].p_addr->u_ofile[0] == NULL);
 	CHECK(file_in_use() == 0);
 	CHECK(users[0].u_error == SYS_EIO && users[1].u_error == SYS_EPIPE);
 	sched_stub_reset(NULL);
@@ -187,13 +203,16 @@ static void test_fd_exhaustion(void)
 	finit();
 	init_proc(&proc, &proc_user);
 	for (i = 0; i < NOFILE; i++) {
-		fp = falloc(&proc, &fd);
+		fp = allocate_file(&proc, &fd);
 		CHECK(fp != NULL);
 		CHECK(fd == i);
 	}
 	used = file_in_use();
-	CHECK(ufalloc(&proc) == -SYS_EMFILE);
-	CHECK(falloc(&proc, &fd) == NULL);
+	sched_stub_reset(&proc);
+	CHECK(ufalloc() == -1);
+	CHECK(u.u_error == SYS_EMFILE);
+	sched_stub_reset(NULL);
+	CHECK(allocate_file(&proc, &fd) == NULL);
 	CHECK(fd == -SYS_EMFILE);
 	CHECK(file_in_use() == used);
 	close_all(&proc);
@@ -213,9 +232,11 @@ static void test_file_exhaustion(void)
 	init_proc(&owner, &owner_user);
 	init_proc(&waiter, &waiter_user);
 	for (i = 0; i < NFILE; i++)
-		CHECK(falloc(&owner, &fd) != NULL);
-	CHECK(ufalloc(&waiter) == 0);
-	CHECK(falloc(&waiter, &fd) == NULL);
+		CHECK(allocate_file(&owner, &fd) != NULL);
+	sched_stub_reset(&waiter);
+	CHECK(ufalloc() == 0);
+	sched_stub_reset(NULL);
+	CHECK(allocate_file(&waiter, &fd) == NULL);
 	CHECK(fd == -SYS_ENFILE);
 	CHECK(waiter.p_addr->u_ofile[0] == NULL);
 	CHECK(file_in_use() == NFILE);
@@ -242,7 +263,7 @@ static void test_inode_lifecycle(void)
 	CHECK(ip->i_buf != NULL);
 	CHECK(ip->i_buf->b_flags & B_BUSY);
 	bp = ip->i_buf;
-	fp = falloc(&proc, &fd);
+	fp = allocate_file(&proc, &fd);
 	CHECK(fp != NULL);
 	fp->f_inode = ip;
 	fp->f_flag = FREAD | FPIPE;
@@ -269,6 +290,7 @@ static void test_inode_exhaustion(void)
 	}
 	CHECK(inode_in_use() == NINODE);
 	CHECK(ialloc() == NULL);
+	CHECK(u.u_error == SYS_ENFILE);
 	CHECK(inode_in_use() == NINODE);
 	for (i = 0; i < NINODE; i++)
 		iput(ips[i]);
@@ -289,6 +311,7 @@ static void test_buffer_failure(void)
 		CHECK(held[i] != NULL);
 	}
 	CHECK(ialloc() == NULL);
+	CHECK(u.u_error == SYS_ENFILE);
 	CHECK(inode_in_use() == 0);
 	for (i = 0; i < NBUF; i++)
 		brelse(held[i]);
@@ -309,7 +332,7 @@ static void test_reuse_after_close_all(void)
 	finit();
 	init_proc(&proc, &proc_user);
 	ip = ialloc();
-	fp = falloc(&proc, &fd);
+	fp = allocate_file(&proc, &fd);
 	CHECK(ip != NULL);
 	CHECK(fp != NULL);
 	bp = ip->i_buf;
@@ -317,11 +340,58 @@ static void test_reuse_after_close_all(void)
 	close_all(&proc);
 	CHECK(file_in_use() == 0);
 	CHECK(inode_in_use() == 0);
-	CHECK(falloc(&proc, &fd) == &file[0]);
+	CHECK(allocate_file(&proc, &fd) == &file[0]);
 	CHECK(fd == 0);
 	ip = ialloc();
 	CHECK(ip == &inode[0]);
 	CHECK(ip->i_buf == bp);
 	close_all(&proc);
 	iput(ip);
+}
+
+/* Check V7 results, sticky errors and current-user selection */
+static void test_current_file_api(void)
+{
+	struct proc procs[2];
+	struct user users[2];
+	struct file *fp;
+	int i;
+
+	binit();
+	finit();
+	for (i = 0; i < 2; i++) {
+		memset(&users[i], 0xa5, sizeof(users[i]));
+		proc_init(&procs[i], &users[i]);
+		CHECK(users[i].u_r.r_val1 == 0);
+		CHECK(users[i].u_r.r_val2 == 0);
+	}
+	sched_stub_reset(&procs[0]);
+	u.u_error = SYS_EIO;
+	u.u_r.r_val2 = 123;
+	CHECK(ufalloc() == 0 && u.u_r.r_val1 == 0);
+	CHECK(u.u_error == SYS_EIO && u.u_r.r_val2 == 123);
+	fp = falloc();
+	CHECK(fp != NULL && u.u_r.r_val1 == 0);
+	CHECK(getf(0) == fp && u.u_error == SYS_EIO);
+	CHECK(getf(-1) == NULL && u.u_error == SYS_EBADF);
+	CHECK(getf(NOFILE) == NULL && u.u_error == SYS_EBADF);
+	users[1].u_error = SYS_EPIPE;
+	users[1].u_r.r_val1 = 456;
+	users[1].u_r.r_val2 = 789;
+	CHECK(fd_install(&procs[1], fp) == 0);
+	CHECK(getf_for_proc(&procs[1], NOFILE) == NULL);
+	CHECK(users[1].u_error == SYS_EPIPE);
+	CHECK(users[1].u_r.r_val1 == 456);
+	CHECK(users[1].u_r.r_val2 == 789);
+	CHECK(u.u_error == SYS_EBADF && u.u_r.r_val2 == 123);
+	sched_stub_reset(&procs[1]);
+	CHECK(getf(0) == fp && u.u_error == SYS_EPIPE);
+	close_all(&procs[0]);
+	close_all(&procs[1]);
+	CHECK(u.u_error == SYS_EPIPE && u.u_r.r_val1 == 456);
+	sched_stub_reset(NULL);
+	u.u_error = 0;
+	CHECK(falloc() == NULL && u.u_error == SYS_EINVAL);
+	CHECK(file_in_use() == 0);
+	u.u_error = 0;
 }

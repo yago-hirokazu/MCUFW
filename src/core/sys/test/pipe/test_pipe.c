@@ -48,6 +48,23 @@ static void test_wait_rechecks(void);
 static void test_pipe_lock(void);
 static void test_rdwri_bounds(void);
 static void test_resource_rollback(void);
+static void test_pipe_user_results(void);
+
+/* Prepare file for explicit test owner */
+static struct file *allocate_file(struct proc *proc, int *fd)
+{
+	struct file *fp;
+
+	if (!fd)
+		return NULL;
+	if (!proc || !proc->p_addr) {
+		*fd = -SYS_EINVAL;
+		return NULL;
+	}
+	fp = falloc_for_user(proc->p_addr);
+	*fd = fp ? (int)proc->p_addr->u_r.r_val1 : -proc->p_addr->u_error;
+	return fp;
+}
 
 int main(void)
 {
@@ -59,6 +76,7 @@ int main(void)
 	test_pipe_lock();
 	test_rdwri_bounds();
 	test_resource_rollback();
+	test_pipe_user_results();
 	if (failures) {
 		printf("%d tests failed\n", failures);
 		return 1;
@@ -79,7 +97,7 @@ static ptrdiff_t call_read(struct proc *proc, int fd, void *buf,
 	ptrdiff_t result;
 
 	kernel_lock();
-	result = readp(proc, getf(proc, fd), buf, count);
+	result = readp(proc, getf_for_proc(proc, fd), buf, count);
 	kernel_unlock();
 	return result;
 }
@@ -90,7 +108,7 @@ static ptrdiff_t call_write(struct proc *proc, int fd, const void *buf,
 	ptrdiff_t result;
 
 	kernel_lock();
-	result = writep(proc, getf(proc, fd), buf, count);
+	result = writep(proc, getf_for_proc(proc, fd), buf, count);
 	kernel_unlock();
 	return result;
 }
@@ -185,8 +203,8 @@ static void test_create_and_data_path(void)
 	CHECK(sys_pipe(fd) == 0);
 	CHECK(fd[0] == 0);
 	CHECK(fd[1] == 1);
-	rf = getf(&proc, fd[0]);
-	wf = getf(&proc, fd[1]);
+	rf = getf_for_proc(&proc, fd[0]);
+	wf = getf_for_proc(&proc, fd[1]);
 	CHECK(rf != NULL);
 	CHECK(wf != NULL);
 	CHECK(rf->f_flag == (FREAD | FPIPE));
@@ -233,7 +251,7 @@ static void test_full_and_offset_reset(void)
 	init_proc(&proc, &proc_user);
 	sched_stub_reset(&proc);
 	CHECK(sys_pipe(fd) == 0);
-	rf = getf(&proc, fd[0]);
+	rf = getf_for_proc(&proc, fd[0]);
 	ip = rf->f_inode;
 	for (i = 0; i < PIPSIZ + 1; i++)
 		input[i] = (unsigned char)i;
@@ -265,7 +283,7 @@ static void test_eof_epipe_and_close_wakeup(void)
 	init_proc(&proc, &proc_user);
 	sched_stub_reset(&proc);
 	CHECK(sys_pipe(fd) == 0);
-	ip = getf(&proc, fd[0])->f_inode;
+	ip = getf_for_proc(&proc, fd[0])->f_inode;
 	CHECK(call_close(&proc, fd[1]) == 0);
 	CHECK(sched_stub_wakeup_count(&ip->i_read_chan) == 1);
 	CHECK(sched_stub_wakeup_count(&ip->i_write_chan) == 1);
@@ -299,7 +317,7 @@ static void test_wait_rechecks(void)
 	proc.p_backend = &proc;
 	sched_stub_reset(&proc);
 	CHECK(sys_pipe(fd) == 0);
-	rf = getf(&proc, fd[0]);
+	rf = getf_for_proc(&proc, fd[0]);
 	hook_inode = rf->f_inode;
 	hook_result = -1;
 	sched_stub_set_sleep_hook(supply_read_hook);
@@ -335,7 +353,7 @@ static void test_pipe_lock(void)
 	proc.p_backend = &proc;
 	sched_stub_reset(&proc);
 	CHECK(sys_pipe(fd) == 0);
-	ip = getf(&proc, fd[0])->f_inode;
+	ip = getf_for_proc(&proc, fd[0])->f_inode;
 	hook_inode = ip;
 	ip->i_flag |= ILOCK;
 	sched_stub_set_sleep_hook(unlock_hook);
@@ -393,7 +411,7 @@ static void test_resource_rollback(void)
 	init_proc(&caller, &caller_user);
 	sched_stub_reset(&caller);
 	for (i = 0; i < NOFILE - 1; i++)
-		CHECK(falloc(&caller, &item) != NULL);
+		CHECK(allocate_file(&caller, &item) != NULL);
 	CHECK(sys_pipe(fd) == -SYS_EMFILE);
 	CHECK(file_in_use() == NOFILE - 1);
 	CHECK(inode_in_use() == 0);
@@ -404,7 +422,7 @@ static void test_resource_rollback(void)
 	init_proc(&caller, &caller_user);
 	sched_stub_reset(&caller);
 	for (i = 0; i < NOFILE; i++)
-		CHECK(falloc(&caller, &item) != NULL);
+		CHECK(allocate_file(&caller, &item) != NULL);
 	CHECK(sys_pipe(fd) == -SYS_EMFILE);
 	CHECK(file_in_use() == NOFILE);
 	CHECK(inode_in_use() == 0);
@@ -416,7 +434,7 @@ static void test_resource_rollback(void)
 	init_proc(&owner, &owner_user);
 	sched_stub_reset(&caller);
 	for (i = 0; i < NFILE; i++)
-		CHECK(falloc(&owner, &item) != NULL);
+		CHECK(allocate_file(&owner, &item) != NULL);
 	CHECK(sys_pipe(fd) == -SYS_ENFILE);
 	CHECK(file_in_use() == NFILE);
 	CHECK(inode_in_use() == 0);
@@ -428,7 +446,7 @@ static void test_resource_rollback(void)
 	init_proc(&owner, &owner_user);
 	sched_stub_reset(&caller);
 	for (i = 0; i < NFILE - 1; i++)
-		CHECK(falloc(&owner, &item) != NULL);
+		CHECK(allocate_file(&owner, &item) != NULL);
 	CHECK(sys_pipe(fd) == -SYS_ENFILE);
 	CHECK(file_in_use() == NFILE - 1);
 	CHECK(inode_in_use() == 0);
@@ -460,4 +478,78 @@ static void test_resource_rollback(void)
 	call_close_all(&caller);
 	CHECK(file_in_use() == 0);
 	CHECK(inode_in_use() == 0);
+}
+
+/* Check explicit target preparation and current pipe result conversion */
+static void test_pipe_user_results(void)
+{
+	struct inode *ips[NINODE];
+	struct proc unbound = { 0 };
+	struct proc caller;
+	struct proc owner;
+	struct user caller_user;
+	struct user owner_user;
+	int fd[2] = { -10, -20 };
+	int error = 0;
+	int i;
+
+	binit();
+	finit();
+	proc_init(&caller, &caller_user);
+	proc_init(&owner, &owner_user);
+	sched_stub_reset(&caller);
+	u.u_error = SYS_EIO;
+	u.u_r.r_val1 = 111;
+	u.u_r.r_val2 = 222;
+	CHECK(pipe_for_proc(&unbound, fd) == -SYS_EINVAL);
+	CHECK(fd[0] == -10 && fd[1] == -20);
+	CHECK(pipe_for_proc(&owner, fd) == 0);
+	CHECK(fd[0] == 0 && fd[1] == 1);
+	CHECK(owner_user.u_error == 0);
+	CHECK(owner_user.u_r.r_val1 == 0 && owner_user.u_r.r_val2 == 1);
+	CHECK(current_user() == &caller_user);
+	CHECK(u.u_error == SYS_EIO);
+	CHECK(u.u_r.r_val1 == 111 && u.u_r.r_val2 == 222);
+	close_all(&owner);
+	for (i = 0; i < NOFILE - 1; i++)
+		CHECK(falloc_for_user(&owner_user) != NULL);
+	fd[0] = -10;
+	fd[1] = -20;
+	CHECK(pipe_for_proc(&owner, fd) == -SYS_EMFILE);
+	CHECK(owner_user.u_error == SYS_EMFILE);
+	CHECK(fd[0] == -10 && fd[1] == -20);
+	CHECK(owner_user.u_ofile[NOFILE - 1] == NULL);
+	CHECK(file_in_use() == NOFILE - 1 && inode_in_use() == 0);
+	CHECK(u.u_error == SYS_EIO);
+	CHECK(u.u_r.r_val1 == 111 && u.u_r.r_val2 == 222);
+	close_all(&owner);
+	for (i = 0; i < NINODE; i++) {
+		ips[i] = ialloc_error(&error);
+		CHECK(ips[i] != NULL && error == 0);
+	}
+	CHECK(pipe_for_proc(&owner, fd) == -SYS_ENFILE);
+	CHECK(owner_user.u_error == SYS_ENFILE);
+	CHECK(fd[0] == -10 && fd[1] == -20);
+	CHECK(u.u_error == SYS_EIO);
+	CHECK(u.u_r.r_val1 == 111 && u.u_r.r_val2 == 222);
+	for (i = 0; i < NINODE; i++)
+		iput(ips[i]);
+	CHECK(sys_pipe(NULL) == -SYS_EINVAL);
+	CHECK(u.u_error == SYS_EINVAL);
+	CHECK(sys_pipe(fd) == 0);
+	CHECK(u.u_error == 0 && u.u_r.r_val1 == fd[0]);
+	CHECK(u.u_r.r_val2 == fd[1]);
+	close_all(&caller);
+	u.u_error = SYS_EIO;
+	pipe_create();
+	CHECK(u.u_error == SYS_EIO);
+	CHECK(getf((int)u.u_r.r_val1)->f_flag == (FREAD | FPIPE));
+	CHECK(getf((int)u.u_r.r_val2)->f_flag == (FWRITE | FPIPE));
+	close_all(&caller);
+	sched_stub_reset(NULL);
+	fd[0] = -10;
+	fd[1] = -20;
+	CHECK(sys_pipe(fd) == -SYS_EINVAL);
+	CHECK(fd[0] == -10 && fd[1] == -20);
+	u.u_error = 0;
 }

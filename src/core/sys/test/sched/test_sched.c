@@ -139,6 +139,22 @@ static unsigned __stdcall native_user_entry(void *arg);
 static void test_native_user_isolation(void);
 #endif
 
+/* Prepare file for explicit test owner */
+static struct file *allocate_file(struct proc *proc, int *fd)
+{
+	struct file *fp;
+
+	if (!fd)
+		return NULL;
+	if (!proc || !proc->p_addr) {
+		*fd = -SYS_EINVAL;
+		return NULL;
+	}
+	fp = falloc_for_user(proc->p_addr);
+	*fd = fp ? (int)proc->p_addr->u_r.r_val1 : -proc->p_addr->u_error;
+	return fp;
+}
+
 int main(void)
 {
 	test_user_isolation();
@@ -182,7 +198,7 @@ static ptrdiff_t proc_read(int fd, void *buf, size_t count)
 
 	kernel_lock();
 	proc = current_proc();
-	result = readp(proc, getf(proc, fd), buf, count);
+	result = readp(proc, getf_for_proc(proc, fd), buf, count);
 	kernel_unlock();
 	return result;
 }
@@ -194,7 +210,7 @@ static ptrdiff_t proc_write(int fd, const void *buf, size_t count)
 
 	kernel_lock();
 	proc = current_proc();
-	result = writep(proc, getf(proc, fd), buf, count);
+	result = writep(proc, getf_for_proc(proc, fd), buf, count);
 	kernel_unlock();
 	return result;
 }
@@ -229,7 +245,7 @@ static int connect_pipe(struct proc *writer, struct proc *reader,
 	result = pipe_for_proc(writer, fd);
 	if (result < 0)
 		goto out;
-	read_file = getf(writer, fd[0]);
+	read_file = getf_for_proc(writer, fd[0]);
 	*read_fd = fd_install(reader, read_file);
 	if (*read_fd < 0) {
 		result = *read_fd;
@@ -383,7 +399,7 @@ static void test_wait_lock(void)
 	proc_init(&owner, &owner_user);
 	proc_init(&sleeper, &sleeper_user);
 	CHECK(connect_pipe(&owner, &sleeper, &write_fd, &read_fd) == 0);
-	ip = getf(&sleeper, read_fd)->f_inode;
+	ip = getf_for_proc(&sleeper, read_fd)->f_inode;
 	kernel_lock();
 	ip->i_flag |= ILOCK;
 	offset = 0;
@@ -629,7 +645,8 @@ static void make_full_pipes(struct proc *owner, int pipes[NINODE][2])
 	for (i = 0; i < NINODE; i++) {
 		CHECK(pipe_for_proc(owner, pipes[i]) == 0);
 		marker = (unsigned char)(0x30 + i);
-		CHECK(writep(owner, getf(owner, pipes[i][1]), &marker, 1) == 1);
+		CHECK(writep(owner, getf_for_proc(owner, pipes[i][1]),
+			     &marker, 1) == 1);
 	}
 	CHECK(pipe_in_use() == NINODE);
 	CHECK(file_in_use() == NINODE * 2);
@@ -642,7 +659,8 @@ static void drain_full_pipes(struct proc *owner, int pipes[NINODE][2])
 
 	for (i = 0; i < NINODE; i++) {
 		marker = 0;
-		CHECK(readp(owner, getf(owner, pipes[i][0]), &marker, 1) == 1);
+		CHECK(readp(owner, getf_for_proc(owner, pipes[i][0]),
+			    &marker, 1) == 1);
 		CHECK(marker == (unsigned char)(0x30 + i));
 	}
 	close_all(owner);
@@ -960,11 +978,14 @@ static void user_wait_entry(void *arg)
 	bp = bread(makedev(RAM_MAJOR, 0), RAM_NBLK);
 	CHECK(bp != NULL);
 	waiter->before = u.u_error;
+	u.u_r.r_val1 = 101;
+	u.u_r.r_val2 = 202;
 	brelse(bp);
 	CHECK(sched_sleep(waiter->chan, WAIT_READ) == 0);
 	CHECK(current_user() == current_proc()->p_addr);
 	CHECK(u.u_procp == current_proc());
 	CHECK(u.u_ofile[0] != NULL && u.u_ofile[0]->f_offset == 1);
+	CHECK(u.u_r.r_val1 == 101 && u.u_r.r_val2 == 202);
 	waiter->after = u.u_error;
 	kernel_unlock();
 }
@@ -979,6 +1000,8 @@ static void user_peer_entry(void *arg)
 	CHECK(u.u_error == 0);
 	CHECK(u.u_procp == current_proc());
 	CHECK(u.u_ofile[0] != NULL && u.u_ofile[0]->f_offset == 2);
+	CHECK(ufalloc() == 1 && u.u_r.r_val1 == 1);
+	u.u_r.r_val2 = 303;
 	bp = bread(makedev(RAM_MAJOR, 0), 0);
 	CHECK(bp != NULL && u.u_error == 0);
 	brelse(bp);
@@ -1018,7 +1041,7 @@ static void test_user_isolation(void)
 		for (j = 0; j < NOFILE; j++)
 			CHECK(users[i].u_ofile[j] == NULL);
 		kernel_lock();
-		files[i] = falloc(&procs[i], &fd);
+		files[i] = allocate_file(&procs[i], &fd);
 		CHECK(files[i] != NULL && fd == 0);
 		if (files[i])
 			files[i]->f_offset = (size_t)i + 1;

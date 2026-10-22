@@ -13,60 +13,66 @@
 #include "sys_error.h"
 #include "user.h"
 
+static int find_fd(struct user *user);
+static int alloc_fd(struct user *user);
+
 void finit(void)
 {
 	memset(file, 0, NFILE * sizeof(file[0]));
 	memset(inode, 0, NINODE * sizeof(inode[0]));
 }
 
-struct file *getf(struct proc *proc, int fd)
+/* Look up target descriptor without changing error or results */
+struct file *getf_for_proc(struct proc *proc, int fd)
 {
 	if (!proc || !proc->p_addr || fd < 0 || fd >= NOFILE)
 		return NULL;
 	return proc->p_addr->u_ofile[fd];
 }
 
-int ufalloc(struct proc *proc)
-{
-	int fd;
-
-	if (!proc || !proc->p_addr)
-		return -SYS_EINVAL;
-	for (fd = 0; fd < NOFILE; fd++) {
-		if (!proc->p_addr->u_ofile[fd])
-			return fd;
-	}
-	return -SYS_EMFILE;
-}
-
-struct file *falloc(struct proc *proc, int *fd)
+/* Convert current user descriptor into file reference */
+struct file *getf(int fd)
 {
 	struct file *fp;
-	int new_fd;
+
+	fp = getf_for_proc(u.u_procp, fd);
+	if (!fp)
+		u.u_error = SYS_EBADF;
+	return fp;
+}
+
+/* Find current user descriptor and record return value */
+int ufalloc(void)
+{
+	return alloc_fd(&u);
+}
+
+/* Allocate current user descriptor and file */
+struct file *falloc(void)
+{
+	return falloc_for_user(&u);
+}
+
+/* Share file allocation with preparation of another user */
+struct file *falloc_for_user(struct user *user)
+{
+	struct file *fp;
+	int fd;
 	int i;
 
-	if (!fd)
+	fd = alloc_fd(user);
+	if (fd < 0)
 		return NULL;
-	if (!proc || !proc->p_addr) {
-		*fd = -SYS_EINVAL;
-		return NULL;
-	}
-	new_fd = ufalloc(proc);
-	if (new_fd < 0) {
-		*fd = new_fd;
-		return NULL;
-	}
 	for (i = 0; i < NFILE; i++) {
 		fp = &file[i];
 		if (fp->f_count)
 			continue;
 		memset(fp, 0, sizeof(*fp));
 		fp->f_count = 1;
-		proc->p_addr->u_ofile[new_fd] = fp;
-		*fd = new_fd;
+		user->u_ofile[fd] = fp;
 		return fp;
 	}
-	*fd = -SYS_ENFILE;
+	user->u_error = SYS_ENFILE;
 	return NULL;
 }
 
@@ -99,7 +105,7 @@ int fd_install(struct proc *proc, struct file *fp)
 		return -SYS_EINVAL;
 	if (fp->f_count == UCHAR_MAX)
 		return -SYS_ENFILE;
-	fd = ufalloc(proc);
+	fd = find_fd(proc->p_addr);
 	if (fd < 0)
 		return fd;
 	proc->p_addr->u_ofile[fd] = fp;
@@ -125,7 +131,7 @@ int fd_close(struct proc *proc, int fd)
 {
 	struct file *fp;
 
-	fp = getf(proc, fd);
+	fp = getf_for_proc(proc, fd);
 	if (!fp)
 		return -SYS_EBADF;
 	proc->p_addr->u_ofile[fd] = NULL;
@@ -156,4 +162,34 @@ size_t file_in_use(void)
 			count++;
 	}
 	return count;
+}
+
+/* Find free slot without changing target user state */
+static int find_fd(struct user *user)
+{
+	int fd;
+
+	for (fd = 0; fd < NOFILE; fd++) {
+		if (!user->u_ofile[fd])
+			return fd;
+	}
+	return -SYS_EMFILE;
+}
+
+/* Record descriptor result or allocation error for target user */
+static int alloc_fd(struct user *user)
+{
+	int fd;
+
+	if (!user->u_procp) {
+		user->u_error = SYS_EINVAL;
+		return -1;
+	}
+	fd = find_fd(user);
+	if (fd < 0) {
+		user->u_error = -fd;
+		return -1;
+	}
+	user->u_r.r_val1 = fd;
+	return fd;
 }

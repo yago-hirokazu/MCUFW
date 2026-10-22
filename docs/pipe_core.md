@@ -48,7 +48,9 @@ RAM内容も消去する場合は、停止状態で`raminit()`を先に呼ぶ。
 
 ## 所有権
 
-`falloc()`は空きfdとfile entryを同時に確保し、fdが所有する1参照を設定する。
+`falloc()`はcurrent userの空きfdとfile entryを確保し、fd所有の1参照を設定する。
+fdは`u_r.r_val1`、失敗は`u_error`へ設定する。`ufalloc()`もfdと結果領域を設定し、
+失敗時は-1を返す。`getf(fd)`は失敗時NULLと`SYS_EBADF`を設定する。
 `fd_install()`と`fd_install_at()`は既存file参照を1個追加する。`fd_close()`はfdを
 外して`closef()`へ1参照を渡す。
 
@@ -56,8 +58,12 @@ file参照が0になると、pipe wait channelを起床してinode参照を解�
 readまたはwrite endpointが閉じた状態は`i_count < 2`で判定する。両endpointが
 閉じると`iput()`がbufferを返し、inodeを空き状態へ戻す。
 
-`pipe_for_proc()`はinode、read file、write fileの順に確保する。途中で失敗した
-場合は確保済みfd/file/inodeを逆順に戻す。process終了時は`close_all()`が全fdを
+`pipe_create()`と`pipe_for_proc()`は共通処理でinode、read file、write fileを確保する。
+前者はcurrent user、後者は実行前の指定userへerrorと両端fdの結果を設定する。
+別userの準備ではcurrentを切り替えず、呼出し元のerror/resultを保持する。
+file割当は`falloc_for_user()`、inode割当は`ialloc_error()`を共有する。
+`ialloc()`は同じ確保処理を使い、失敗時current userへ`SYS_ENFILE`を設定する。
+途中で失敗した場合は確保済みfd/file/inodeを逆順に戻す。process終了時は`close_all()`が全fdを
 閉じる。
 
 ## Pipe I/O
@@ -107,7 +113,8 @@ RAM driverのblock I/O、遅延書込み、flushは実装済みである。
 `current_user()`はcurrent procの`p_addr`を返す。current procがなければbackendの
 base userを使う。Windows thread backendではbase userもTLSで分離する。
 
-`struct user`は`u_error`、所有procへの`u_procp`、fd tableの`u_ofile[]`を保持する。
+`struct user`は`u_error`、`ptrdiff_t`型2個の結果領域`u_r`、
+所有procへの`u_procp`、fd tableの`u_ofile[]`を保持する。
 inode転送のbuffer/count/offsetは明示引数のままで、userへの全面移行は未完了である。
 buffer I/Oの呼出元は操作前に`u.u_error = 0`とし、操作後にerrorを確認する。
 成功時の`geterror()`は以前のerrorを消さない。pipeの公開APIは従来どおり転送量
