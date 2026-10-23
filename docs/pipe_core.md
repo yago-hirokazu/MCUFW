@@ -77,10 +77,18 @@ file割当は`falloc_for_user()`、inode割当は`ialloc_error()`を共有する
 - `PIPE_IO_BROKEN`: readerが存在しない
 - `PIPE_IO_ERROR`: 不正fd、方向違反、不正引数
 
-`readi()`はread fileの`f_offset`から`i_size`までを読み取る。全data読取後の
-read offsetと`i_size`の0への復帰は`readp()`が行う。
-`writei()`は渡されたoffsetから`PIPSIZ`までへ書き、`writep()`が追記位置に
-`i_size`を使う。
+`readi(ip)`と`writei(ip)`はcurrent userの`u_base/u_count/u_offset`を使う。
+`readi()`は`u_offset`から`i_size`まで、`writei()`は`PIPSIZ`まで転送する。
+`iomove()`はB_READでbufferからuser、B_WRITEでuserからbufferへコピーし、
+成功時だけbase/offsetを転送量だけ進め、countを同量減らす。内部成功はerrorを消さない。
+負のoffset、範囲外のinode size/offset、不正pointer・残量・方向・offset加算overflowは
+EINVALとなり、転送状態を変更しない。ゼロ長ではpointer演算しない。
+
+Step 4では`pipe_inode_io()`が旧形式のpipe I/Oと新inode I/Oを接続する。
+current userの転送状態とerrorを保存し、一回のinode転送を実行して結果を旧形式へ戻し、
+保存した状態を復元する。fd・u_r・current自体は変更しない。Step 5で削除する一時helper。
+全data読取後のread offsetと`i_size`の0への復帰は`readp()`が行い、
+`writep()`は追記位置として`i_size`を使う。
 未読dataが残る間はbuffer先頭へ回り込まない。
 
 `readp()`は現在取得可能なdataを返す。`writep()`は要求全体を完了するまで部分
@@ -114,8 +122,8 @@ RAM driverのblock I/O、遅延書込み、flushは実装済みである。
 base userを使う。Windows thread backendではbase userもTLSで分離する。
 
 `struct user`は`u_error`、`ptrdiff_t`型2個の結果領域`u_r`、
-所有procへの`u_procp`、fd tableの`u_ofile[]`を保持する。
-inode転送のbuffer/count/offsetは明示引数のままで、userへの全面移行は未完了である。
+所有procへの`u_procp`、fd tableの`u_ofile[]`、転送用`u_base/u_count/u_offset`を保持する。
+inode I/Oはuserへ移行済み。pipe I/Oとsys2の全面移行はStep 5で実施する。
 buffer I/Oの呼出元は操作前に`u.u_error = 0`とし、操作後にerrorを確認する。
 成功時の`geterror()`は以前のerrorを消さない。pipeの公開APIは従来どおり転送量
 または負の`SYS_E*`を返す。RAM APIの詳細は[RAM block I/O](ram_block_device.md)参照。

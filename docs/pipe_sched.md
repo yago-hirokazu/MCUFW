@@ -77,7 +77,8 @@ idleまたはdeadlockとして扱う。
 processは`proc_init(proc, user)`で初期化する。`p_addr`は呼出元所有userを指し、
 `current_user()`と`u`マクロはcurrent procからその参照先を求める。currentが
 なければbackend-local base userを使い、thread backendではTLSに置く。
-sleep/wakeupでuserを初期化しない。fd tableは`p_addr->u_ofile[]`にあり、
+sleep/wakeupでuserを初期化しない。`u_base/u_count/u_offset`と`u_r`も
+各userに保持し、別procやhostの転送状態と分離する。fd tableは`p_addr->u_ofile[]`にあり、
 `u_procp`は所有procを指す。currentなしのbase userでは`u_procp`はNULLとなる。
 専用userはbackendのrelease/join完了まで生存させる。
 

@@ -64,6 +64,8 @@ sys層内部とesh executorは、明示的な`struct proc *`を受け取る
 
 current用内部APIは`getf(fd)`、`ufalloc()`、`falloc()`、`pipe_create()`。
 失敗は正の`u_error`、fd結果は`u_r.r_val1/r_val2`で受け渡す。
+inode用内部APIは`readi(ip)`、`writei(ip)`、`iomove(cp, count, flag)`で、
+current userの`u_base/u_count/u_offset`を更新する。宣言は`inode.h`に置く。
 内部成功では以前のerrorを消さない。`sys_pipe()`は入口でerror/resultを初期化し、
 成功時だけfd配列へコピーする。
 

@@ -24,6 +24,9 @@ struct user {
 		ptrdiff_t r_val1;
 		ptrdiff_t r_val2;
 	} u_r;			/* System call results */
+	unsigned char *u_base;	/* Current transfer address */
+	size_t u_count;		/* Remaining byte count */
+	ptrdiff_t u_offset;	/* Current inode offset */
 	struct proc *u_procp;	/* Owning process; NULL for host context */
 	struct file *u_ofile[NOFILE]; /* Open file references */
 };

@@ -1,5 +1,6 @@
 /* test_pipe.c */
 
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -47,6 +48,8 @@ static void test_eof_epipe_and_close_wakeup(void);
 static void test_wait_rechecks(void);
 static void test_pipe_lock(void);
 static void test_rdwri_bounds(void);
+static void test_rdwri_validation(void);
+static void test_iomove(void);
 static void test_resource_rollback(void);
 static void test_pipe_user_results(void);
 
@@ -75,6 +78,8 @@ int main(void)
 	test_wait_rechecks();
 	test_pipe_lock();
 	test_rdwri_bounds();
+	test_rdwri_validation();
+	test_iomove();
 	test_resource_rollback();
 	test_pipe_user_results();
 	if (failures) {
@@ -134,12 +139,23 @@ static void supply_read_hook(struct wait_chan *chan,
 			     enum wait_reason reason)
 {
 	static const char data = 'Q';
-	size_t offset;
+	unsigned char *base = u.u_base;
+	size_t count = u.u_count;
+	ptrdiff_t offset = u.u_offset;
+	int error = u.u_error;
 
 	(void)chan;
 	(void)reason;
-	offset = hook_inode->i_size;
-	hook_result = writei(hook_inode, &offset, &data, 1);
+	u.u_base = (unsigned char *)&data;
+	u.u_count = 1;
+	u.u_offset = (ptrdiff_t)hook_inode->i_size;
+	u.u_error = 0;
+	writei(hook_inode);
+	hook_result = u.u_error ? -u.u_error : (ptrdiff_t)(1 - u.u_count);
+	u.u_base = base;
+	u.u_count = count;
+	u.u_offset = offset;
+	u.u_error = error;
 }
 
 static void drain_write_hook(struct wait_chan *chan,
@@ -214,6 +230,12 @@ static void test_create_and_data_path(void)
 	CHECK(ip->i_count == 2);
 	CHECK(pipe_in_use() == 1);
 
+	u.u_base = (unsigned char *)data;
+	u.u_count = 123;
+	u.u_offset = 77;
+	u.u_error = SYS_EIO;
+	u.u_r.r_val1 = 71;
+	u.u_r.r_val2 = 72;
 	CHECK(call_write(&proc, fd[1], "abc", 3) == 3);
 	CHECK(ip->i_size == 3);
 	CHECK(wf->f_offset == 0);
@@ -230,6 +252,14 @@ static void test_create_and_data_path(void)
 	CHECK(ip->i_size == 0);
 	CHECK(sched_stub_wakeup_count(&ip->i_read_chan) >= 2);
 	CHECK(sched_stub_wakeup_count(&ip->i_write_chan) >= 1);
+	CHECK(u.u_base == (unsigned char *)data && u.u_count == 123);
+	CHECK(u.u_offset == 77 && u.u_error == SYS_EIO);
+	CHECK(u.u_r.r_val1 == 71 && u.u_r.r_val2 == 72);
+	ip->i_size = PIPSIZ + 1;
+	CHECK(call_read(&proc, fd[0], data, 1) == -SYS_EINVAL);
+	CHECK(u.u_base == (unsigned char *)data && u.u_count == 123);
+	CHECK(u.u_offset == 77 && u.u_error == SYS_EIO);
+	ip->i_size = 0;
 	call_close_all(&proc);
 	CHECK(file_in_use() == 0);
 	CHECK(inode_in_use() == 0);
@@ -367,31 +397,227 @@ static void test_pipe_lock(void)
 	call_close_all(&proc);
 }
 
+/* Check partial transfer, capacity, EOF and zero-length state */
 static void test_rdwri_bounds(void)
 {
 	unsigned char input[PIPSIZ + 1];
-	unsigned char output[PIPSIZ];
+	unsigned char output[PIPSIZ + 2];
 	struct inode *ip;
-	size_t offset;
 
 	binit();
 	finit();
 	sched_stub_reset(NULL);
 	memset(input, 0xa5, sizeof(input));
+	memset(output, 0x5a, sizeof(output));
 	ip = ialloc();
 	CHECK(ip != NULL);
-	offset = 0;
-	CHECK(writei(ip, &offset, input, sizeof(input)) == PIPSIZ);
-	CHECK(offset == PIPSIZ);
-	CHECK(ip->i_size == PIPSIZ);
-	CHECK(writei(ip, &offset, input, 1) == 0);
-	offset = 0;
-	CHECK(readi(ip, &offset, output, sizeof(output)) == PIPSIZ);
-	CHECK(memcmp(input, output, PIPSIZ) == 0);
-	CHECK(readi(ip, &offset, output, 1) == 0);
-	CHECK(readi(NULL, NULL, NULL, 0) == 0);
-	CHECK(writei(NULL, NULL, NULL, 0) == 0);
+	u.u_base = input;
+	u.u_count = sizeof(input);
+	u.u_offset = 0;
+	u.u_error = SYS_EIO;
+	u.u_r.r_val1 = 77;
+	u.u_r.r_val2 = 88;
+	writei(ip);
+	CHECK(u.u_count == 1 && u.u_base == input + PIPSIZ);
+	CHECK(u.u_offset == PIPSIZ && ip->i_size == PIPSIZ);
+	CHECK(u.u_error == SYS_EIO);
+	writei(ip);
+	CHECK(u.u_count == 1 && u.u_offset == PIPSIZ);
+	u.u_base = output + 1;
+	u.u_count = PIPSIZ + 1;
+	u.u_offset = 0;
+	readi(ip);
+	CHECK(u.u_count == 1 && u.u_base == output + PIPSIZ + 1);
+	CHECK(u.u_offset == PIPSIZ && u.u_error == SYS_EIO);
+	CHECK(memcmp(input, output + 1, PIPSIZ) == 0);
+	CHECK(output[0] == 0x5a && output[PIPSIZ + 1] == 0x5a);
+	readi(ip);
+	CHECK(u.u_count == 1 && u.u_offset == PIPSIZ);
+	CHECK(u.u_r.r_val1 == 77 && u.u_r.r_val2 == 88);
+	u.u_base = NULL;
+	u.u_count = 0;
+	u.u_offset = -1;
+	u.u_error = 0;
+	readi(NULL);
+	writei(NULL);
+	iomove(NULL, 0, -1);
+	CHECK(u.u_base == NULL && u.u_count == 0 && u.u_offset == -1);
+	CHECK(u.u_error == 0);
 	iput(ip);
+}
+
+/* Invalid inode requests leave transfer state and payload untouched */
+static void test_rdwri_validation(void)
+{
+	unsigned char bytes[2] = { 0x31, 0x32 };
+	unsigned char *saved_base;
+	unsigned char *payload;
+	struct inode *ip;
+	struct inode *target;
+	struct buf *bp;
+	size_t saved_count;
+	ptrdiff_t saved_offset;
+	int direction;
+	int item;
+
+	binit();
+	finit();
+	sched_stub_reset(NULL);
+	ip = ialloc();
+	CHECK(ip != NULL);
+	bp = ip->i_buf;
+	payload = bp->b_addr;
+	memset(payload, 0x5a, PIPSIZ);
+	for (direction = 0; direction < 2; direction++) {
+		for (item = 0; item < 8; item++) {
+			target = ip;
+			ip->i_size = 1;
+			u.u_base = bytes;
+			u.u_count = 1;
+			u.u_offset = 0;
+			u.u_error = 0;
+			switch (item) {
+			case 0:
+				u.u_offset = -1;
+				break;
+			case 1:
+				u.u_offset = PIPSIZ + 1;
+				break;
+			case 2:
+				ip->i_size = PIPSIZ + 1;
+				break;
+			case 3:
+				u.u_base = NULL;
+				break;
+			case 4:
+				target = NULL;
+				break;
+			case 5:
+				ip->i_buf = NULL;
+				break;
+			case 6:
+				bp->b_addr = NULL;
+				break;
+			case 7:
+				u.u_count = (size_t)PTRDIFF_MAX + 1;
+				break;
+			}
+			saved_base = u.u_base;
+			saved_count = u.u_count;
+			saved_offset = u.u_offset;
+			if (direction == B_READ)
+				readi(target);
+			else
+				writei(target);
+			CHECK(u.u_error == SYS_EINVAL);
+			CHECK(u.u_base == saved_base);
+			CHECK(u.u_count == saved_count);
+			CHECK(u.u_offset == saved_offset);
+			CHECK(ip->i_size ==
+			      (size_t)(item == 2 ? PIPSIZ + 1 : 1));
+			CHECK(bytes[0] == 0x31 && bytes[1] == 0x32);
+			CHECK(payload[0] == 0x5a &&
+			      payload[PIPSIZ - 1] == 0x5a);
+			ip->i_buf = bp;
+			bp->b_addr = payload;
+		}
+	}
+	ip->i_size = 1;
+	u.u_base = bytes;
+	u.u_count = 1;
+	u.u_offset = 2;
+	u.u_error = 0;
+	readi(ip);
+	CHECK(u.u_error == SYS_EINVAL && u.u_count == 1);
+	CHECK(u.u_offset == 2 && u.u_base == bytes);
+	iput(ip);
+	u.u_base = NULL;
+	u.u_count = 0;
+	u.u_offset = 0;
+	u.u_error = 0;
+}
+
+/* Check copy directions, immutable source and offset overflow */
+static void test_iomove(void)
+{
+	static const unsigned char source[] = "immutable";
+	unsigned char payload[sizeof(source) + 2];
+	unsigned char output[sizeof(source)];
+	unsigned char *base;
+	void *cp;
+	size_t count;
+	size_t remaining;
+	ptrdiff_t offset;
+	int flag;
+	int item;
+
+	memset(payload, 0x5a, sizeof(payload));
+	u.u_base = (unsigned char *)source;
+	u.u_count = sizeof(source);
+	u.u_offset = 3;
+	u.u_error = SYS_EIO;
+	iomove(payload + 1, sizeof(source), B_WRITE);
+	CHECK(memcmp(payload + 1, source, sizeof(source)) == 0);
+	CHECK(payload[0] == 0x5a && payload[sizeof(payload) - 1] == 0x5a);
+	CHECK(u.u_count == 0 && u.u_base == source + sizeof(source));
+	CHECK(u.u_offset == (ptrdiff_t)(3 + sizeof(source)) &&
+	      u.u_error == SYS_EIO);
+	u.u_base = output;
+	u.u_count = sizeof(output);
+	u.u_offset = 0;
+	iomove(payload + 1, sizeof(output), B_READ);
+	CHECK(memcmp(output, source, sizeof(output)) == 0);
+	CHECK(u.u_count == 0 && u.u_base == output + sizeof(output));
+	CHECK(u.u_offset == (ptrdiff_t)sizeof(output) && u.u_error == SYS_EIO);
+	for (item = 0; item < 7; item++) {
+		u.u_base = output;
+		u.u_count = 1;
+		u.u_offset = 0;
+		u.u_error = 0;
+		cp = payload;
+		count = 1;
+		flag = B_WRITE;
+		switch (item) {
+		case 0:
+			flag = B_READ | B_DONE;
+			break;
+		case 1:
+			cp = NULL;
+			break;
+		case 2:
+			u.u_base = NULL;
+			break;
+		case 3:
+			count = 2;
+			break;
+		case 4:
+			u.u_offset = -1;
+			break;
+		case 5:
+			u.u_offset = PTRDIFF_MAX;
+			break;
+		case 6:
+			u.u_count = (size_t)PTRDIFF_MAX + 1;
+			break;
+		}
+		base = u.u_base;
+		remaining = u.u_count;
+		offset = u.u_offset;
+		iomove(cp, count, flag);
+		CHECK(u.u_error == SYS_EINVAL);
+		CHECK(u.u_base == base && u.u_count == remaining);
+		CHECK(u.u_offset == offset && payload[0] == 0x5a);
+	}
+	u.u_base = output;
+	u.u_count = 1;
+	u.u_offset = PTRDIFF_MAX - 1;
+	u.u_error = 0;
+	iomove(payload, 1, B_READ);
+	CHECK(u.u_offset == PTRDIFF_MAX && u.u_count == 0);
+	CHECK(u.u_base == output + 1 && u.u_error == 0);
+	u.u_base = NULL;
+	u.u_count = 0;
+	u.u_offset = 0;
 }
 
 static void test_resource_rollback(void)

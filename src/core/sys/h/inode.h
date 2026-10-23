@@ -34,9 +34,10 @@ struct inode *ialloc(void);
 /* Internal allocator reports error without changing current user */
 struct inode *ialloc_error(int *error);
 void iput(struct inode *ip);
-ptrdiff_t readi(struct inode *ip, size_t *offset, void *buf, size_t count);
-ptrdiff_t writei(struct inode *ip, size_t *offset, const void *buf,
-		 size_t count);
+/* Transfer through current user; caller holds kernel lock */
+void readi(struct inode *ip);
+void writei(struct inode *ip);
+void iomove(void *cp, size_t count, int flag);
 size_t inode_in_use(void);
 
 #ifdef __cplusplus

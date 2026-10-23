@@ -201,3 +201,13 @@ par、exe、cquote、Windows本体も使用したdirectoryでmake cleanを実行
 - 別userのpipe準備でcurrentと呼出し元error/resultを保持
 - fd/file/inode/buffer枯渇、片端確保後のrollback、失敗時のfd配列保持
 - coroutine/thread双方のsleep/wakeup前後における`u_r`の独立性
+
+## User移行 Step 4の検証項目
+
+- inode I/Oの部分転送、EOF、固定容量とbase/count/offsetの更新
+- 不正inode、NULL pointer、負/範囲外offset、異常inode sizeで状態を更新しない
+- iomoveのB_READ/B_WRITE、読取専用source、コピー領域の前後guard
+- 残量不足、無効方向、PTRDIFF_MAX境界と加算overflow、ゼロ長NULL
+- 内部成功時のerror保持と、inode I/Oがu_rを変更しないこと
+- Step 4の一時pipe bridgeによる転送状態/errorの保存・復元
+- user初期化・再利用、両backendのsleep/wakeup前後、hostとの転送状態分離

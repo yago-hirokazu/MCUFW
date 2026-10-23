@@ -9,7 +9,7 @@ Step 0 の確定事項は [Step 0 設計決定](unix_v7_user_context_step0.md) �
 
 | 項目 | 現在の実装 |
 |---|---|
-| user領域 | u_error、u_r（ptrdiff_tのr_val1/r_val2）、u_procp、u_ofile[NOFILE] |
+| user領域 | u_error、u_r、u_procp、u_ofile[NOFILE]、u_base/u_count/u_offset |
 | procからの参照 | struct user *p_addrを実装済み |
 | 初期化 | proc_init(proc, user)が両者を初期化してp_addrとu_procpを設定 |
 | 所有者 | exe_proc.p_user、または呼出元の固定・局所領域 |
@@ -19,17 +19,18 @@ Step 0 の確定事項は [Step 0 設計決定](unix_v7_user_context_step0.md) �
 | 寿命 | backendの停止・unwind・join完了までuserを保持 |
 | buffer error | geterror()が正のerrorをu_errorへ設定。成功時は以前の値を保持 |
 | fd table | proc.p_addr->u_ofile[]へ移行 |
-| inode/pipe I/O | buffer/count/offsetは明示引数のまま |
+| inode I/O | readi/writei/iomoveがcurrent userの転送状態を更新 |
+| pipe I/O | 明示引数を維持し、一時pipe_inode_ioでinode I/Oへ変換 |
 | 公開sys API | 転送量または負のSYS_E*を返す契約を維持 |
 | file/pipe作成 | current APIと管理APIを分離。結果はu_r、失敗はu_error |
-| 未導入userメンバ | u_base、u_count、u_offset等 |
+| 後続の移行 | readp/writep/plock/sys2をStep 5でuser形式へ変更 |
 
 src/core/sys/test/schedにはsleep/wakeup前後とhost/worker間のerror分離、
 thread backendのbase user分離を確認する試験がある。
 src/core/esh/test/pipeline_execには単一commandのcurrent設定・復元・user再初期化の
-試験がある。Step 2・3の変更内容と試験結果は末尾の作業記録を参照する。
+試験がある。Step 2～4の変更内容と試験結果は末尾の作業記録を参照する。
 
-後続作業はStep 4のinode I/O移行から着手する。導入済みの基盤を再実装しない。
+後続作業はStep 5のpipe I/O・sys2移行から着手する。導入済みの基盤を再実装しない。
 [pipe core](pipe_core.md)、[scheduler](pipe_sched.md)、[RAM I/O](ram_block_device.md)参照。
 
 作成日: 2026-10-20
@@ -282,8 +283,8 @@ scheduler をリンクしていない。current user のスタブ等を追加す
 | 0 | 原典・既存差分を確認し、未確定の API・型・エラー契約を決定 | [設計決定](unix_v7_user_context_step0.md)に記録 | done |
 | 1 | `p_addr` と専用 user、current user、基底 context を導入 | 既存コードに導入済み。Step 0 で現行実装と照合 | done |
 | 2 | `p_ofile` を `u_ofile` へ移し、executor と管理 helper を更新 | 接続・close・再利用と参照数が正常 | done |
-| 3 | `fio.c` を V7 型へ移行し、pipe 作成経路を適合 | fd/file 枯渇と途中失敗が漏れなく復旧 | pending |
-| 4 | `rdwri.c` と `iomove()` に user 状態を導入 | 転送量・残量・offset・容量境界が正常 | pending |
+| 3 | `fio.c` を V7 型へ移行し、pipe 作成経路を適合 | fd/file 枯渇と途中失敗が漏れなく復旧 | done |
+| 4 | `rdwri.c` と `iomove()` に user 状態を導入 | 転送量・残量・offset・容量境界が正常 | done |
 | 5 | pipe 転送と `sys2.c` を V7 型へ移行 | 待機・部分転送・EOF・EPIPE が正常 | pending |
 | 6 | inode/bio エラー、終了・unwind・再利用を整合 | 他 user の状態破壊と資源漏れがない | pending |
 | 7 | 全回帰・文書更新・生成物 clean | 両 backend の動作と差分を記録 | pending |
@@ -488,3 +489,61 @@ Windows本体は一時OUTDIR/TARGETでビルドし、対話コンソールで`sa
 
 Step 3完了。次はStep 4のu_base/u_count/u_offsetとinode I/O移行。
 試験用の一時スクリプトを削除し、生成したd/o/exeの清掃と`git diff --check`を確認した。
+
+
+## Step 4 作業記録
+
+実施日: 2026-10-23
+
+`struct user`に`unsigned char *u_base`、`size_t u_count`、`ptrdiff_t u_offset`を
+追加した。所有者・寿命、`struct user *p_addr`による参照とcurrent選択は変更しない。
+`proc_init()`の全体初期化で転送状態もゼロに戻る。
+
+V7の`sys/rdwri.c`を基準に`readi(ip)`、`writei(ip)`をvoidのcurrent用APIへ移行した。
+コピーは新設`iomove(cp, count, flag)`へ集約した。B_READ/B_WRITEの値を維持し、
+同一アドレス空間のmemcpyで転送する。成功時はbase/offsetを転送量だけ進め、
+countを同量減らす。u_rは変更せず、成功時も以前のerrorを消さない。
+
+固定容量内に転送を制限し、コピー前に負/範囲外offset、異常inode size、NULL、
+方向、残量、加算overflowを検査する。PIPSIZがPTRDIFF_MAX以下であることを
+コンパイル時に確認する。正のinode要求とiomove残量はPTRDIFF_MAX以下に制限する。
+不正時はEINVALとして転送状態とpayloadを変更しない。ゼロ長はNULLでも演算しない。
+callerがcp/countの有効領域を保証する契約を維持し、未知の領域長は推測しない。
+
+pipe I/Oとsys2の全面移行はStep 5へ残す。Step 4限定のstatic helper
+`pipe_inode_io()`でcurrentのbase/count/offset/errorを保存し、inode I/Oを実行して
+旧形式の転送量/負のerrorとoffsetへ変換した後、保存値を復元する。currentを変更せず、
+user全体のコピーや公開sys APIへの再入は行わない。このhelperはStep 5で削除する。
+readp/writepの引数、pipe_io_status、待機と部分転送の処理は維持する。
+公開sys_read/writeの全要求残量・u_r・error変換と一律の入口検証もStep 5で行う。
+
+単体試験はinode I/Oの容量・EOF・部分転送・sticky error、iomoveの方向と
+読取専用source、guard、無効入力・overflow時の無変更を確認する。
+scheduler試験は途中まで進めた転送状態のsleep/wakeup前後の保持、hostとの分離、
+初期化・再利用を確認する。pipe bridgeは成功・失敗時の状態復元も検証する。
+
+
+### Step 4 検証結果
+
+MSYS2 MINGW64 shellから既存のrun_test.shを実行した。parserは同ディレクトリで
+run_test1.shとrun_test2.shを実行した。終了時のmake cleanも正常終了した。
+
+| 試験 | 構成 | 結果 |
+|---|---|---|
+| sys header | C/C++、単独/順序入替え、O0/O2 | passed |
+| sys file/pipe | O0/O2、inode/I/O境界・状態保持を含む | passed |
+| sys scheduler | cortn/thread、O0/O2、既定/NBUF=3 | passed |
+| esh pipe | cortn/thread、O0/O2 | passed |
+| pipeline executor | cortn/thread、O0/O2、既存30秒制限 | passed |
+| esh exe | 既存10スクリプト | passed |
+| parser | run_test1.sh、run_test2.sh | passed |
+| Windows本体 | cortn/thread、sam1・sam2・sam3 | passed |
+
+Windows本体は一時OUTDIR/TARGETでビルドし、対話コンソールで`sam1`、
+`sam2 1 10 100`、`sam3 -a -b string`を実行した。両backendで
+`sample1 applet`、`arg1=1`、`arg2=10`、`arg3=0x00000064`、
+`-a option`、`-b option with string`を確認し、Ctrl-Dで正常終了した。
+両backendのmake cleanも正常終了した。
+
+Step 4完了。次はStep 5のreadp/writep/plock/sys2の一括移行と、一時bridgeの削除。
+一時スクリプトを削除し、生成したd/o/exeの清掃と`git diff --check`を確認した。

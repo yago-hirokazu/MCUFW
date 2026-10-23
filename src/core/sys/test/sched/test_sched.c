@@ -388,7 +388,6 @@ static void test_wait_lock(void)
 	struct inode *ip;
 	unsigned char input;
 	unsigned char output;
-	size_t offset;
 	int write_fd;
 	int read_fd;
 
@@ -402,8 +401,14 @@ static void test_wait_lock(void)
 	ip = getf_for_proc(&sleeper, read_fd)->f_inode;
 	kernel_lock();
 	ip->i_flag |= ILOCK;
-	offset = 0;
-	CHECK(writei(ip, &offset, &input, 1) == 1);
+	u.u_base = &input;
+	u.u_count = 1;
+	u.u_offset = 0;
+	u.u_error = 0;
+	writei(ip);
+	CHECK(u.u_error == 0 && u.u_count == 0 && u.u_offset == 1);
+	u.u_base = NULL;
+	u.u_offset = 0;
 	kernel_unlock();
 	reader.data = &output;
 	reader.capacity = 1;
@@ -969,6 +974,8 @@ static void user_wait_entry(void *arg)
 {
 	struct user_wait_arg *waiter = arg;
 	struct buf *bp;
+	unsigned char bytes[2];
+	unsigned char data = 0x41;
 
 	kernel_lock();
 	CHECK(current_user() == current_proc()->p_addr);
@@ -980,12 +987,20 @@ static void user_wait_entry(void *arg)
 	waiter->before = u.u_error;
 	u.u_r.r_val1 = 101;
 	u.u_r.r_val2 = 202;
+	u.u_base = bytes;
+	u.u_count = sizeof(bytes);
+	u.u_offset = 7;
+	iomove(&data, 1, B_READ);
+	CHECK(u.u_base == bytes + 1 && u.u_count == 1 && u.u_offset == 8);
 	brelse(bp);
 	CHECK(sched_sleep(waiter->chan, WAIT_READ) == 0);
 	CHECK(current_user() == current_proc()->p_addr);
 	CHECK(u.u_procp == current_proc());
 	CHECK(u.u_ofile[0] != NULL && u.u_ofile[0]->f_offset == 1);
 	CHECK(u.u_r.r_val1 == 101 && u.u_r.r_val2 == 202);
+	CHECK(u.u_base == bytes + 1 && u.u_count == 1 && u.u_offset == 8);
+	CHECK(bytes[0] == 0x41);
+	u.u_base = NULL;
 	waiter->after = u.u_error;
 	kernel_unlock();
 }
@@ -995,6 +1010,8 @@ static void user_peer_entry(void *arg)
 {
 	struct wait_chan *chan = arg;
 	struct buf *bp;
+	unsigned char bytes[2];
+	unsigned char data = 0x42;
 
 	kernel_lock();
 	CHECK(u.u_error == 0);
@@ -1005,6 +1022,13 @@ static void user_peer_entry(void *arg)
 	bp = bread(makedev(RAM_MAJOR, 0), 0);
 	CHECK(bp != NULL && u.u_error == 0);
 	brelse(bp);
+	u.u_base = bytes;
+	u.u_count = sizeof(bytes);
+	u.u_offset = 19;
+	iomove(&data, 1, B_READ);
+	CHECK(u.u_base == bytes + 1 && u.u_count == 1 && u.u_offset == 20);
+	CHECK(bytes[0] == 0x42);
+	u.u_base = NULL;
 	sched_wakeup(chan);
 	kernel_unlock();
 }
@@ -1018,6 +1042,7 @@ static void test_user_isolation(void)
 	struct user *host;
 	struct wait_chan chan = { 0 };
 	struct user_wait_arg waiter = { &chan, 0, 0 };
+	unsigned char host_byte;
 	int fd;
 	int i;
 	int j;
@@ -1030,13 +1055,21 @@ static void test_user_isolation(void)
 	for (j = 0; j < NOFILE; j++)
 		CHECK(host->u_ofile[j] == NULL);
 	host->u_error = SYS_EINVAL;
+	host->u_base = &host_byte;
+	host->u_count = 7;
+	host->u_offset = 11;
 	for (i = 0; i < 2; i++) {
 		users[i].u_error = SYS_EPIPE;
+		users[i].u_base = &host_byte;
+		users[i].u_count = 123;
+		users[i].u_offset = -1;
 		users[i].u_ofile[NOFILE - 1] = &file[0];
 		proc_init(&procs[i], &users[i]);
 		CHECK(procs[i].p_addr == &users[i]);
 		CHECK(users[i].u_procp == &procs[i]);
 		CHECK(users[i].u_error == 0);
+		CHECK(users[i].u_base == NULL && users[i].u_count == 0);
+		CHECK(users[i].u_offset == 0);
 		CHECK(procs[i].p_addr != host);
 		for (j = 0; j < NOFILE; j++)
 			CHECK(users[i].u_ofile[j] == NULL);
@@ -1054,6 +1087,11 @@ static void test_user_isolation(void)
 	CHECK(waiter.before == SYS_EIO && waiter.after == SYS_EIO);
 	CHECK(users[0].u_error == SYS_EIO && users[1].u_error == 0);
 	CHECK(current_user() == host && host->u_error == SYS_EINVAL);
+	CHECK(host->u_base == &host_byte && host->u_count == 7);
+	CHECK(host->u_offset == 11);
+	host->u_base = NULL;
+	host->u_count = 0;
+	host->u_offset = 0;
 	kernel_lock();
 	for (i = 0; i < 2; i++)
 		close_all(&procs[i]);
@@ -1064,6 +1102,8 @@ static void test_user_isolation(void)
 	CHECK(users[0].u_procp == &procs[0]);
 	proc_init(&procs[0], &users[0]);
 	CHECK(users[0].u_error == 0);
+	CHECK(users[0].u_base == NULL && users[0].u_count == 0);
+	CHECK(users[0].u_offset == 0);
 	CHECK(users[0].u_procp == &procs[0]);
 	for (j = 0; j < NOFILE; j++)
 		CHECK(users[0].u_ofile[j] == NULL);

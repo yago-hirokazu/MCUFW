@@ -1,7 +1,10 @@
 /*
  * sys_pipe() => pipe_create() => pipe_alloc() => inode and file allocation
  * pipe_for_proc() => pipe_alloc() with explicit target user
+ * readp() / writep() => pipe_inode_io() => readi() / writei()
  */
+
+#include <stdint.h>
 
 #include "file.h"
 #include "inode.h"
@@ -12,6 +15,8 @@
 #include "user.h"
 
 static void pipe_alloc(struct user *user);
+static ptrdiff_t pipe_inode_io(struct inode *ip, size_t *offset,
+			      const void *buf, size_t count, int flag);
 static struct pipe_io_status pipe_status(enum pipe_io_result result,
 					 ptrdiff_t count, int error);
 static struct pipe_io_status pipe_read_once(struct file *fp, void *buf,
@@ -215,7 +220,7 @@ static struct pipe_io_status pipe_read_once(struct file *fp, void *buf,
 			return pipe_status(PIPE_IO_EOF, 0, 0);
 		return pipe_status(PIPE_IO_WAIT_READ, 0, 0);
 	}
-	transferred = readi(ip, &fp->f_offset, buf, count);
+	transferred = pipe_inode_io(ip, &fp->f_offset, buf, count, B_READ);
 	if (transferred < 0)
 		return pipe_status(PIPE_IO_ERROR, 0, (int)transferred);
 	if (fp->f_offset == ip->i_size) {
@@ -245,7 +250,7 @@ static struct pipe_io_status pipe_write_once(struct file *fp,
 	if (ip->i_size >= PIPSIZ)
 		return pipe_status(PIPE_IO_WAIT_WRITE, 0, 0);
 	offset = ip->i_size;
-	transferred = writei(ip, &offset, buf, count);
+	transferred = pipe_inode_io(ip, &offset, buf, count, B_WRITE);
 	if (transferred < 0)
 		return pipe_status(PIPE_IO_ERROR, 0, (int)transferred);
 	sched_wakeup(&ip->i_read_chan);
@@ -291,4 +296,33 @@ static void pipe_alloc(struct user *user)
 
 put_inode:
 	iput(ip);
+}
+
+/* Step 4 bridge only; remove with pipe/sys2 migration in Step 5 */
+static ptrdiff_t pipe_inode_io(struct inode *ip, size_t *offset,
+			      const void *buf, size_t count, int flag)
+{
+	unsigned char *saved_base = u.u_base;
+	size_t saved_count = u.u_count;
+	ptrdiff_t saved_offset = u.u_offset;
+	int saved_error = u.u_error;
+	ptrdiff_t result;
+
+	if (*offset > PIPSIZ || count > PTRDIFF_MAX)
+		return -SYS_EINVAL;
+	u.u_base = (unsigned char *)buf;
+	u.u_count = count;
+	u.u_offset = (ptrdiff_t)*offset;
+	u.u_error = 0;
+	if (flag == B_READ)
+		readi(ip);
+	else
+		writei(ip);
+	result = u.u_error ? -u.u_error : (ptrdiff_t)(count - u.u_count);
+	*offset = (size_t)u.u_offset;
+	u.u_base = saved_base;
+	u.u_count = saved_count;
+	u.u_offset = saved_offset;
+	u.u_error = saved_error;
+	return result;
 }
