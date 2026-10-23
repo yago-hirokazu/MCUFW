@@ -15,6 +15,7 @@ OBJS = $(OUTDIR)/test_sched.o
 OBJS += $(OUTDIR)/sched.o
 OBJS += $(addprefix $(OUTDIR)/,$(SCHED_CSOURCES:.c=.o))
 OBJS += $(addprefix $(OUTDIR)/,$(SCHED_ASOURCES:.S=.o))
+OBJS += $(OUTDIR)/sys2.o
 OBJS += $(OUTDIR)/pipe.o
 OBJS += $(OUTDIR)/rdwri.o
 OBJS += $(OUTDIR)/fio.o
@@ -54,6 +55,9 @@ $(OUTDIR)/sched_cortn.o: ../../dev/windows/sched_cortn.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OUTDIR)/sched_thread.o: ../../dev/windows/sched_thread.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OUTDIR)/sys2.o: ../../sys/sys2.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OUTDIR)/pipe.o: ../../sys/pipe.c

@@ -1,7 +1,7 @@
 /*
  * sys_pipe() => pipe_create() => pipe_alloc() => inode and file allocation
  * pipe_for_proc() => pipe_alloc() with explicit target user
- * readp() / writep() => pipe_inode_io() => readi() / writei()
+ * readp() / writep() => readi() / writei() => iomove()
  */
 
 #include <stdint.h>
@@ -15,15 +15,8 @@
 #include "user.h"
 
 static void pipe_alloc(struct user *user);
-static ptrdiff_t pipe_inode_io(struct inode *ip, size_t *offset,
-			      const void *buf, size_t count, int flag);
-static struct pipe_io_status pipe_status(enum pipe_io_result result,
-					 ptrdiff_t count, int error);
-static struct pipe_io_status pipe_read_once(struct file *fp, void *buf,
-					    size_t count);
-static struct pipe_io_status pipe_write_once(struct file *fp,
-					     const void *buf,
-					     size_t count);
+static struct inode *pipe_inode(struct file *fp, int mode);
+static void pipe_sleep(struct wait_chan *chan, enum wait_reason reason);
 
 /* Return pipe descriptors through current user results */
 void pipe_create(void)
@@ -72,101 +65,118 @@ int sys_pipe(int fd[2])
 	return result;
 }
 
-ptrdiff_t readp(struct proc *proc, struct file *fp, void *buf, size_t count)
+/* Read available data or wait for writer to supply it */
+void readp(struct file *fp)
 {
-	struct pipe_io_status status;
-	int result;
+	struct inode *ip;
 
-	if (!count)
-		return 0;
-	if (!buf)
-		return -SYS_EINVAL;
-	for (;;) {
-		result = plock(fp ? fp->f_inode : NULL);
-		if (result < 0)
-			return result;
-		status = pipe_read_once(fp, buf, count);
-		prele(fp->f_inode);
-		switch (status.io_result) {
-		case PIPE_IO_PROGRESS:
-		case PIPE_IO_EOF:
-			return status.io_count;
-		case PIPE_IO_WAIT_READ:
-			if (!proc || !proc->p_backend)
-				return -SYS_EAGAIN;
-			result = sched_sleep(&fp->f_inode->i_read_chan,
-					     WAIT_READ);
-			if (result < 0)
-				return result;
-			break;
-		default:
-			return status.io_error;
-		}
-	}
-}
-
-ptrdiff_t writep(struct proc *proc, struct file *fp, const void *buf,
-		 size_t count)
-{
-	const unsigned char *bytes;
-	struct pipe_io_status status;
-	size_t transferred;
-	int result;
-
-	if (!count)
-		return 0;
-	if (!buf)
-		return -SYS_EINVAL;
-	bytes = buf;
-	transferred = 0;
-	for (;;) {
-		result = plock(fp ? fp->f_inode : NULL);
-		if (result < 0)
-			return result;
-		status = pipe_write_once(fp, bytes + transferred,
-					 count - transferred);
-		prele(fp->f_inode);
-		switch (status.io_result) {
-		case PIPE_IO_PROGRESS:
-			transferred += (size_t)status.io_count;
-			if (transferred == count)
-				return (ptrdiff_t)transferred;
-			break;
-		case PIPE_IO_WAIT_WRITE:
-			if (!proc || !proc->p_backend) {
-				if (transferred)
-					return (ptrdiff_t)transferred;
-				return -SYS_EAGAIN;
-			}
-			result = sched_sleep(&fp->f_inode->i_write_chan,
-					     WAIT_WRITE);
-			if (result < 0)
-				return result;
-			break;
-		default:
-			return status.io_error;
-		}
-	}
-}
-
-int plock(struct inode *ip)
-{
-	struct proc *proc;
-	int result;
-
+	if (!u.u_count || u.u_error)
+		return;
+	ip = pipe_inode(fp, FREAD);
 	if (!ip)
-		return -SYS_EINVAL;
+		return;
+	for (;;) {
+		plock(ip);
+		if (u.u_error)
+			return;
+		if (!ip->i_size) {
+			prele(ip);
+			if (ip->i_count < 2)
+				return;
+			pipe_sleep(&ip->i_read_chan, WAIT_READ);
+			if (u.u_error)
+				return;
+			continue;
+		}
+		if (fp->f_offset > PIPSIZ) {
+			u.u_error = SYS_EINVAL;
+			prele(ip);
+			return;
+		}
+		u.u_offset = (ptrdiff_t)fp->f_offset;
+		readi(ip);
+		fp->f_offset = (size_t)u.u_offset;
+		if (!u.u_error && fp->f_offset == ip->i_size) {
+			fp->f_offset = 0;
+			ip->i_size = 0;
+			sched_wakeup(&ip->i_write_chan);
+		}
+		prele(ip);
+		return;
+	}
+}
+
+/* Write bounded intervals and retain whole-request remainder */
+void writep(struct file *fp)
+{
+	struct inode *ip;
+	size_t remaining;
+	size_t requested;
+	size_t count;
+
+	if (!u.u_count || u.u_error)
+		return;
+	ip = pipe_inode(fp, FWRITE);
+	if (!ip)
+		return;
+	requested = u.u_count;
+	remaining = requested;
+	while (remaining) {
+		plock(ip);
+		if (u.u_error)
+			break;
+		if (ip->i_size > PIPSIZ) {
+			u.u_error = SYS_EINVAL;
+			prele(ip);
+			break;
+		}
+		if (ip->i_count < 2) {
+			u.u_error = SYS_EPIPE;
+			prele(ip);
+			break;
+		}
+		if (ip->i_size == PIPSIZ) {
+			prele(ip);
+			if ((!u.u_procp || !u.u_procp->p_backend) &&
+			    remaining != requested)
+				break;
+			pipe_sleep(&ip->i_write_chan, WAIT_WRITE);
+			if (u.u_error)
+				break;
+			continue;
+		}
+		u.u_offset = (ptrdiff_t)ip->i_size;
+		count = PIPSIZ - ip->i_size;
+		if (count > remaining)
+			count = remaining;
+		u.u_count = count;
+		writei(ip);
+		remaining -= count - u.u_count;
+		u.u_count = remaining;
+		prele(ip);
+		sched_wakeup(&ip->i_read_chan);
+		if (u.u_error)
+			break;
+	}
+	u.u_count = remaining;
+}
+
+/* Acquire inode lock or record failure without unlocking peer */
+void plock(struct inode *ip)
+{
+	if (u.u_error)
+		return;
+	if (!ip) {
+		u.u_error = SYS_EINVAL;
+		return;
+	}
 	while (ip->i_flag & ILOCK) {
 		ip->i_flag |= IWANT;
-		proc = current_proc();
-		if (!proc || !proc->p_backend)
-			return -SYS_EAGAIN;
-		result = sched_sleep(&ip->i_lock_chan, WAIT_LOCK);
-		if (result < 0)
-			return result;
+		pipe_sleep(&ip->i_lock_chan, WAIT_LOCK);
+		if (u.u_error)
+			return;
 	}
 	ip->i_flag |= ILOCK;
-	return 0;
 }
 
 void prele(struct inode *ip)
@@ -191,70 +201,6 @@ size_t pipe_in_use(void)
 			count++;
 	}
 	return count;
-}
-
-static struct pipe_io_status pipe_status(enum pipe_io_result result,
-					 ptrdiff_t count, int error)
-{
-	struct pipe_io_status status;
-
-	status.io_result = result;
-	status.io_count = count;
-	status.io_error = error;
-	return status;
-}
-
-static struct pipe_io_status pipe_read_once(struct file *fp, void *buf,
-					    size_t count)
-{
-	struct inode *ip;
-	ptrdiff_t transferred;
-
-	if (!fp || (fp->f_flag & (FREAD | FPIPE)) != (FREAD | FPIPE))
-		return pipe_status(PIPE_IO_ERROR, 0, -SYS_EBADF);
-	ip = fp->f_inode;
-	if (!ip || !ip->i_count || !ip->i_buf)
-		return pipe_status(PIPE_IO_ERROR, 0, -SYS_EBADF);
-	if (!ip->i_size) {
-		if (ip->i_count < 2)
-			return pipe_status(PIPE_IO_EOF, 0, 0);
-		return pipe_status(PIPE_IO_WAIT_READ, 0, 0);
-	}
-	transferred = pipe_inode_io(ip, &fp->f_offset, buf, count, B_READ);
-	if (transferred < 0)
-		return pipe_status(PIPE_IO_ERROR, 0, (int)transferred);
-	if (fp->f_offset == ip->i_size) {
-		fp->f_offset = 0;
-		ip->i_size = 0;
-		sched_wakeup(&ip->i_write_chan);
-	}
-	return pipe_status(PIPE_IO_PROGRESS, transferred, 0);
-}
-
-static struct pipe_io_status pipe_write_once(struct file *fp,
-					     const void *buf,
-					     size_t count)
-{
-	struct inode *ip;
-	size_t offset;
-	ptrdiff_t transferred;
-
-	if (!fp || (fp->f_flag & (FWRITE | FPIPE)) !=
-		   (FWRITE | FPIPE))
-		return pipe_status(PIPE_IO_ERROR, 0, -SYS_EBADF);
-	ip = fp->f_inode;
-	if (!ip || !ip->i_count || !ip->i_buf)
-		return pipe_status(PIPE_IO_ERROR, 0, -SYS_EBADF);
-	if (ip->i_count < 2)
-		return pipe_status(PIPE_IO_BROKEN, 0, -SYS_EPIPE);
-	if (ip->i_size >= PIPSIZ)
-		return pipe_status(PIPE_IO_WAIT_WRITE, 0, 0);
-	offset = ip->i_size;
-	transferred = pipe_inode_io(ip, &offset, buf, count, B_WRITE);
-	if (transferred < 0)
-		return pipe_status(PIPE_IO_ERROR, 0, (int)transferred);
-	sched_wakeup(&ip->i_read_chan);
-	return pipe_status(PIPE_IO_PROGRESS, transferred, 0);
 }
 
 /* Allocate complete pipe or release only resources acquired here */
@@ -298,31 +244,31 @@ put_inode:
 	iput(ip);
 }
 
-/* Step 4 bridge only; remove with pipe/sys2 migration in Step 5 */
-static ptrdiff_t pipe_inode_io(struct inode *ip, size_t *offset,
-			      const void *buf, size_t count, int flag)
+/* Validate current request and pipe endpoint before waiting */
+static struct inode *pipe_inode(struct file *fp, int mode)
 {
-	unsigned char *saved_base = u.u_base;
-	size_t saved_count = u.u_count;
-	ptrdiff_t saved_offset = u.u_offset;
-	int saved_error = u.u_error;
-	ptrdiff_t result;
+	if (!u.u_base || u.u_count > PTRDIFF_MAX) {
+		u.u_error = SYS_EINVAL;
+		return NULL;
+	}
+	if (!fp || (fp->f_flag & (mode | FPIPE)) != (mode | FPIPE) ||
+	    !fp->f_inode || !fp->f_inode->i_count || !fp->f_inode->i_buf) {
+		u.u_error = SYS_EBADF;
+		return NULL;
+	}
+	return fp->f_inode;
+}
 
-	if (*offset > PIPSIZ || count > PTRDIFF_MAX)
-		return -SYS_EINVAL;
-	u.u_base = (unsigned char *)buf;
-	u.u_count = count;
-	u.u_offset = (ptrdiff_t)*offset;
-	u.u_error = 0;
-	if (flag == B_READ)
-		readi(ip);
-	else
-		writei(ip);
-	result = u.u_error ? -u.u_error : (ptrdiff_t)(count - u.u_count);
-	*offset = (size_t)u.u_offset;
-	u.u_base = saved_base;
-	u.u_count = saved_count;
-	u.u_offset = saved_offset;
-	u.u_error = saved_error;
-	return result;
+/* Sleep with kernel lock held and preserve originating user state */
+static void pipe_sleep(struct wait_chan *chan, enum wait_reason reason)
+{
+	int result;
+
+	if (!u.u_procp || !u.u_procp->p_backend) {
+		u.u_error = SYS_EAGAIN;
+		return;
+	}
+	result = sched_sleep(chan, reason);
+	if (result < 0)
+		u.u_error = -result;
 }

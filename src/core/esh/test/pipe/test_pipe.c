@@ -28,6 +28,9 @@ struct write_arg {
 	size_t count;
 	int fd;
 	ptrdiff_t result;
+	size_t remaining;
+	ptrdiff_t transferred;
+	int error;
 };
 
 struct read_arg {
@@ -153,6 +156,9 @@ static void write_entry(void *arg)
 
 	writer = arg;
 	writer->result = sys_write(writer->fd, writer->data, writer->count);
+	writer->remaining = u.u_count;
+	writer->transferred = u.u_r.r_val1;
+	writer->error = u.u_error;
 	CHECK(sys_close(writer->fd) == 0);
 }
 
@@ -303,6 +309,8 @@ static void test_blocking_transfer(void)
 	CHECK(procs[1].p_state == PROC_WAIT_READ);
 	CHECK(run_scheduler(procs, 2) == 0);
 	CHECK(writer.result == TEST_DATA_SIZE);
+	CHECK(writer.remaining == 0 && writer.transferred == TEST_DATA_SIZE);
+	CHECK(writer.error == 0);
 	CHECK(reader.result == 0);
 	CHECK(reader.count == TEST_DATA_SIZE);
 	CHECK(!memcmp(source, result, sizeof(source)));
@@ -366,11 +374,15 @@ static void test_writer_close_wakeup(void)
 	CHECK(sched_prepare(&procs[0], write_entry, &writer) == 0);
 	CHECK(sched_resume(&procs[0]) == 0);
 	CHECK(procs[0].p_state == PROC_WAIT_WRITE);
+	CHECK(procs_user[0].u_count == 1);
+	CHECK(procs_user[0].u_base == data + PIPSIZ);
 	kernel_lock();
 	CHECK(fd_close(&procs[1], read_fd) == 0);
 	kernel_unlock();
 	CHECK(run_scheduler(&procs[0], 1) == 0);
 	CHECK(writer.result == -SYS_EPIPE);
+	CHECK(writer.remaining == 1 && writer.transferred == PIPSIZ);
+	CHECK(writer.error == SYS_EPIPE);
 	sched_release(&procs[0]);
 	CHECK(file_in_use() == 0);
 	CHECK(pipe_in_use() == 0);

@@ -18,32 +18,16 @@ extern "C" {
 #error "NBUF must be at least NINODE"
 #endif
 
-enum pipe_io_result {
-	PIPE_IO_PROGRESS,
-	PIPE_IO_WAIT_READ,
-	PIPE_IO_WAIT_WRITE,
-	PIPE_IO_EOF,
-	PIPE_IO_BROKEN,
-	PIPE_IO_ERROR
-};
-
-struct pipe_io_status {
-	enum pipe_io_result io_result;
-	ptrdiff_t io_count;
-	int io_error;
-};
-
 struct file;
 struct inode;
 struct proc;
 
 int pipe_for_proc(struct proc *proc, int fd[2]);
 void pipe_create(void);
-ptrdiff_t readp(struct proc *proc, struct file *fp, void *buf,
-		size_t count);
-ptrdiff_t writep(struct proc *proc, struct file *fp, const void *buf,
-		 size_t count);
-int plock(struct inode *ip);
+/* Current user carries transfer state; caller holds kernel lock */
+void readp(struct file *fp);
+void writep(struct file *fp);
+void plock(struct inode *ip);
 void prele(struct inode *ip);
 size_t pipe_in_use(void);
 

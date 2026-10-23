@@ -45,7 +45,6 @@ STATIC_ASSERT(SYS_EIO == 10, "I/O error value");
 STATIC_ASSERT(RAM_MAJOR == 1U, "RAM major");
 STATIC_ASSERT(RAM_NDEV == 2U, "RAM device count");
 STATIC_ASSERT(RAM_NBLK == 16UL, "RAM block count");
-STATIC_ASSERT(PIPE_IO_PROGRESS == 0, "Pipe I/O result base");
 STATIC_ASSERT(sizeof(((struct user *)0)->u_ofile) /
 	      sizeof(((struct user *)0)->u_ofile[0]) == NOFILE,
 	      "Descriptor count");

@@ -1,6 +1,6 @@
 # sys pipe sleep・wakeup
 
-更新日: 2026-10-23
+更新日: 2026-10-24
 
 ## 役割
 
@@ -81,6 +81,9 @@ sleep/wakeupでuserを初期化しない。`u_base/u_count/u_offset`と`u_r`も
 各userに保持し、別procやhostの転送状態と分離する。fd tableは`p_addr->u_ofile[]`にあり、
 `u_procp`は所有procを指す。currentなしのbase userでは`u_procp`はNULLとなる。
 専用userはbackendのrelease/join完了まで生存させる。
+pipe待機へ入る前に`u_count`を全要求の残量へ戻す。復帰後はinode条件を再検査し、
+別procのcloseでEPIPE/EOFになった場合も、実際の転送済み状態を保持する。
+plockの競合やsched_sleepの失敗は`u_error`へ記録し、取得していないlockは解放しない。
 
 `sched_release()`はprocessをwait listから外し、backend handleをkernel lock外で
 解放する。thread join中にworkerがlockを必要とするため、lock内でjoinしない。

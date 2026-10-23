@@ -1,6 +1,6 @@
 # sys file・fd・pipeコア
 
-更新日: 2026-10-23
+更新日: 2026-10-24
 
 ## 役割
 
@@ -68,14 +68,9 @@ file割当は`falloc_for_user()`、inode割当は`ialloc_error()`を共有する
 
 ## Pipe I/O
 
-内部結果は次を区別する。
-
-- `PIPE_IO_PROGRESS`: 1 byte以上転送、またはzero-length操作
-- `PIPE_IO_WAIT_READ`: dataが空でwriterが存在する
-- `PIPE_IO_WAIT_WRITE`: `i_size == PIPSIZ`でreaderが存在する
-- `PIPE_IO_EOF`: dataが空でwriterが存在しない
-- `PIPE_IO_BROKEN`: readerが存在しない
-- `PIPE_IO_ERROR`: 不正fd、方向違反、不正引数
+`readp(fp)`と`writep(fp)`はcurrent userの転送状態を使うvoid APIで、
+内部status構造体や負の戻り値を使わない。失敗は正の`u_error`、EOFは残量を減らさず
+errorなしで返す。`plock(ip)`もvoidとなり、失敗時に取得していないlockを解放しない。
 
 `readi(ip)`と`writei(ip)`はcurrent userの`u_base/u_count/u_offset`を使う。
 `readi()`は`u_offset`から`i_size`まで、`writei()`は`PIPSIZ`まで転送する。
@@ -84,19 +79,21 @@ file割当は`falloc_for_user()`、inode割当は`ialloc_error()`を共有する
 負のoffset、範囲外のinode size/offset、不正pointer・残量・方向・offset加算overflowは
 EINVALとなり、転送状態を変更しない。ゼロ長ではpointer演算しない。
 
-Step 4では`pipe_inode_io()`が旧形式のpipe I/Oと新inode I/Oを接続する。
-current userの転送状態とerrorを保存し、一回のinode転送を実行して結果を旧形式へ戻し、
-保存した状態を復元する。fd・u_r・current自体は変更しない。Step 5で削除する一時helper。
+Step 4の一時helperは削除済みであり、pipeからinode I/Oへ同じuserを引き継ぐ。
+writepは全要求の残量をローカルに保持し、各区間を`PIPSIZ - i_size`以下に制限する。
+区間後は未着手分を含む残量をu_countへ戻してからlockを解放する。
+途中エラー・待機脱出でもbaseは実際の転送分だけ進み、全要求の残量を保持する。
 全data読取後のread offsetと`i_size`の0への復帰は`readp()`が行い、
 `writep()`は追記位置として`i_size`を使う。
 未読dataが残る間はbuffer先頭へ回り込まない。
 
-`readp()`は現在取得可能なdataを返す。`writep()`は要求全体を完了するまで部分
-転送と待機を繰り返す。backend未設定processで待機が必要な場合は
-`-SYS_EAGAIN`、またはすでに転送済みのbyte数を返す。
+`readp()`は現在取得可能なdataを転送し、`writep()`は要求全体を完了するまで部分
+転送と待機を繰り返す。backendなしで空/fullならEAGAINとするが、writeが転送後に
+fullへ到達した場合だけ短い成功を維持する。inode lock競合やsleep失敗は、
+転送済み量があってもエラーとなる。
 
 最終writer close後もbuffer内のdataを読み出せる。その後のreadは0を返す。
-reader不在時のwriteは`-SYS_EPIPE`を返し、signalは発生させない。
+reader不在時のwriteはu_errorをEPIPEとし、公開APIは`-SYS_EPIPE`を返す。signalは発生させない。
 
 ## 排他制御
 
@@ -123,7 +120,9 @@ base userを使う。Windows thread backendではbase userもTLSで分離する�
 
 `struct user`は`u_error`、`ptrdiff_t`型2個の結果領域`u_r`、
 所有procへの`u_procp`、fd tableの`u_ofile[]`、転送用`u_base/u_count/u_offset`を保持する。
-inode I/Oはuserへ移行済み。pipe I/Oとsys2の全面移行はStep 5で実施する。
+inode/pipe I/Oとsys2はuserへ移行済みで、公開read/writeは開始時に状態を準備する。
+終了時の`u_r.r_val1`は要求量-u_count。途中エラー時も診断用の転送量を保持するが、
+外部戻り値は負のerrorを優先する。close/pipeの入口でもerror/resultを準備する。
 buffer I/Oの呼出元は操作前に`u.u_error = 0`とし、操作後にerrorを確認する。
 成功時の`geterror()`は以前のerrorを消さない。pipeの公開APIは従来どおり転送量
 または負の`SYS_E*`を返す。RAM APIの詳細は[RAM block I/O](ram_block_device.md)参照。

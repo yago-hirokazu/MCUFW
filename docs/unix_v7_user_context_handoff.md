@@ -1,6 +1,6 @@
 # UNIX V7 user 構造体導入 引き継ぎ書
 
-## 現行コードとの差分（2026-10-23）
+## 現行コードとの差分（2026-10-24）
 
 Step 0 の確定事項は [Step 0 設計決定](unix_v7_user_context_step0.md) を参照する。
 後続実装では同文書の API・型・エラー契約と、下記の現行実装を基準とする。
@@ -20,17 +20,17 @@ Step 0 の確定事項は [Step 0 設計決定](unix_v7_user_context_step0.md) �
 | buffer error | geterror()が正のerrorをu_errorへ設定。成功時は以前の値を保持 |
 | fd table | proc.p_addr->u_ofile[]へ移行 |
 | inode I/O | readi/writei/iomoveがcurrent userの転送状態を更新 |
-| pipe I/O | 明示引数を維持し、一時pipe_inode_ioでinode I/Oへ変換 |
-| 公開sys API | 転送量または負のSYS_E*を返す契約を維持 |
+| pipe I/O | readp/writep/plockがcurrent userを使い、同じ状態でinode I/O・待機 |
+| 公開sys API | error/resultとread/write状態を準備し、残量から結果を計算。errorを優先 |
 | file/pipe作成 | current APIと管理APIを分離。結果はu_r、失敗はu_error |
-| 後続の移行 | readp/writep/plock/sys2をStep 5でuser形式へ変更 |
+| 後続の検証 | Step 6～7でerror・寿命・資源再利用と全回帰を検証 |
 
 src/core/sys/test/schedにはsleep/wakeup前後とhost/worker間のerror分離、
 thread backendのbase user分離を確認する試験がある。
 src/core/esh/test/pipeline_execには単一commandのcurrent設定・復元・user再初期化の
-試験がある。Step 2～4の変更内容と試験結果は末尾の作業記録を参照する。
+試験がある。Step 2～5の変更内容と試験結果は末尾の作業記録を参照する。
 
-後続作業はStep 5のpipe I/O・sys2移行から着手する。導入済みの基盤を再実装しない。
+後続作業はStep 6のerror・寿命・資源再利用の整合確認から着手する。導入済みの基盤を再実装しない。
 [pipe core](pipe_core.md)、[scheduler](pipe_sched.md)、[RAM I/O](ram_block_device.md)参照。
 
 作成日: 2026-10-20
@@ -285,7 +285,7 @@ scheduler をリンクしていない。current user のスタブ等を追加す
 | 2 | `p_ofile` を `u_ofile` へ移し、executor と管理 helper を更新 | 接続・close・再利用と参照数が正常 | done |
 | 3 | `fio.c` を V7 型へ移行し、pipe 作成経路を適合 | fd/file 枯渇と途中失敗が漏れなく復旧 | done |
 | 4 | `rdwri.c` と `iomove()` に user 状態を導入 | 転送量・残量・offset・容量境界が正常 | done |
-| 5 | pipe 転送と `sys2.c` を V7 型へ移行 | 待機・部分転送・EOF・EPIPE が正常 | pending |
+| 5 | pipe 転送と `sys2.c` を V7 型へ移行 | 待機・部分転送・EOF・EPIPE が正常 | done |
 | 6 | inode/bio エラー、終了・unwind・再利用を整合 | 他 user の状態破壊と資源漏れがない | pending |
 | 7 | 全回帰・文書更新・生成物 clean | 両 backend の動作と差分を記録 | pending |
 
@@ -547,3 +547,66 @@ Windows本体は一時OUTDIR/TARGETでビルドし、対話コンソールで`sa
 
 Step 4完了。次はStep 5のreadp/writep/plock/sys2の一括移行と、一時bridgeの削除。
 一時スクリプトを削除し、生成したd/o/exeの清掃と`git diff --check`を確認した。
+
+
+## Step 5 作業記録
+
+実施日: 2026-10-23
+
+V7のsys/pipe.cとsys/sys2.cを基準にreadp/writep/plockをvoidのcurrent用APIへ
+移行した。u_base/u_count/u_offsetをinode I/Oへ直接引き継ぎ、同じuserとstackで
+待機・復帰する。procからの参照は従来どおり`struct user *p_addr`を維持する。
+`pipe_io_status`、PIPE_IO_*、一回転送用helperとStep 4の`pipe_inode_io`を削除した。
+
+writepはV7型のローカル残量と区間転送を使い、各区間を空き容量以下に制限する。
+実際に書いた量だけ残量を減らし、未着手分を含むu_countを復元してからlockを解放する。
+baseはコピー済み量だけ進め、offsetは現在のinode位置を表す。途中エラーでも
+転送済み状態は戻さない。backendなしで部分転送後にfullとなる短い成功だけ維持し、
+lock競合、sleep失敗、EPIPEでの短い成功には一般化しない。
+
+plockは失敗を正のu_errorへ記録する。callerは失敗時にpreleを呼ばない。
+pipeの空/fullではinode lockを解放して待機し、復帰後に再検査する。
+backendなしの待機はEAGAIN、sched_sleepの失敗は従来のエラーへ変換する。
+
+sys2の共通rdwrは入口でerror/resultとbase/count/offsetを初期化する。
+count 0なら他の引数を検査せず成功。正のcountではNULL/PTRDIFF_MAX、fd/方向の順に
+検査する。終了時は要求量-u_countをu_r.r_val1へ設定し、エラーがあれば負の戻り値を
+優先する。sys_closeもerror/resultを準備する。公開シグネチャは維持する。
+
+pipe/scheduler単体試験は実際のsys_read/write/closeを使うように更新し、Makefileへ
+sys2を追加した。esh側のscheduler試験入口も同じソースを使うためリンクを更新した。
+mock sleepでpeer readを行う試験は公開sys APIへ再入せず、呼出し元I/O状態を保持する。
+旧bridgeを期待する試験は、公開API終了時の残量・結果・error確認へ更新した。
+
+追加試験はゼロ長/巨大要求/currentなし、backendなしの短いwrite、EOF、
+部分転送後のsleep失敗・lock競合、他者のlockを解放しないことを確認する。
+両backendの試験ではwrite中の残量とbase、全量転送後の結果、および部分転送後の
+reader closeでEPIPEと転送済み量を返すことも確認する。
+
+### Step 5 検証結果
+
+検証完了日: 2026-10-24
+
+MSYS2 MINGW64 shellから試験を実行した。途中で実行セッションが終了したため、
+完了結果のないpipeline executor以降の試験とWindows本体を再開した。
+試験の制限時間と判定条件は変更していない。
+
+| 試験 | 構成 | 結果 |
+|---|---|---|
+| sys header | C/C++、単独/順序入替え、O0/O2 | passed |
+| sys file/pipe | O0/O2、部分エラー時の残量・lock保持を含む | passed |
+| sys scheduler | cortn/thread、O0/O2、既定/NBUF=3 | passed |
+| esh pipe | cortn/thread、O0/O2 | passed |
+| pipeline executor | cortn/thread、O0/O2、既存30秒制限 | passed |
+| esh exe | 既存10スクリプト | passed |
+| parser | run_test1.sh、run_test2.sh | passed |
+| Windows本体 | cortn/thread、sam1・sam2・sam3 | passed |
+
+Windows本体は一時OUTDIR/TARGETでビルドし、両backendの対話コンソールで
+`sam1`、`sam2 1 10 100`、`sam3 -a -b string`を実行した。
+`sample1 applet`、`arg1=1`、`arg2=10`、`arg3=0x00000064`、
+`-a option`、`-b option with string`を確認し、Ctrl-Dで正常終了した。
+
+Step 5完了。次はStep 6のinode/bioエラーと終了・unwind・再利用の整合確認。
+各試験のmake clean後、一時スクリプトを削除した。生成したd/o/exeの残存なし、
+旧pipe statusと一時bridgeのソース残存なし、`git diff --check`正常を確認した。

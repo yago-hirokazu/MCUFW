@@ -24,7 +24,6 @@
 	} while (0)
 
 static int failures;
-static struct proc *hook_proc;
 static struct file *hook_file;
 static struct inode *hook_inode;
 static ptrdiff_t hook_result;
@@ -52,6 +51,9 @@ static void test_rdwri_validation(void);
 static void test_iomove(void);
 static void test_resource_rollback(void);
 static void test_pipe_user_results(void);
+static void test_public_transfer_state(void);
+static void test_partial_failures(void);
+static void fail_lock_hook(struct wait_chan *chan, enum wait_reason reason);
 
 /* Prepare file for explicit test owner */
 static struct file *allocate_file(struct proc *proc, int *fd)
@@ -82,6 +84,8 @@ int main(void)
 	test_iomove();
 	test_resource_rollback();
 	test_pipe_user_results();
+	test_public_transfer_state();
+	test_partial_failures();
 	if (failures) {
 		printf("%d tests failed\n", failures);
 		return 1;
@@ -99,33 +103,21 @@ static void init_proc(struct proc *proc, struct user *user)
 static ptrdiff_t call_read(struct proc *proc, int fd, void *buf,
 			   size_t count)
 {
-	ptrdiff_t result;
-
-	kernel_lock();
-	result = readp(proc, getf_for_proc(proc, fd), buf, count);
-	kernel_unlock();
-	return result;
+	CHECK(current_proc() == proc);
+	return sys_read(fd, buf, count);
 }
 
 static ptrdiff_t call_write(struct proc *proc, int fd, const void *buf,
 			    size_t count)
 {
-	ptrdiff_t result;
-
-	kernel_lock();
-	result = writep(proc, getf_for_proc(proc, fd), buf, count);
-	kernel_unlock();
-	return result;
+	CHECK(current_proc() == proc);
+	return sys_write(fd, buf, count);
 }
 
 static int call_close(struct proc *proc, int fd)
 {
-	int result;
-
-	kernel_lock();
-	result = fd_close(proc, fd);
-	kernel_unlock();
-	return result;
+	CHECK(current_proc() == proc);
+	return sys_close(fd);
 }
 
 static void call_close_all(struct proc *proc)
@@ -158,14 +150,29 @@ static void supply_read_hook(struct wait_chan *chan,
 	u.u_error = error;
 }
 
+/* Simulate peer read while retaining suspended writer state */
 static void drain_write_hook(struct wait_chan *chan,
 			     enum wait_reason reason)
 {
 	unsigned char data[PIPSIZ];
+	unsigned char *base = u.u_base;
+	size_t count = u.u_count;
+	ptrdiff_t offset = u.u_offset;
+	int error = u.u_error;
 
 	(void)chan;
 	(void)reason;
-	hook_result = readp(hook_proc, hook_file, data, sizeof(data));
+	u.u_base = data;
+	u.u_count = sizeof(data);
+	u.u_offset = 0;
+	u.u_error = 0;
+	readp(hook_file);
+	hook_result = u.u_error ? -u.u_error :
+		      (ptrdiff_t)(sizeof(data) - u.u_count);
+	u.u_base = base;
+	u.u_count = count;
+	u.u_offset = offset;
+	u.u_error = error;
 }
 
 static void unlock_hook(struct wait_chan *chan, enum wait_reason reason)
@@ -186,8 +193,8 @@ static void test_zero_length_and_validation(void)
 	finit();
 	init_proc(&proc, &proc_user);
 	sched_stub_reset(&proc);
-	CHECK(readp(NULL, NULL, NULL, 0) == 0);
-	CHECK(writep(NULL, NULL, NULL, 0) == 0);
+	CHECK(sys_read(NOFILE, NULL, 0) == 0);
+	CHECK(sys_write(NOFILE, NULL, 0) == 0);
 	sched_stub_reset(NULL);
 	CHECK(sys_pipe(fd) == -SYS_EINVAL);
 	CHECK(file_in_use() == 0);
@@ -198,7 +205,7 @@ static void test_zero_length_and_validation(void)
 	CHECK(call_write(&proc, fd[1], NULL, 1) == -SYS_EINVAL);
 	CHECK(call_read(&proc, fd[1], &data, 1) == -SYS_EBADF);
 	CHECK(call_write(&proc, fd[0], &data, 1) == -SYS_EBADF);
-	CHECK(call_read(&proc, NOFILE, &data, 1) == -SYS_EINVAL);
+	CHECK(call_read(&proc, NOFILE, &data, 1) == -SYS_EBADF);
 	call_close_all(&proc);
 }
 
@@ -252,13 +259,14 @@ static void test_create_and_data_path(void)
 	CHECK(ip->i_size == 0);
 	CHECK(sched_stub_wakeup_count(&ip->i_read_chan) >= 2);
 	CHECK(sched_stub_wakeup_count(&ip->i_write_chan) >= 1);
-	CHECK(u.u_base == (unsigned char *)data && u.u_count == 123);
-	CHECK(u.u_offset == 77 && u.u_error == SYS_EIO);
-	CHECK(u.u_r.r_val1 == 71 && u.u_r.r_val2 == 72);
+	CHECK(u.u_base == (unsigned char *)data + 2 && u.u_count == 0);
+	CHECK(u.u_offset == 4 && u.u_error == 0);
+	CHECK(u.u_r.r_val1 == 2 && u.u_r.r_val2 == 0);
 	ip->i_size = PIPSIZ + 1;
 	CHECK(call_read(&proc, fd[0], data, 1) == -SYS_EINVAL);
-	CHECK(u.u_base == (unsigned char *)data && u.u_count == 123);
-	CHECK(u.u_offset == 77 && u.u_error == SYS_EIO);
+	CHECK(u.u_base == (unsigned char *)data && u.u_count == 1);
+	CHECK(u.u_offset == 0 && u.u_error == SYS_EINVAL);
+	CHECK(u.u_r.r_val1 == 0 && u.u_r.r_val2 == 0);
 	ip->i_size = 0;
 	call_close_all(&proc);
 	CHECK(file_in_use() == 0);
@@ -359,7 +367,6 @@ static void test_wait_rechecks(void)
 
 	memset(data, 0x5a, sizeof(data));
 	CHECK(call_write(&proc, fd[1], data, sizeof(data)) == PIPSIZ);
-	hook_proc = &proc;
 	hook_file = rf;
 	hook_result = -1;
 	sched_stub_set_sleep_hook(drain_write_hook);
@@ -388,7 +395,8 @@ static void test_pipe_lock(void)
 	ip->i_flag |= ILOCK;
 	sched_stub_set_sleep_hook(unlock_hook);
 	kernel_lock();
-	CHECK(plock(ip) == 0);
+	plock(ip);
+	CHECK(u.u_error == 0);
 	CHECK(ip->i_flag & ILOCK);
 	CHECK(!(ip->i_flag & IWANT));
 	CHECK(sched_stub_last_reason() == WAIT_LOCK);
@@ -778,4 +786,135 @@ static void test_pipe_user_results(void)
 	CHECK(sys_pipe(fd) == -SYS_EINVAL);
 	CHECK(fd[0] == -10 && fd[1] == -20);
 	u.u_error = 0;
+}
+
+/* Verify public entry validation and whole-request results */
+static void test_public_transfer_state(void)
+{
+	static const unsigned char source[] = "read-only source";
+	unsigned char input[PIPSIZ + 44] = { 0 };
+	unsigned char output[PIPSIZ + 44];
+	struct proc proc;
+	struct user proc_user;
+	int fd[2];
+
+	binit();
+	finit();
+	sched_stub_reset(NULL);
+	u.u_error = SYS_EIO;
+	u.u_r.r_val1 = 123;
+	u.u_r.r_val2 = 456;
+	CHECK(sys_read(NOFILE, NULL, 0) == 0);
+	CHECK(u.u_error == 0 && u.u_count == 0 && u.u_base == NULL);
+	CHECK(u.u_r.r_val1 == 0 && u.u_r.r_val2 == 0 && u.u_offset == 0);
+	CHECK(sys_write(NOFILE, NULL, 0) == 0);
+	CHECK(sys_read(NOFILE, NULL, 1) == -SYS_EINVAL);
+	CHECK(u.u_count == 1 && u.u_r.r_val1 == 0);
+	CHECK(sys_write(NOFILE, input, (size_t)PTRDIFF_MAX + 1) ==
+	      -SYS_EINVAL);
+	CHECK(u.u_count == (size_t)PTRDIFF_MAX + 1 && u.u_r.r_val1 == 0);
+	CHECK(sys_read(NOFILE, output, 1) == -SYS_EBADF);
+	CHECK(sys_close(NOFILE) == -SYS_EINVAL);
+	CHECK(u.u_error == SYS_EINVAL && u.u_r.r_val1 == 0);
+	proc_init(&proc, &proc_user);
+	sched_stub_reset(&proc);
+	CHECK(sys_pipe(fd) == 0);
+	CHECK(sys_read(fd[0], output, 1) == -SYS_EAGAIN);
+	CHECK(u.u_error == SYS_EAGAIN && u.u_count == 1);
+	CHECK(u.u_base == output && u.u_r.r_val1 == 0);
+	memset(input, 0xa5, sizeof(input));
+	CHECK(sys_write(fd[1], input, sizeof(input)) == PIPSIZ);
+	CHECK(u.u_error == 0 && u.u_count == 44 && u.u_offset == PIPSIZ);
+	CHECK(u.u_base == input + PIPSIZ && u.u_r.r_val1 == PIPSIZ);
+	CHECK(sys_write(fd[1], input + PIPSIZ, 44) == -SYS_EAGAIN);
+	CHECK(u.u_count == 44 && u.u_r.r_val1 == 0);
+	CHECK(sys_read(fd[0], output, sizeof(output)) == PIPSIZ);
+	CHECK(u.u_count == 44 && u.u_offset == PIPSIZ);
+	CHECK(u.u_base == output + PIPSIZ && u.u_r.r_val1 == PIPSIZ);
+	CHECK(!memcmp(input, output, PIPSIZ));
+	CHECK(sys_write(fd[1], source, sizeof(source)) ==
+	      (ptrdiff_t)sizeof(source));
+	CHECK(u.u_count == 0 && u.u_base == source + sizeof(source));
+	CHECK(sys_read(fd[0], output, sizeof(output)) ==
+	      (ptrdiff_t)sizeof(source));
+	CHECK(u.u_count == sizeof(output) - sizeof(source));
+	CHECK(!memcmp(output, source, sizeof(source)));
+	CHECK(sys_close(fd[1]) == 0);
+	CHECK(u.u_error == 0 && u.u_r.r_val1 == 0 && u.u_r.r_val2 == 0);
+	CHECK(sys_read(fd[0], output, 1) == 0);
+	CHECK(u.u_count == 1 && u.u_r.r_val1 == 0 && u.u_base == output);
+	CHECK(sys_close(fd[0]) == 0);
+	sched_stub_reset(NULL);
+}
+
+/* Simulate lock conflict after writer has already filled pipe */
+static void fail_lock_hook(struct wait_chan *chan, enum wait_reason reason)
+{
+	CHECK(reason == WAIT_WRITE);
+	drain_write_hook(chan, reason);
+	hook_inode->i_flag |= ILOCK;
+	current_proc()->p_backend = NULL;
+}
+
+/* Preserve partial progress on sleep failure and later lock failure */
+static void test_partial_failures(void)
+{
+	unsigned char data[PIPSIZ + 44];
+	struct proc proc;
+	struct user proc_user;
+	struct inode *ip;
+	int fd[2];
+
+	memset(data, 0x5a, sizeof(data));
+	binit();
+	finit();
+	proc_init(&proc, &proc_user);
+	proc.p_backend = &proc;
+	sched_stub_reset(&proc);
+	CHECK(sys_pipe(fd) == 0);
+	ip = getf_for_proc(&proc, fd[0])->f_inode;
+	sched_stub_set_sleep_result(-SYS_EINVAL);
+	CHECK(sys_write(fd[1], data, sizeof(data)) == -SYS_EINVAL);
+	CHECK(u.u_count == 44 && u.u_r.r_val1 == PIPSIZ);
+	CHECK(u.u_base == data + PIPSIZ && u.u_offset == PIPSIZ);
+	CHECK(u.u_error == SYS_EINVAL && !(ip->i_flag & ILOCK));
+	CHECK(ip->i_size == PIPSIZ);
+	CHECK(!memcmp(ip->i_buf->b_addr, data, PIPSIZ));
+	call_close_all(&proc);
+
+	binit();
+	finit();
+	proc_init(&proc, &proc_user);
+	proc.p_backend = &proc;
+	sched_stub_reset(&proc);
+	CHECK(sys_pipe(fd) == 0);
+	hook_file = getf_for_proc(&proc, fd[0]);
+	hook_inode = hook_file->f_inode;
+	sched_stub_set_sleep_hook(fail_lock_hook);
+	CHECK(sys_write(fd[1], data, sizeof(data)) == -SYS_EAGAIN);
+	CHECK(u.u_error == SYS_EAGAIN && u.u_count == 44);
+	CHECK(u.u_r.r_val1 == PIPSIZ && u.u_base == data + PIPSIZ);
+	CHECK(hook_inode->i_flag & ILOCK);
+	kernel_lock();
+	prele(hook_inode);
+	kernel_unlock();
+	call_close_all(&proc);
+
+	binit();
+	finit();
+	proc_init(&proc, &proc_user);
+	proc.p_backend = &proc;
+	sched_stub_reset(&proc);
+	CHECK(sys_pipe(fd) == 0);
+	ip = getf_for_proc(&proc, fd[0])->f_inode;
+	ip->i_flag |= ILOCK;
+	sched_stub_set_sleep_result(-SYS_EINVAL);
+	CHECK(sys_read(fd[0], data, 1) == -SYS_EINVAL);
+	CHECK(u.u_error == SYS_EINVAL && u.u_count == 1);
+	CHECK(u.u_r.r_val1 == 0 && (ip->i_flag & ILOCK));
+	kernel_lock();
+	prele(ip);
+	kernel_unlock();
+	call_close_all(&proc);
+	sched_stub_reset(NULL);
 }

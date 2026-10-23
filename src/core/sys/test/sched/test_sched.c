@@ -193,38 +193,17 @@ int main(void)
 
 static ptrdiff_t proc_read(int fd, void *buf, size_t count)
 {
-	struct proc *proc;
-	ptrdiff_t result;
-
-	kernel_lock();
-	proc = current_proc();
-	result = readp(proc, getf_for_proc(proc, fd), buf, count);
-	kernel_unlock();
-	return result;
+	return sys_read(fd, buf, count);
 }
 
 static ptrdiff_t proc_write(int fd, const void *buf, size_t count)
 {
-	struct proc *proc;
-	ptrdiff_t result;
-
-	kernel_lock();
-	proc = current_proc();
-	result = writep(proc, getf_for_proc(proc, fd), buf, count);
-	kernel_unlock();
-	return result;
+	return sys_write(fd, buf, count);
 }
 
 static int proc_close(int fd)
 {
-	struct proc *proc;
-	int result;
-
-	kernel_lock();
-	proc = current_proc();
-	result = fd_close(proc, fd);
-	kernel_unlock();
-	return result;
+	return sys_close(fd);
 }
 
 static void close_all_locked(struct proc *proc)
@@ -650,8 +629,13 @@ static void make_full_pipes(struct proc *owner, int pipes[NINODE][2])
 	for (i = 0; i < NINODE; i++) {
 		CHECK(pipe_for_proc(owner, pipes[i]) == 0);
 		marker = (unsigned char)(0x30 + i);
-		CHECK(writep(owner, getf_for_proc(owner, pipes[i][1]),
-			     &marker, 1) == 1);
+		u.u_base = &marker;
+		u.u_count = 1;
+		u.u_offset = 0;
+		u.u_error = 0;
+		writep(getf_for_proc(owner, pipes[i][1]));
+		CHECK(u.u_error == 0 && u.u_count == 0);
+		u.u_base = NULL;
 	}
 	CHECK(pipe_in_use() == NINODE);
 	CHECK(file_in_use() == NINODE * 2);
@@ -664,8 +648,13 @@ static void drain_full_pipes(struct proc *owner, int pipes[NINODE][2])
 
 	for (i = 0; i < NINODE; i++) {
 		marker = 0;
-		CHECK(readp(owner, getf_for_proc(owner, pipes[i][0]),
-			    &marker, 1) == 1);
+		u.u_base = &marker;
+		u.u_count = 1;
+		u.u_offset = 0;
+		u.u_error = 0;
+		readp(getf_for_proc(owner, pipes[i][0]));
+		CHECK(u.u_error == 0 && u.u_count == 0);
+		u.u_base = NULL;
 		CHECK(marker == (unsigned char)(0x30 + i));
 	}
 	close_all(owner);

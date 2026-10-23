@@ -1,6 +1,6 @@
 # sys pipe移行回帰試験
 
-更新日: 2026-10-23
+更新日: 2026-10-24
 
 現行の試験入口と回帰点を示す。user移行Step 2の実行結果は
 [引き継ぎ書](unix_v7_user_context_handoff.md)を参照する。
@@ -211,3 +211,14 @@ par、exe、cquote、Windows本体も使用したdirectoryでmake cleanを実行
 - 内部成功時のerror保持と、inode I/Oがu_rを変更しないこと
 - Step 4の一時pipe bridgeによる転送状態/errorの保存・復元
 - user初期化・再利用、両backendのsleep/wakeup前後、hostとの転送状態分離
+
+## User移行 Step 5の検証項目
+
+- 公開read/writeの状態初期化、ゼロ長、NULL、PTRDIFF_MAX、fd/方向の検証順
+- current procなしのread/write=EBADF、pipe/close=EINVAL
+- 要求量-u_countによるu_r.r_val1、失敗時の診断用転送量の保持
+- backendなしの部分write後fullは短い成功、初期fullはEAGAIN
+- 部分write後のsleep失敗・lock競合はエラー優先、全要求残量とbaseを保持
+- 取得できなかったinode lockをpreleしない
+- 両backendで部分write後のreader closeはEPIPE、残量・転送量を保持
+- 旧pipe status構造体とStep 4の一時bridgeがソースに残らない

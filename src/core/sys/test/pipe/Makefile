@@ -9,6 +9,7 @@ CFLAGS += -I../../h
 CFLAGS += -I../stub
 
 OBJS = $(OUTDIR)/test_pipe.o
+OBJS += $(OUTDIR)/sys2.o
 OBJS += $(OUTDIR)/pipe.o
 OBJS += $(OUTDIR)/rdwri.o
 OBJS += $(OUTDIR)/fio.o
@@ -31,6 +32,9 @@ $(OUTDIR):
 	mkdir -p $(OUTDIR)
 
 $(OUTDIR)/test_pipe.o: test_pipe.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OUTDIR)/sys2.o: ../../sys/sys2.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OUTDIR)/pipe.o: ../../sys/pipe.c

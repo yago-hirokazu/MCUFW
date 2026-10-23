@@ -1,6 +1,6 @@
 # sys pipe API・データモデル
 
-更新日: 2026-10-23
+更新日: 2026-10-24
 
 ## 対象範囲
 
@@ -66,8 +66,12 @@ current用内部APIは`getf(fd)`、`ufalloc()`、`falloc()`、`pipe_create()`。
 失敗は正の`u_error`、fd結果は`u_r.r_val1/r_val2`で受け渡す。
 inode用内部APIは`readi(ip)`、`writei(ip)`、`iomove(cp, count, flag)`で、
 current userの`u_base/u_count/u_offset`を更新する。宣言は`inode.h`に置く。
-内部成功では以前のerrorを消さない。`sys_pipe()`は入口でerror/resultを初期化し、
-成功時だけfd配列へコピーする。
+pipe用内部APIは`void readp(fp)`、`void writep(fp)`、`void plock(ip)`で、
+転送・待機・失敗を同じuserに保持する。失敗時のlockにはpreleを呼ばない。
+内部ではerrorを消さず、公開sys APIの入口でerror/resultを初期化する。
+read/writeはbase/count/offsetも初期化し、終了時に要求量から残量を引いて
+`u_r.r_val1`へ設定する。失敗時も転送済み量は保持し、戻り値はerrorを優先する。
+`sys_pipe()`は成功時だけfd配列へコピーする。
 
 - 作成とcloseは成功時0、失敗時は負の`SYS_E*`を返す
 - read/writeは転送byte数、EOFの0、または負の`SYS_E*`を返す
@@ -79,8 +83,12 @@ current userの`u_base/u_count/u_offset`を更新する。宣言は`inode.h`に�
 - 最終writer close後は残存dataを読み切ってからEOFを返す
 - reader不在時のwriteは`-SYS_EPIPE`を返し、signalは発生させない
 
-内部pipe処理は`PIPE_IO_*`で進行、read待ち、write待ち、EOF、broken pipe、
-errorを区別する。`sys_read()`と`sys_write()`が待機と再試行を隠す。
+`readp()`と`writep()`がinode条件を再検査し、必要ならschedulerで待機する。
+待機・再開をまたいでbase/count/offsetを保持し、`u_count`は全要求の残量となる。
+count 0はcurrent procも検査しない。正のcountでNULLまたはPTRDIFF_MAX超ならEINVAL、
+その後にfdと方向を検査する。current procなしのread/writeはEBADF、pipe/closeはEINVAL。
+backendなしでwriteが途中まで進んでfullになった場合だけ、短い成功を返す。
+EPIPE・lock競合・sleep失敗は途中まで転送していても負のerrorを返す。
 
 ## Pipe data位置
 
@@ -118,7 +126,7 @@ pipeline全体の終了statusは最後のcommandのstatusとする。途中comma
 ## V7との差分
 
 - trapとMMU user copyは使わない。`u`は`(*current_user())`マクロである
-- fdとpipe I/Oはcurrent processまたは明示引数を使う。fd tableはuserに置く
+- 通常のfd/pipe I/Oはcurrent userを使い、別procのfd管理は明示引数を使う
 - pipeはdevice strategyを呼ばない。別用途のRAM block I/Oはstrategyを使う
 - inodeはdirectoryやmodeを持たず、pipeに必要なstateだけを持つ
 - buffer cacheはRAM block I/Oと共有し、pipe当たり1 blockに固定する

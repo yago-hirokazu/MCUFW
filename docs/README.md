@@ -1,6 +1,6 @@
 # MCUFW 文書案内
 
-更新日: 2026-10-23
+更新日: 2026-10-24
 
 現行ソースに基づく仕様と、過去の依頼・作業記録を案内する。
 user移行の段階別の実装・試験結果は
@@ -26,8 +26,8 @@ user移行の段階別の実装・試験結果は
 既定cache数は5、pipeは最大3本、pipelineは最大4段である。
 `struct proc.p_addr`で専用userを参照し、userは`u_error`、`u_r`、`u_procp`、`u_ofile[]`、
 `u_base/u_count/u_offset`を持つ。
-fd table、file割当・pipe作成の結果、inode I/Oはuserへ移行済み。
-pipe I/O引数とsys2の全面移行はStep 5で実施する。
+fd table、file割当・pipe作成の結果、inode/pipe I/Oとsys2はuserへ移行済み。
+後続Stepではerror・寿命・資源再利用と全回帰を検証する。
 
 ## 作業記録・計画
 
