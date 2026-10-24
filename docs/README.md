@@ -44,6 +44,7 @@ Step 7の全回帰と最終文書確認も完了し、user導入計画の全Step
 - [Coroutine移動・初期化分離](cortn_finit_refactoring_handoff.md)
 - [RAM device導入](unix_v7_ram_block_device_handoff.md)
 - [User導入計画と実装済み範囲](unix_v7_user_context_handoff.md)
+- [V7 proc構造体整合計画・引き継ぎ](unix_v7_proc_alignment_handoff.md)
 - 過去の依頼: [10-11](request_2026-10-11.md)、[10-12](request_2026-10-12.md)、
   [10-14](request_2026-10-14.md)、[10-20](request_2026-10-20.md)
 - [引用変数の不具合記録](issue_2026-09-26_001.md)、[開発ログ](log.md)
