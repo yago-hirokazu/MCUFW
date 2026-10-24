@@ -2,7 +2,7 @@
 
 更新日: 2026-10-24
 
-現行の試験入口と回帰点を示す。user移行Step 2の実行結果は
+現行の試験入口と回帰点を示す。user移行各Stepの実行結果は
 [引き継ぎ書](unix_v7_user_context_handoff.md)を参照する。
 過去のwarning・sanitizer記録は末尾を参照する。
 
@@ -79,7 +79,9 @@ lock外でbackendをreleaseまたはjoinする。
 - proc_init(proc, user)はp_addrを設定し、sleep/wakeupでuserを保持する
 - 単一commandもcurrent procを設定・復元し、専用userで動作する
 - host/worker、thread backendのcurrentなしnative thread間でerrorを分離する
-- fd tableはuser.u_ofile[]に移行済み。buffer/count/offsetは明示引数のまま
+- fd tableはuser.u_ofile[]、内部I/Oの位置・残量はu_base/u_count/u_offsetに保持する
+- 公開read/writeの引数からuser状態を準備し、要求量-u_countをu_r.r_val1へ設定する
+- 途中エラー時も転送済み状態を保持し、公開戻り値はerrorを優先する
 - 同一fd番号の分離、別procへのfd受渡し、close後の参照数と再利用を確認する
 - u_procpの初期化・再利用、sleep/wakeup前後のfd tableと所有procを確認する
 
@@ -154,19 +156,20 @@ console自動試験は4段、while/if、変数と引用変数、数値command su
 - pipe stdinへ`scanf`を使用できない
 - STM32/Cortex-M/RTOS移植は未着手
 
-## 過去のwarning記録（今回未再確認）
+## 既存warning（2026-10-24再確認）
 
-以下は2026-10-13時点の記録。strictなsys、pipe、scheduler、coroutine suiteには
-warningがなかった。pipeline、
-executor、Windows targetの広いbuildには移行前から次が残る。
+user移行Step 7の全回帰で確認した。strictなsys、pipe、scheduler、coroutine suiteは
+warningなしで通過した。pipeline、executor等の広いbuildには次が残る。
 
 - `help.c`: 未使用`argc`、`argv`
-- `lex.c`: 未使用static関数、`snprintf`/`strncpy`切詰め警告
+- `lex.c`: 未使用static関数、`snprintf`/`strncpy`切詰め、過剰format引数
 - `par.c`: `char`型array subscript
-- `test.c`: 未使用static関数
+- `test.c`: 未使用static関数、過剰format引数
 
-これらはgeneric sys移行による新規warningではない。試験中に出るlexer/parser
-error表示はerror pathを確認する意図された診断で、当時のsuiteは成功した。
+これらのソースは今回のuser移行で変更していない。試験中に出るlexer/parserの
+error表示は異常系を確認する意図された診断であり、全suiteは成功した。
+cquoteは既存の出力表示型試験を実行し、正常終了を確認した。assert/golden照合を
+備える他suiteとは判定方法が異なる。
 
 ## 試験後のclean
 
@@ -209,7 +212,7 @@ par、exe、cquote、Windows本体も使用したdirectoryでmake cleanを実行
 - iomoveのB_READ/B_WRITE、読取専用source、コピー領域の前後guard
 - 残量不足、無効方向、PTRDIFF_MAX境界と加算overflow、ゼロ長NULL
 - 内部成功時のerror保持と、inode I/Oがu_rを変更しないこと
-- Step 4の一時pipe bridgeによる転送状態/errorの保存・復元
+- 当時の一時pipe bridgeによる転送状態/errorの保存・復元（Step 5で削除済み）
 - user初期化・再利用、両backendのsleep/wakeup前後、hostとの転送状態分離
 
 ## User移行 Step 5の検証項目

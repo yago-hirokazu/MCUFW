@@ -28,7 +28,7 @@ user移行の段階別の実装・試験結果は
 `u_base/u_count/u_offset`を持つ。
 fd table、file割当・pipe作成の結果、inode/pipe I/Oとsys2はuserへ移行済み。
 Step 6でinode/bioのerror分離、終了・unwind・join後の資源再利用を検証した。
-後続Step 7では全回帰と最終文書を確認する。
+Step 7の全回帰と最終文書確認も完了し、user導入計画の全Stepは完了した。
 
 ## 作業記録・計画
 

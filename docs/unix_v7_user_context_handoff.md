@@ -3,7 +3,8 @@
 ## 現行コードとの差分（2026-10-24）
 
 Step 0 の確定事項は [Step 0 設計決定](unix_v7_user_context_step0.md) を参照する。
-後続実装では同文書の API・型・エラー契約と、下記の現行実装を基準とする。
+同文書の API・型・エラー契約に従うuser移行はStep 7まで完了した。
+今後の変更では下記の現行実装と末尾の完了記録を基準とする。
 以下の全面移行計画に残る「設計のみ」「全Step pending」「グローバルu」は
 2026-10-20 作成時点の記述であり、現在の状態を示さない。
 
@@ -24,14 +25,14 @@ Step 0 の確定事項は [Step 0 設計決定](unix_v7_user_context_step0.md) �
 | 公開sys API | error/resultとread/write状態を準備し、残量から結果を計算。errorを優先 |
 | file/pipe作成 | current APIと管理APIを分離。結果はu_r、失敗はu_error |
 | error・寿命・再利用 | Step 6でinode/bioと終了・unwind・join・再利用を検証 |
-| 後続の検証 | Step 7で全回帰と最終文書を確認 |
+| 最終検証 | Step 7で全回帰と最終文書を確認済み |
 
 src/core/sys/test/schedにはsleep/wakeup前後とhost/worker間のerror分離、
 thread backendのbase user分離を確認する試験がある。
 src/core/esh/test/pipeline_execには単一commandのcurrent設定・復元・user再初期化の
-試験がある。Step 2～6の変更内容と試験結果は末尾の作業記録を参照する。
+試験がある。Step 2～7の変更内容と試験結果は末尾の作業記録を参照する。
 
-後続作業はStep 7の全回帰・最終文書確認から着手する。導入済みの基盤を再実装しない。
+user移行の未完Stepはない。導入済みの基盤を再実装しない。
 [pipe core](pipe_core.md)、[scheduler](pipe_sched.md)、[RAM I/O](ram_block_device.md)参照。
 
 作成日: 2026-10-20
@@ -288,7 +289,7 @@ scheduler をリンクしていない。current user のスタブ等を追加す
 | 4 | `rdwri.c` と `iomove()` に user 状態を導入 | 転送量・残量・offset・容量境界が正常 | done |
 | 5 | pipe 転送と `sys2.c` を V7 型へ移行 | 待機・部分転送・EOF・EPIPE が正常 | done |
 | 6 | inode/bio エラー、終了・unwind・再利用を整合 | 他 user の状態破壊と資源漏れがない | done |
-| 7 | 全回帰・文書更新・生成物 clean | 両 backend の動作と差分を記録 | pending |
+| 7 | 全回帰・文書更新・生成物 clean | 両 backend の動作と差分を記録 | done |
 
 Step 間はビルド可能な状態を保つ。Step 3～5 は呼出し関係が連動するため、
 必要なら一時的な変換 helper を使うか、まとまった変更単位にする。
@@ -671,3 +672,75 @@ Windows本体は一時OUTDIR/TARGETでビルドし、両backendの対話コン�
 `-a option`、`-b option with string`を確認し、Ctrl-Dで終了した。
 
 Step 6完了。次はStep 7の全回帰・最終文書確認。各試験のmake cleanは正常終了した。
+
+
+## Step 7 作業記録
+
+実施日: 2026-10-24
+
+開始時HEAD: `fb1d22f`。本体・テストのCソースとビルド定義は変更せず、
+既存の試験入口を使って最終回帰を行った。Step 0の設計決定は変更していない。
+
+最終文書確認で、回帰ガイドの「buffer/count/offsetは明示引数のまま」という
+旧説明をuser経由の内部I/Oと公開APIでの初期化・結果変換へ更新した。
+Step 4の一時bridgeの試験記録は当時の記録と明記し、削除済みであることを示した。
+coroutine/threadガイドは転送状態・結果領域の保持、停止・join後の再初期化条件を
+補足した。ソースにはp_ofile、pipe_io_status、PIPE_IO_*、pipe_inode_ioが残っていない。
+
+### V7との最終対応
+
+| V7の仕組み | MCUFWの実装・制約 |
+|---|---|
+| proc.p_addrがswappable imageの配置を示す | struct user *p_addrで専用userを直接参照。MMU・swap・p_sizeは追加しない |
+| process切替で同じuアドレスに各userを対応させる | current procを切り替え、uマクロ/current_user()がp_addrを選択。userをコピーしない |
+| u_ofile、u_error、u_r、I/O状態をcurrent userで渡す | file・inode・pipeが同じuserを使用。別procのfd管理は明示APIで状態を保持 |
+| trap入口と出口で要求準備とerror/result変換を行う | 公開sys APIで準備し、要求量-u_countを結果へ設定。errorを優先 |
+| inode経由のpipe dataとsleep/wakeup | pipeごとに1固定buffer。容量を超えず転送し、同じuserとstackで待機・再開 |
+| process終了時のfd/inode解放 | close/wakeup後にbackendをrelease。threadのunwind・join完了までuserを保持 |
+
+disk、通常ファイル、trap、signal、MMU、CPU preemption、STM32固有context switchは
+今回の完了範囲に含めない。ゼロ長要求の検証順、部分転送時のerror優先と
+backendなしfull時の短い成功はStep 0で決定したMCUFWの契約を維持する。
+
+### Step 7 検証結果
+
+MSYS2 MINGW64 shellで全試験を実行した。各run_test.shのO0/O2、backend、
+小容量構成を変更せず、既存の30秒制限も維持した。
+
+| 試験 | 構成 | 結果 |
+|---|---|---|
+| sys header | C/C++、単独include・順序入替え、O0/O2 | passed |
+| sys table/bdev/ramdisk/bio/file/pipe | 各O0/O2 | passed |
+| sys scheduler | cortn/thread、O0/O2、既定/NBUF=3 | passed |
+| esh coroutine | O0/O2、guard・watermark・ABI保存 | passed |
+| esh pipe/scheduler | 各cortn/thread、O0/O2 | passed |
+| pipeline executor | cortn/thread、O0/O2、既存30秒制限 | passed |
+| pipeline構文 | O0/O2 | passed |
+| esh exe | 既存10スクリプト | passed |
+| parser | run_test1.sh、run_test2.sh | passed |
+| cquote | 既存5ケースの出力型試験 | 正常終了 |
+| Windows本体 | cortn/thread、サンプル・pipe・変数展開 | passed |
+
+Windows本体は一時OUTDIR/TARGETでビルドし、両backendで次を実行した。
+
+```sh
+sam1
+sam2 1 10 100
+sam3 -a -b string
+echo hello|cat
+echo four|cat|cat|cat
+k=3
+echo "$k"|cat
+```
+
+sample1、引数値1/10/0x00000064、option出力、hello、four、3を確認した。
+両backendともCtrl-Dで正常終了した。
+
+strict suiteはwarningなし。広いshell buildでは未変更のhelp.c、lex.c、par.c、
+test.cに未使用・切詰め・char添字・過剰format引数の既存警告が残る。
+文法異常系の意図された診断も含めてsuiteは成功した。cquoteは既存の出力型試験であり、
+自動assert/golden照合の追加は行っていない。詳細は[回帰ガイド](pipe_regression.md)参照。
+
+Step 7完了。user導入計画のStep 0～7はすべて完了した。
+各試験のmake cleanは正常終了し、一時スクリプトを削除した。生成したd/o/exeの
+残存なし、`git diff --check`正常を確認した。既存の未追跡ファイルは変更していない。

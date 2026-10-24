@@ -1,6 +1,6 @@
 # Windows thread scheduler backend
 
-更新日: 2026-10-22
+更新日: 2026-10-24
 
 ## Backend選択
 
@@ -60,6 +60,9 @@ pipeとinode lockはwake後に条件を再検査する。
 releaseとjoinはkernel lock外で行う。workerがI/Oをunwindしてfdを閉じるために
 同じlockを必要とするからである。file/inode/buffer tableを初期化する前に全thread
 を終了させる。
+userもrelease完了まで保持する。releaseはuserをゼロ化せず、停止したworkerは
+元のp_addrで残量とerror/resultを確定する。全fd解放とjoinの完了後、proc_initで
+procとuserを再初期化する。sleep/wakeup中もu_base/u_count/u_offsetとu_rを保持する。
 
 ## 試験
 

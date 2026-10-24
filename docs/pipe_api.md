@@ -125,6 +125,7 @@ pipeline全体の終了statusは最後のcommandのstatusとする。途中comma
 
 ## V7との差分
 
+- V7のp_addrはswappable imageの配置を表す。MCUFWは同名のstruct user *で直接参照する
 - trapとMMU user copyは使わない。`u`は`(*current_user())`マクロである
 - 通常のfd/pipe I/Oはcurrent userを使い、別procのfd管理は明示引数を使う
 - pipeはdevice strategyを呼ばない。別用途のRAM block I/Oはstrategyを使う

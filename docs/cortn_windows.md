@@ -1,6 +1,6 @@
 # Windows stackful coroutine
 
-更新日: 2026-10-22
+更新日: 2026-10-24
 
 ## 役割
 
@@ -100,4 +100,6 @@ coroutine/thread双方で確認する。
 
 専用userはcoroutine slotではなくprocの所有者が保持し、p_addrで参照する。
 current_user()はcurrent procからuserを選び、currentなしではbackend base userを
-使う。yield/wakeupではu_errorを初期化せず、backend release完了までuserを保持する。
+使う。yield/wakeupではerror/result・u_base/u_count/u_offsetを初期化せず、
+backend release完了までuserを保持する。待機中のreleaseはstackを破棄し、継続処理を
+実行しない。再利用時は全fd解放とreleaseの後にproc_initする。
