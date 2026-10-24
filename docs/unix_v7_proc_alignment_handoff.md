@@ -9,7 +9,10 @@
 ユーザーの依頼は、現在の MCUFW の `struct proc` の変数名と役割を、
 可能な限り UNIX V7 に合わせ、無理なく組み込むことである。
 本書は別タスクから実装を継続できるよう、設計方針、順序、検証条件を整理する。
-本書作成時点では計画のみ。下記 Step 0～5 の実装・検証は未着手である。
+Step 0 の設計確定は完了した。Step 1～5 の実装・検証は未着手である。
+状態・寿命・異常の確定契約は
+[Step 0 設計決定](unix_v7_proc_alignment_step0.md)を参照する。
+以下の「現在の実装」は移行前のソースを示し、確定契約の実装完了を意味しない。
 実装を依頼された後続タスクは、各 Step の確認・実装・検証・記録を進める。
 通常の設計具体化を、追加のユーザー承認待ちとして扱う必要はない。
 
@@ -37,6 +40,7 @@
 - [回帰試験](pipe_regression.md)
 - [User 導入引き継ぎ書](unix_v7_user_context_handoff.md)
 - [User 導入の設計決定](unix_v7_user_context_step0.md)
+- [Proc 整合 Step 0 設計決定](unix_v7_proc_alignment_step0.md)
 
 V7 調査には `.agents/skills/ancient_unix/SKILL.md` を使う。
 原典の基準ディレクトリは次のとおり。
@@ -144,8 +148,9 @@ struct proc {
 | PROC_ERROR | MCUFW 拡張として維持 | backend などの実行異常 |
 
 V7 の値 SSLEEP=1、SRUN=3、SIDL=4、SZOMB=5 を踏襲する。
-PROC_ERROR の値は Step 0 で明記する。未使用の 7 を候補とし、
-V7 の SWAIT=2 や SSTOP=6 を異常状態へ転用しない。
+PROC_ERROR=7 と確定した。V7 の SWAIT=2 や SSTOP=6 を異常状態へ転用しない。
+回復可能な操作失敗は SRUN へ戻し、PROC_ERROR は継続不能・取消の状態とする。
+通常 return や古い backend 報告で PROC_ERROR を上書きしない。
 状態 0 を有効な初期化済み proc とみなさず、proc_init を必要とする。
 proc table や空き slot 管理を新設する計画ではない。
 
@@ -190,7 +195,7 @@ file/inode/buffer-cache の基本構造、I/O のエラー契約、shell 文法�
 
 | Step | 内容 | 状態 |
 |---|---|---|
-| 0 | 状態・寿命・異常の契約を確定 | pending |
+| 0 | 状態・寿命・異常の契約を確定 | complete |
 | 1 | メンバ改名と proc.h 分離 | pending |
 | 2 | scheduler/backend/executor の状態統合 | pending |
 | 3 | 直接実行・管理用 proc・解放処理の整合 | pending |
@@ -199,7 +204,8 @@ file/inode/buffer-cache の基本構造、I/O のエラー契約、shell 文法�
 
 ### Step 0: 状態・寿命・異常の契約
 
-本書、現行コード、V7 原典を照合し、次を本書へ追記する。
+完了。契約の詳細と出典は[Step 0 設計決定](unix_v7_proc_alignment_step0.md)に記載した。
+本書、現行コード、V7 原典を照合し、次を確定した。
 
 - 状態値と、各遷移を更新する関数・lock 条件
 - SIDL の管理専用 proc と、SRUN の backend なし直接実行の扱い
@@ -215,6 +221,9 @@ entry が戻った後に PROC_FINISHED になることを確認している。
 
 完了条件: 通常・待機・異常・解放について、状態と資源の寿命を説明できる。
 この Step で決定した内容を以後の実装・試験の基準とする。
+回復可能な yield 失敗では、従来の一時的な PROC_ERROR を SRUN 復帰へ変更する。
+fatal/cancel の PROC_ERROR は保持し、thread の通常 return で消さない。
+これらは Step 2 の実装対象であり、Step 0 ではコードを変更していない。
 
 ### Step 1: メンバ改名とヘッダ整理
 
@@ -264,6 +273,8 @@ SIDL -- prepare/bind --> SRUN -- command completion --> SZOMB
 - executor は SRUN を実行候補、SZOMB を完了として数える
 - 起床後の SRUN を古い backend 報告で上書きしない
 - PROC_RUNNING の削除で失われる検査がないか、全参照箇所を確認する
+- 回復可能な待機失敗は SRUN に戻し、fatal/cancel は通常完了で上書きしない
+- 未完了 backend の release は PROC_ERROR を切離しと同じ lock 内で公開する
 
 完了条件: 両 backend の scheduler/pipe/pipeline executor 試験が通る。
 待機理由の詳細は引数・backend・試験用記録で確認し、p_stat から推測しない。
@@ -384,3 +395,18 @@ file/inode/buffer-cache の基本設計変更は必要ない見込みである�
 
 2026-10-24: 本書を作成。Step 0～5 は全て pending。
 計画用のソース確認のみ実施。本書作成に伴う本体変更・試験実行はなし。
+
+### Step 0 完了記録
+
+- 実施日: 2026-10-24
+- 開始 HEAD: `81d3fab`
+- 状態: complete。Step 1～5 は pending
+- 確定契約: [Step 0 設計決定](unix_v7_proc_alignment_step0.md)
+- 状態値: SSLEEP=1、SRUN=3、SIDL=4、SZOMB=5、PROC_ERROR=7
+- 回復可能な操作失敗、backend fatal、通常 return、取消を区別した
+- 状態更新担当・lock 条件、backend 報告の優先規則、p_ret の有効性を確定した
+- release 中の PROC_ERROR 保持と、unwind/join 完了後の再利用条件を確定した
+- V7 原典、現行 scheduler/backend/executor、関連試験をソースで照合した
+- 文書のみ変更。実行試験なし、生成物なし、make clean 対象なし
+- 次の着手点: Step 1 のメンバ改名と proc.h 分離。状態分類はまだ変更しない
+- 本記録時点は未コミット。対象は本書、Step 0 設計決定、docs/README.md
