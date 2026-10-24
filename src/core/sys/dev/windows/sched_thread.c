@@ -171,7 +171,7 @@ enum proc_state sched_backend_resume(struct proc *proc)
 			return PROC_ERROR;
 		}
 	}
-	state = proc->p_state;
+	state = proc->p_stat;
 	kernel_unlock();
 	return state;
 }
@@ -201,7 +201,7 @@ static unsigned __stdcall sched_thread_entry(void *arg)
 		kernel_unlock();
 		slot->ts_entry(slot->ts_arg);
 		kernel_lock();
-		slot->ts_proc->p_state = PROC_FINISHED;
+		slot->ts_proc->p_stat = PROC_FINISHED;
 	}
 	slot->ts_done = 1;
 	slot->ts_run = 0;

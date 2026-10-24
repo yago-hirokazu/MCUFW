@@ -9,7 +9,9 @@
 #include "file.h"
 #include "sys_error.h"
 #include "param.h"
+#include "proc.h"
 #else
+#include "proc.h"
 #include "param.h"
 #include "sys_error.h"
 #include "conf.h"

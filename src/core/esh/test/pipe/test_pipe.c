@@ -130,13 +130,13 @@ static int run_scheduler(struct proc *procs, int count)
 		finished = 0;
 		progress = 0;
 		for (i = 0; i < count; i++) {
-			if (procs[i].p_state == PROC_FINISHED) {
+			if (procs[i].p_stat == PROC_FINISHED) {
 				finished++;
 				continue;
 			}
-			if (procs[i].p_state == PROC_ERROR)
+			if (procs[i].p_stat == PROC_ERROR)
 				return -1;
-			if (procs[i].p_state != PROC_RUNNABLE)
+			if (procs[i].p_stat != PROC_RUNNABLE)
 				continue;
 			if (sched_resume(&procs[i]) < 0)
 				return -1;
@@ -306,7 +306,7 @@ static void test_blocking_transfer(void)
 	CHECK(sched_prepare(&procs[0], write_entry, &writer) == 0);
 	CHECK(sched_prepare(&procs[1], read_entry, &reader) == 0);
 	CHECK(sched_resume(&procs[1]) == 0);
-	CHECK(procs[1].p_state == PROC_WAIT_READ);
+	CHECK(procs[1].p_stat == PROC_WAIT_READ);
 	CHECK(run_scheduler(procs, 2) == 0);
 	CHECK(writer.result == TEST_DATA_SIZE);
 	CHECK(writer.remaining == 0 && writer.transferred == TEST_DATA_SIZE);
@@ -341,7 +341,7 @@ static void test_reader_close_wakeup(void)
 	reader.result = -1;
 	CHECK(sched_prepare(&procs[1], read_entry, &reader) == 0);
 	CHECK(sched_resume(&procs[1]) == 0);
-	CHECK(procs[1].p_state == PROC_WAIT_READ);
+	CHECK(procs[1].p_stat == PROC_WAIT_READ);
 	kernel_lock();
 	CHECK(fd_close(&procs[0], write_fd) == 0);
 	kernel_unlock();
@@ -373,7 +373,7 @@ static void test_writer_close_wakeup(void)
 	writer.result = -1;
 	CHECK(sched_prepare(&procs[0], write_entry, &writer) == 0);
 	CHECK(sched_resume(&procs[0]) == 0);
-	CHECK(procs[0].p_state == PROC_WAIT_WRITE);
+	CHECK(procs[0].p_stat == PROC_WAIT_WRITE);
 	CHECK(procs_user[0].u_count == 1);
 	CHECK(procs_user[0].u_base == data + PIPSIZ);
 	kernel_lock();

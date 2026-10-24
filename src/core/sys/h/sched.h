@@ -8,35 +8,12 @@ extern "C" {
 #endif /* __cplusplus */
 
 #include "param.h"
-
-enum proc_state {
-	PROC_NEW,
-	PROC_RUNNABLE,
-	PROC_RUNNING,
-	PROC_WAIT_LOCK,
-	PROC_WAIT_READ,
-	PROC_WAIT_WRITE,
-	PROC_FINISHED,
-	PROC_ERROR
-};
+#include "proc.h"
 
 enum wait_reason {
 	WAIT_LOCK,
 	WAIT_READ,
 	WAIT_WRITE
-};
-
-struct user;
-struct wait_chan;
-
-/* Portable execution state embedded in executor process */
-struct proc {
-	enum proc_state p_state;
-	struct user *p_addr;	/* Dedicated user area owned by caller */
-	struct wait_chan *p_wait_chan;
-	struct proc *p_wait_next;
-	void *p_xctx;		/* eXecution ConTeXt owned by backend */
-	int p_ret;		/* Command function return value */
 };
 
 /* Channel storage belongs to waiting object; scheduler manages list */

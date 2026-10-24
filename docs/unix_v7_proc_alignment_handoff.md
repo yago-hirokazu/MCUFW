@@ -1,6 +1,7 @@
 # UNIX V7 proc 構造体整合 引き継ぎ書
 
-作成日・更新日: 2026-10-24
+作成日: 2026-10-24
+更新日: 2026-10-25
 対象: `C:\usr\src\MCUFW`
 計画作成時 HEAD: `82b7617` (`Rename proc members to p_xctx and p_ret`)
 
@@ -9,10 +10,12 @@
 ユーザーの依頼は、現在の MCUFW の `struct proc` の変数名と役割を、
 可能な限り UNIX V7 に合わせ、無理なく組み込むことである。
 本書は別タスクから実装を継続できるよう、設計方針、順序、検証条件を整理する。
-Step 0 の設計確定は完了した。Step 1～5 の実装・検証は未着手である。
+Step 0 の設計確定と Step 1 のメンバ改名・ヘッダ分離は完了した。
+Step 2～5 は未着手である。次は Step 2 の状態統合を進める。
 状態・寿命・異常の確定契約は
 [Step 0 設計決定](unix_v7_proc_alignment_step0.md)を参照する。
-以下の「現在の実装」は移行前のソースを示し、確定契約の実装完了を意味しない。
+以下の「現在の実装」はメンバ改名後のソースを示す。
+状態分類・異常契約の移行は未実装であり、確定契約の実装完了を意味しない。
 実装を依頼された後続タスクは、各 Step の確認・実装・検証・記録を進める。
 通常の設計具体化を、追加のユーザー承認待ちとして扱う必要はない。
 
@@ -81,14 +84,15 @@ src/target/windows/libMPSSE_i2c.dll
 
 ## 現在の実装
 
-`src/core/sys/h/sched.h` が次の定義を持つ。
+`src/core/sys/h/proc.h` が次の定義を持つ。
+`sched.h` は `proc.h` を include するため、既存利用者も同じ型を参照できる。
 
 ```c
 struct proc {
-	enum proc_state p_state;
+	enum proc_state p_stat;
 	struct user *p_addr;
-	struct wait_chan *p_wait_chan;
-	struct proc *p_wait_next;
+	struct wait_chan *p_wchan;
+	struct proc *p_link;
 	void *p_xctx;
 	int p_ret;
 };
@@ -110,7 +114,7 @@ struct proc {
 
 ## 目標とする構成
 
-| 現在 | 移行先 | 意味 |
+| 移行開始時 | 移行先 | 意味 |
 |---|---|---|
 | `p_state` | `p_stat` | プロセス状態 |
 | `p_wait_chan` | `p_wchan` | 待機対象 |
@@ -132,7 +136,7 @@ struct proc {
 };
 ```
 
-`h/proc.h` を新設し、構造体と状態定義を移すことを推奨する。
+`h/proc.h` を新設し、構造体と既存状態定義を移した。
 `sched.h` は `proc.h` を include し、scheduler API、wait_reason、wait_chan を持つ。
 `proc.h` は user/wait_chan を前方宣言し、循環 include を避ける。
 既存利用者の include を一斉に変更する必要はない。
@@ -196,7 +200,7 @@ file/inode/buffer-cache の基本構造、I/O のエラー契約、shell 文法�
 | Step | 内容 | 状態 |
 |---|---|---|
 | 0 | 状態・寿命・異常の契約を確定 | complete |
-| 1 | メンバ改名と proc.h 分離 | pending |
+| 1 | メンバ改名と proc.h 分離 | complete |
 | 2 | scheduler/backend/executor の状態統合 | pending |
 | 3 | 直接実行・管理用 proc・解放処理の整合 | pending |
 | 4 | 状態遷移と異常系の集中検証 | pending |
@@ -227,6 +231,7 @@ fatal/cancel の PROC_ERROR は保持し、thread の通常 return で消さな�
 
 ### Step 1: メンバ改名とヘッダ整理
 
+完了。実装・試験結果は末尾の Step 1 完了記録を参照する。
 p_state→p_stat、p_wait_chan→p_wchan、p_wait_next→p_link を一括更新する。
 proc.h に proc と既存状態定義を移し、この段階では PROC_* の分類を維持する。
 本体、stub、試験、現行文書の参照を更新する。
@@ -410,3 +415,41 @@ file/inode/buffer-cache の基本設計変更は必要ない見込みである�
 - 文書のみ変更。実行試験なし、生成物なし、make clean 対象なし
 - 次の着手点: Step 1 のメンバ改名と proc.h 分離。状態分類はまだ変更しない
 - 本記録時点は未コミット。対象は本書、Step 0 設計決定、docs/README.md
+
+### Step 1 完了記録
+
+- 実施日: 2026-10-25
+- 開始 HEAD: `6f79b0e`。Step 0 は同コミットで保存済み
+- 状態: complete。Step 2～5 は pending
+- p_state/p_wait_chan/p_wait_next を p_stat/p_wchan/p_link へ改名した
+- h/proc.h に struct proc と既存 enum proc_state を移した
+- sched.h から proc.h を include し、既存利用者の include 互換を維持した
+- user/wait_chan は proc.h 内で前方宣言し、循環 include を導入していない
+- 本体、stub、試験、現行文書の参照と、header 試験の include 対象を更新した
+- enum proc_state の定義は移行前と同一。状態分類・値・異常契約は未変更
+- header 分離と header 試験以外の C ソース差分は、メンバ名置換のみと照合した
+
+MSYS2 MINGW64 shell で既存 run_test.sh を実行した。
+
+| 試験 | 構成 | 結果 |
+|---|---|---|
+| sys header | 単独 include・順序入替え、C/C++、O0/O2、proc.h 追加 | passed |
+| sys file/pipe | 各 O0/O2、stub 経由の初期化・待機を含む | passed |
+| sys scheduler | cortn/thread、O0/O2、既定/NBUF=3 | passed |
+| esh pipe/scheduler | 各 cortn/thread、O0/O2 | passed |
+| pipeline executor | cortn/thread、O0/O2、既存 timeout 維持 | passed |
+
+strict suite は warning なし。pipeline executor の広い shell build には、
+未変更の help.c、lex.c、par.c、test.c の既存 warning が残る。
+文法異常系の意図された診断を含めて全 suite は成功した。
+Step 5 の全回帰や Windows 本体の対話試験は今回の実施範囲ではない。
+
+各構成の make clean は正常終了した。生成した d/o/exe の残存なし、
+旧メンバ参照のソース残存なし、git diff --check 正常を確認した。
+一時実行 script と log は削除した。既存未追跡ファイルは変更していない。
+
+次の着手点は Step 2。Step 0 設計決定に従い、状態統合と回復可能な失敗の
+SRUN 復帰、fatal/cancel の保持を両 backend・executor と一緒に実装する。
+現在はまだ従来の PROC_* 状態分類と一時的な PROC_ERROR 動作である。
+本記録時点は未コミット。対象は proc.h、改名した本体/stub/試験、header 試験、
+本書、pipe_sched.md、proc Step 0 文書、user 引き継ぎ書である。

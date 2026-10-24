@@ -274,13 +274,13 @@ static int run_scheduler(struct proc *procs, int count)
 		finished = 0;
 		progress = 0;
 		for (i = 0; i < count; i++) {
-			if (procs[i].p_state == PROC_FINISHED) {
+			if (procs[i].p_stat == PROC_FINISHED) {
 				finished++;
 				continue;
 			}
-			if (procs[i].p_state == PROC_ERROR)
+			if (procs[i].p_stat == PROC_ERROR)
 				return -1;
-			if (procs[i].p_state != PROC_RUNNABLE)
+			if (procs[i].p_stat != PROC_RUNNABLE)
 				continue;
 			if (sched_resume(&procs[i]) < 0)
 				return -1;
@@ -371,7 +371,7 @@ static void test_blocking_transfer(void)
 	CHECK(sched_prepare(&procs[0], writer_entry, &writer) == 0);
 	CHECK(sched_prepare(&procs[1], reader_entry, &reader) == 0);
 	CHECK(sched_resume(&procs[1]) == 0);
-	CHECK(procs[1].p_state == PROC_WAIT_READ);
+	CHECK(procs[1].p_stat == PROC_WAIT_READ);
 	CHECK(run_scheduler(procs, 2) == 0);
 	CHECK(writer.result == TEST_DATA_SIZE);
 	CHECK(reader.last_result == 0);
@@ -420,7 +420,7 @@ static void test_wait_lock(void)
 	reader.last_result = -1;
 	CHECK(sched_prepare(&sleeper, reader_entry, &reader) == 0);
 	CHECK(sched_resume(&sleeper) == 0);
-	CHECK(sleeper.p_state == PROC_WAIT_LOCK);
+	CHECK(sleeper.p_stat == PROC_WAIT_LOCK);
 	kernel_lock();
 	prele(ip);
 	kernel_unlock();
@@ -448,7 +448,7 @@ static void test_multiple_waiters(void)
 		wait[i].lock_held = 0;
 		CHECK(sched_prepare(&procs[i], wait_entry, &wait[i]) == 0);
 		CHECK(sched_resume(&procs[i]) == 0);
-		CHECK(procs[i].p_state == PROC_WAIT_READ);
+		CHECK(procs[i].p_stat == PROC_WAIT_READ);
 	}
 	kernel_lock();
 	sched_wakeup(&chan);
@@ -476,7 +476,7 @@ static void test_release_waiter(void)
 	wait.reason = WAIT_WRITE;
 	CHECK(sched_prepare(&proc, wait_entry, &wait) == 0);
 	CHECK(sched_resume(&proc) == 0);
-	CHECK(proc.p_state == PROC_WAIT_WRITE);
+	CHECK(proc.p_stat == PROC_WAIT_WRITE);
 	sched_release(&proc);
 	CHECK(proc.p_xctx == NULL);
 	CHECK(chan.wc_head == NULL);
@@ -499,7 +499,7 @@ static void test_wake_then_release(void)
 	kernel_lock();
 	sched_wakeup(&chan);
 	kernel_unlock();
-	CHECK(proc.p_state == PROC_RUNNABLE);
+	CHECK(proc.p_stat == PROC_RUNNABLE);
 	sched_release(&proc);
 	CHECK(proc.p_xctx == NULL);
 	CHECK(chan.wc_head == NULL);
@@ -523,9 +523,9 @@ static void test_yield_failure_cleanup(void)
 	CHECK(sched_resume(&proc) == 0);
 	CHECK(wait.result == -SYS_EINVAL);
 	CHECK(wait.lock_held);
-	CHECK(proc.p_state == PROC_FINISHED);
-	CHECK(proc.p_wait_chan == NULL);
-	CHECK(proc.p_wait_next == NULL);
+	CHECK(proc.p_stat == PROC_FINISHED);
+	CHECK(proc.p_wchan == NULL);
+	CHECK(proc.p_link == NULL);
 	CHECK(chan.wc_head == NULL);
 	CHECK(chan.wc_tail == NULL);
 	sched_release(&proc);
@@ -1043,7 +1043,7 @@ static void test_release_user_io(void)
 		io.fd = fd[write];
 		CHECK(sched_prepare(&proc, release_io_entry, &io) == 0);
 		CHECK(sched_resume(&proc) == 0);
-		CHECK(proc.p_state == (write ? PROC_WAIT_WRITE :
+		CHECK(proc.p_stat == (write ? PROC_WAIT_WRITE :
 						 PROC_WAIT_READ));
 		transferred = write ? PIPSIZ : 0;
 		CHECK(user.u_base == io.data + transferred);
@@ -1054,8 +1054,8 @@ static void test_release_user_io(void)
 		CHECK(user.u_count == sizeof(io.data) - transferred);
 		CHECK(user.u_error == 0);
 		sched_release(&proc);
-		CHECK(proc.p_xctx == NULL && proc.p_wait_chan == NULL);
-		CHECK(proc.p_wait_next == NULL);
+		CHECK(proc.p_xctx == NULL && proc.p_wchan == NULL);
+		CHECK(proc.p_link == NULL);
 		CHECK(proc.p_addr == &user && user.u_procp == &proc);
 		CHECK(user.u_base == io.data + transferred);
 		CHECK(user.u_count == sizeof(io.data) - transferred);

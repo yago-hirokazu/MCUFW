@@ -8,7 +8,8 @@
 
 [引き継ぎ書](unix_v7_proc_alignment_handoff.md)の状態・寿命・異常の契約を確定する。
 本書は移行後の仕様であり、現行コードが実装済みであることを示さない。
-現行の p_state/p_wait_chan/p_wait_next は Step 1 で改名する。
+設計確定時の p_state/p_wait_chan/p_wait_next は Step 1 の改名対象である。
+現在の実装状況は引き継ぎ書の Step 表と作業記録を参照する。
 以下では移行後の名前 p_stat/p_wchan/p_link を使う。
 p_xctx、p_ret、専用 user、固定容量 pool、協調的な実行方式を維持する。
 本書作成では本体・試験コードを変更せず、実行試験も行っていない。

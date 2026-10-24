@@ -51,22 +51,22 @@ int sched_sleep(struct wait_chan *chan, enum wait_reason reason)
 	proc = current_proc();
 	if (!chan || !proc || !proc->p_xctx || !kernel_is_locked())
 		return -SYS_EINVAL;
-	if (proc->p_wait_chan)
+	if (proc->p_wchan)
 		return -SYS_EINVAL;
 
 	if (reason == WAIT_LOCK)
-		proc->p_state = PROC_WAIT_LOCK;
+		proc->p_stat = PROC_WAIT_LOCK;
 	else if (reason == WAIT_READ)
-		proc->p_state = PROC_WAIT_READ;
+		proc->p_stat = PROC_WAIT_READ;
 	else if (reason == WAIT_WRITE)
-		proc->p_state = PROC_WAIT_WRITE;
+		proc->p_stat = PROC_WAIT_WRITE;
 	else
 		return -SYS_EINVAL;
 
-	proc->p_wait_chan = chan;
-	proc->p_wait_next = NULL;
+	proc->p_wchan = chan;
+	proc->p_link = NULL;
 	if (chan->wc_tail)
-		chan->wc_tail->p_wait_next = proc;
+		chan->wc_tail->p_link = proc;
 	else
 		chan->wc_head = proc;
 	chan->wc_tail = proc;
@@ -83,10 +83,10 @@ int sched_sleep(struct wait_chan *chan, enum wait_reason reason)
 #endif
 	if (result != 0) {
 		wait_remove(chan, proc);
-		proc->p_state = PROC_ERROR;
+		proc->p_stat = PROC_ERROR;
 		return -SYS_EINVAL;
 	}
-	proc->p_state = PROC_RUNNING;
+	proc->p_stat = PROC_RUNNING;
 	return 0;
 }
 
@@ -101,13 +101,13 @@ void sched_wakeup(struct wait_chan *chan)
 	chan->wc_head = NULL;
 	chan->wc_tail = NULL;
 	while (proc) {
-		next = proc->p_wait_next;
-		proc->p_wait_chan = NULL;
-		proc->p_wait_next = NULL;
+		next = proc->p_link;
+		proc->p_wchan = NULL;
+		proc->p_link = NULL;
 		if (proc->p_xctx && sched_backend_wake(proc) == 0)
-			proc->p_state = PROC_RUNNABLE;
+			proc->p_stat = PROC_RUNNABLE;
 		else
-			proc->p_state = PROC_ERROR;
+			proc->p_stat = PROC_ERROR;
 		proc = next;
 	}
 }
@@ -137,15 +137,15 @@ void proc_init(struct proc *proc, struct user *user)
 	memset(user, 0, sizeof(*user));
 	proc->p_addr = user;
 	user->u_procp = proc;
-	proc->p_state = PROC_NEW;
+	proc->p_stat = PROC_NEW;
 }
 
 int proc_bind_backend(struct proc *proc, void *backend)
 {
-	if (!proc || !proc->p_addr || !backend || proc->p_state != PROC_NEW)
+	if (!proc || !proc->p_addr || !backend || proc->p_stat != PROC_NEW)
 		return -SYS_EINVAL;
 	proc->p_xctx = backend;
-	proc->p_state = PROC_RUNNABLE;
+	proc->p_stat = PROC_RUNNABLE;
 	return 0;
 }
 
@@ -153,7 +153,7 @@ int sched_prepare(struct proc *proc, void (*entry)(void *arg), void *arg)
 {
 	void *backend;
 
-	if (!proc || !proc->p_addr || !entry || proc->p_state != PROC_NEW)
+	if (!proc || !proc->p_addr || !entry || proc->p_stat != PROC_NEW)
 		return -SYS_EINVAL;
 	backend = sched_backend_prepare(entry, arg);
 	if (!backend)
@@ -173,8 +173,8 @@ void sched_release(struct proc *proc)
 	if (!proc || !proc->p_xctx)
 		return;
 	kernel_lock();
-	if (proc->p_wait_chan)
-		wait_remove(proc->p_wait_chan, proc);
+	if (proc->p_wchan)
+		wait_remove(proc->p_wchan, proc);
 	backend = proc->p_xctx;
 	proc->p_xctx = NULL;
 	kernel_unlock();
@@ -189,18 +189,18 @@ int sched_resume(struct proc *proc)
 	if (!proc || !proc->p_xctx || current_proc())
 		return -SYS_EINVAL;
 	kernel_lock();
-	if (proc->p_state != PROC_RUNNABLE) {
+	if (proc->p_stat != PROC_RUNNABLE) {
 		kernel_unlock();
 		return -SYS_EINVAL;
 	}
 	sched_set_current_proc(proc);
-	proc->p_state = PROC_RUNNING;
+	proc->p_stat = PROC_RUNNING;
 	kernel_unlock();
 	result = sched_backend_resume(proc);
 	sched_set_current_proc(NULL);
 	if (result == PROC_ERROR) {
 		kernel_lock();
-		proc->p_state = PROC_ERROR;
+		proc->p_stat = PROC_ERROR;
 		kernel_unlock();
 		return -SYS_EINVAL;
 	}
@@ -208,7 +208,7 @@ int sched_resume(struct proc *proc)
 	kernel_lock();
 	if (result != PROC_WAIT_LOCK && result != PROC_WAIT_READ &&
 	    result != PROC_WAIT_WRITE)
-		proc->p_state = (enum proc_state)result;
+		proc->p_stat = (enum proc_state)result;
 	kernel_unlock();
 	return 0;
 }
@@ -229,16 +229,16 @@ static void wait_remove(struct wait_chan *chan, struct proc *proc)
 		if (current == proc)
 			break;
 		previous = current;
-		current = current->p_wait_next;
+		current = current->p_link;
 	}
 	if (!current)
 		return;
 	if (previous)
-		previous->p_wait_next = current->p_wait_next;
+		previous->p_link = current->p_link;
 	else
-		chan->wc_head = current->p_wait_next;
+		chan->wc_head = current->p_link;
 	if (chan->wc_tail == current)
 		chan->wc_tail = previous;
-	current->p_wait_chan = NULL;
-	current->p_wait_next = NULL;
+	current->p_wchan = NULL;
+	current->p_link = NULL;
 }

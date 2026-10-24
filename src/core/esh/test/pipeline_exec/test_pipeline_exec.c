@@ -748,8 +748,8 @@ static void check_released_users(struct exe_proc *proc, int count)
 		CHECK(proc[i].p_exec.p_addr == &proc[i].p_user);
 		CHECK(proc[i].p_user.u_procp == &proc[i].p_exec);
 		CHECK(proc[i].p_exec.p_xctx == NULL);
-		CHECK(proc[i].p_exec.p_wait_chan == NULL);
-		CHECK(proc[i].p_exec.p_wait_next == NULL);
+		CHECK(proc[i].p_exec.p_wchan == NULL);
+		CHECK(proc[i].p_exec.p_link == NULL);
 		for (fd = 0; fd < NOFILE; fd++)
 			CHECK(proc[i].p_user.u_ofile[fd] == NULL);
 	}

@@ -1,12 +1,16 @@
 # sys pipe sleep・wakeup
 
-更新日: 2026-10-24
+更新日: 2026-10-25
 
 ## 役割
 
 portableな`src/core/sys/sys/sched.c`はwait listと`struct proc`状態を管理し、
 context切替とlock実装をscheduler backendへ委譲する。Windows backendは
 `src/core/sys/dev/windows/sched_cortn.c`と`sched_thread.c`にある。
+
+`struct proc`と`enum proc_state`は`h/proc.h`で定義し、`h/sched.h`がincludeする。
+`p_stat`は実行状態、`p_wchan`は待機対象、`p_link`は待機リストの連結を表す。
+V7型状態分類への統合は未実施で、以下の`PROC_*`分類を維持している。
 
 `src/core/sys/dev/windows/sched_backend.mk`の`SCHED_BACKEND`でbackendを選ぶ。
 defaultは`cortn`で、`thread`指定時はnative Windows threadを使用する。

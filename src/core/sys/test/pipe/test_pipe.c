@@ -97,7 +97,7 @@ int main(void)
 static void init_proc(struct proc *proc, struct user *user)
 {
 	proc_init(proc, user);
-	proc->p_state = PROC_NEW;
+	proc->p_stat = PROC_NEW;
 }
 
 static ptrdiff_t call_read(struct proc *proc, int fd, void *buf,

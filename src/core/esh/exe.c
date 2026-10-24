@@ -330,13 +330,13 @@ int exe_run_pipeline(struct exe_proc *proc, int count)
 		finished = 0;
 		progress = 0;
 		for (i = 0; i < count; i++) {
-			if (proc[i].p_exec.p_state == PROC_FINISHED) {
+			if (proc[i].p_exec.p_stat == PROC_FINISHED) {
 				finished++;
 				continue;
 			}
-			if (proc[i].p_exec.p_state == PROC_ERROR)
+			if (proc[i].p_exec.p_stat == PROC_ERROR)
 				goto out;
-			if (proc[i].p_exec.p_state != PROC_RUNNABLE)
+			if (proc[i].p_exec.p_stat != PROC_RUNNABLE)
 				continue;
 			if (sched_resume(&proc[i].p_exec) < 0)
 				goto out;
