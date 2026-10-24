@@ -222,3 +222,15 @@ par、exe、cquote、Windows本体も使用したdirectoryでmake cleanを実行
 - 取得できなかったinode lockをpreleしない
 - 両backendで部分write後のreader closeはEPIPE、残量・転送量を保持
 - 旧pipe status構造体とStep 4の一時bridgeがソースに残らない
+
+## User移行 Step 6の検証項目
+
+- inode/buffer不足のENFILEと、明示error出力による呼出元userの保持
+- 別userのfd最終close、iput、buffer解放でerror/resultと転送状態を保持
+- error付きbufferの再利用時にpayload・error・inode状態が残らない
+- 別contextのiodoneがhost/requesterのerrorを変更せず、要求元だけがgeterrorで収集
+- b_errorが0の場合のEIO代替と、明示errorの伝播
+- read待ち・部分write待ちのclose/releaseでuserを保持し、join後に再初期化
+- threadの協調unwindはEINVALと転送済み量を保持。coroutineは待機中のstackを破棄
+- executorのpipe/backend準備失敗とdeadlock cleanup後にfd・wait link・backendが残らない
+- 同じexecutor配列で失敗を反復した後、正常なpipelineを実行できる

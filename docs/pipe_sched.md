@@ -87,6 +87,10 @@ plockの競合やsched_sleepの失敗は`u_error`へ記録し、取得してい�
 
 `sched_release()`はprocessをwait listから外し、backend handleをkernel lock外で
 解放する。thread join中にworkerがlockを必要とするため、lock内でjoinしない。
+releaseはuserを初期化しない。threadは停止通知により待機からEINVALで戻り、
+同じp_addrのuserでI/Oの残量・結果を確定してから終了する。coroutineは停止中の
+stackを破棄するため、待機後の処理を実行しない。両方式ともrelease完了後にのみ
+userとprocを再初期化できる。破棄済みstackを指すu_baseは参照しない。
 
 ## V7との差分
 

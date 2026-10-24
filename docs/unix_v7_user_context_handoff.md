@@ -23,14 +23,15 @@ Step 0 の確定事項は [Step 0 設計決定](unix_v7_user_context_step0.md) �
 | pipe I/O | readp/writep/plockがcurrent userを使い、同じ状態でinode I/O・待機 |
 | 公開sys API | error/resultとread/write状態を準備し、残量から結果を計算。errorを優先 |
 | file/pipe作成 | current APIと管理APIを分離。結果はu_r、失敗はu_error |
-| 後続の検証 | Step 6～7でerror・寿命・資源再利用と全回帰を検証 |
+| error・寿命・再利用 | Step 6でinode/bioと終了・unwind・join・再利用を検証 |
+| 後続の検証 | Step 7で全回帰と最終文書を確認 |
 
 src/core/sys/test/schedにはsleep/wakeup前後とhost/worker間のerror分離、
 thread backendのbase user分離を確認する試験がある。
 src/core/esh/test/pipeline_execには単一commandのcurrent設定・復元・user再初期化の
-試験がある。Step 2～5の変更内容と試験結果は末尾の作業記録を参照する。
+試験がある。Step 2～6の変更内容と試験結果は末尾の作業記録を参照する。
 
-後続作業はStep 6のerror・寿命・資源再利用の整合確認から着手する。導入済みの基盤を再実装しない。
+後続作業はStep 7の全回帰・最終文書確認から着手する。導入済みの基盤を再実装しない。
 [pipe core](pipe_core.md)、[scheduler](pipe_sched.md)、[RAM I/O](ram_block_device.md)参照。
 
 作成日: 2026-10-20
@@ -286,7 +287,7 @@ scheduler をリンクしていない。current user のスタブ等を追加す
 | 3 | `fio.c` を V7 型へ移行し、pipe 作成経路を適合 | fd/file 枯渇と途中失敗が漏れなく復旧 | done |
 | 4 | `rdwri.c` と `iomove()` に user 状態を導入 | 転送量・残量・offset・容量境界が正常 | done |
 | 5 | pipe 転送と `sys2.c` を V7 型へ移行 | 待機・部分転送・EOF・EPIPE が正常 | done |
-| 6 | inode/bio エラー、終了・unwind・再利用を整合 | 他 user の状態破壊と資源漏れがない | pending |
+| 6 | inode/bio エラー、終了・unwind・再利用を整合 | 他 user の状態破壊と資源漏れがない | done |
 | 7 | 全回帰・文書更新・生成物 clean | 両 backend の動作と差分を記録 | pending |
 
 Step 間はビルド可能な状態を保つ。Step 3～5 は呼出し関係が連動するため、
@@ -610,3 +611,63 @@ Windows本体は一時OUTDIR/TARGETでビルドし、両backendの対話コン�
 Step 5完了。次はStep 6のinode/bioエラーと終了・unwind・再利用の整合確認。
 各試験のmake clean後、一時スクリプトを削除した。生成したd/o/exeの残存なし、
 旧pipe statusと一時bridgeのソース残存なし、`git diff --check`正常を確認した。
+
+
+## Step 6 作業記録
+
+実施日: 2026-10-24
+
+V7の`dev/bio.c`のgeterror/iodone、`sys/fio.c`のclosef、`sys/iget.c`のiputと、
+現行のinode割当・pipe構築・終了処理を照合した。V7のiodoneはbufferの完了を通知し、
+要求元のgeterrorがerrorをuserへ取り込む。現行もこの分離と成功時のerror保持を維持する。
+diskを持たないMCUFWのclosef/iputは新たなI/O・割当・待機を行わず、callerと対象userの
+error/result/転送状態を変更しない。inode/buffer不足のENFILEもStep 0の契約どおり。
+
+既存処理に動作修正が必要な不整合は見つからなかった。本体はiget.c、bio.c、sched.cの
+責務・寿命を説明するコメントのみ更新し、試験を追加した。p_addrとuserの所有者、
+初期化API、close/wakeup/release/joinの順序は変更していない。
+
+file試験はinode枯渇とbuffer枯渇を別々に作り、ialloc_errorが呼出元userを変更せず、
+iallocはcurrent userへENFILEを設定することを確認する。枯渇から回復した後、error付き
+bufferを持つinodeの最終fd closeとiputを別userから行い、両userのerror/result/転送状態を
+保持すること、file/inode/busy bufferを解放し、再割当時にpayload/errorを残さないことを確認する。
+
+scheduler試験は実際のsys_read/sys_writeを空/full pipeで待機させ、管理close後にreleaseする。
+threadは停止通知でsched_sleepからEINVALとして戻り、元のuserで残量と部分転送量を
+確定してから終了する。coroutineは待機中のstackを破棄し、待機後の処理は実行しない。
+両方式ともp_addr/u_procpと転送状態を保持し、host userを変更しない。
+release後に同じproc/userをproc_initし、新しいworkerがfd/error/result/転送状態を
+引き継がず起動できることを確認する。破棄したstackを指すu_baseは参照しない。
+
+buffer完了の試験はworkerを待機させ、hostでB_ERROR/b_errorを設定してiodoneを呼ぶ。
+完了時点ではhost/requesterのerrorを変えず、復帰したworkerのgeterrorでだけ収集する。
+明示ENFILEとb_error=0のEIO代替を確認する。現行driverは同期のままであり、
+この試験は将来の非同期driverやI/O待機APIの実装を意味しない。
+
+executor試験はpipe/backend準備失敗時の全userのfd・wait link・backend解放を確認する。
+private pipeで待機し続けるcommandとconsumerによるdeadlockを反復し、cleanup・join後に
+同じexecutor配列で正常なpipelineを実行する。途中の管理closeとworker unwindが
+host userを変更しないことも確認する。
+
+### Step 6 検証結果
+
+MSYS2 MINGW64 shellで各run_test.shを実行した。試験の制限時間・判定条件と
+公開APIの動作は変更していない。既存の文法異常系の診断とshellの警告は維持する。
+
+| 試験 | 構成 | 結果 |
+|---|---|---|
+| sys file | O0/O2、inode/buffer枯渇とerror保持・再利用 | passed |
+| sys pipe | O0/O2、既存の確保・転送・失敗試験 | passed |
+| sys bio/bdev/ramdisk | 各O0/O2 | passed |
+| sys scheduler | cortn/thread、O0/O2、既定/NBUF=3 | passed |
+| pipeline executor | cortn/thread、O0/O2、既存30秒制限 | passed |
+| esh exe | 既存10スクリプト | passed |
+| parser | run_test1.sh、run_test2.sh | passed |
+| Windows本体 | cortn/thread、sam1・sam2・sam3 | passed |
+
+Windows本体は一時OUTDIR/TARGETでビルドし、両backendの対話コンソールで
+`sam1`、`sam2 1 10 100`、`sam3 -a -b string`を実行した。
+`sample1 applet`、`arg1=1`、`arg2=10`、`arg3=0x00000064`、
+`-a option`、`-b option with string`を確認し、Ctrl-Dで終了した。
+
+Step 6完了。次はStep 7の全回帰・最終文書確認。各試験のmake cleanは正常終了した。

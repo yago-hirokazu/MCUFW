@@ -1,4 +1,7 @@
-/* test_file.c */
+/*
+ * Allocation failure => user error => closef() / iput() => resource reuse
+ * Explicit allocation and cleanup preserve unrelated user state
+ */
 
 #include <limits.h>
 #include <stdio.h>
@@ -35,6 +38,7 @@ static void test_inode_lifecycle(void);
 static void test_inode_exhaustion(void);
 static void test_buffer_failure(void);
 static void test_reuse_after_close_all(void);
+static void test_inode_user_errors(void);
 
 /* Prepare file for explicit test owner */
 static struct file *allocate_file(struct proc *proc, int *fd)
@@ -64,6 +68,7 @@ int main(void)
 	test_inode_exhaustion();
 	test_buffer_failure();
 	test_reuse_after_close_all();
+	test_inode_user_errors();
 	if (failures) {
 		printf("%d tests failed\n", failures);
 		return 1;
@@ -347,6 +352,94 @@ static void test_reuse_after_close_all(void)
 	CHECK(ip->i_buf == bp);
 	close_all(&proc);
 	iput(ip);
+}
+
+/* Keep allocation errors and I/O state through final inode release */
+static void test_inode_user_errors(void)
+{
+	struct proc procs[2];
+	struct user users[2];
+	struct inode *ips[NINODE];
+	struct buf *held[NBUF];
+	struct inode *ip;
+	struct file *fp;
+	unsigned char byte;
+	int error;
+	int fd;
+	int i;
+	int shortage;
+
+	for (shortage = 0; shortage < 2; shortage++) {
+		binit();
+		finit();
+		for (i = 0; i < 2; i++) {
+			proc_init(&procs[i], &users[i]);
+			users[i].u_error = SYS_EPIPE;
+			users[i].u_r.r_val1 = 101;
+			users[i].u_r.r_val2 = 102;
+			users[i].u_base = &byte;
+			users[i].u_count = 103;
+			users[i].u_offset = 104;
+		}
+		sched_stub_reset(&procs[0]);
+		if (shortage) {
+			for (i = 0; i < NBUF; i++) {
+				held[i] = geteblk();
+				CHECK(held[i] != NULL);
+			}
+		} else {
+			for (i = 0; i < NINODE; i++) {
+				ips[i] = ialloc();
+				CHECK(ips[i] != NULL);
+			}
+		}
+		error = SYS_EINVAL;
+		CHECK(ialloc_error(&error) == NULL && error == SYS_ENFILE);
+		CHECK(users[0].u_error == SYS_EPIPE);
+		sched_stub_reset(&procs[1]);
+		CHECK(ialloc() == NULL && u.u_error == SYS_ENFILE);
+		if (shortage) {
+			for (i = 0; i < NBUF; i++)
+				brelse(held[i]);
+		} else {
+			for (i = 0; i < NINODE; i++)
+				iput(ips[i]);
+		}
+		ip = ialloc();
+		CHECK(ip != NULL && u.u_error == SYS_ENFILE);
+		fp = falloc();
+		CHECK(fp != NULL);
+		fd = (int)u.u_r.r_val1;
+		fp->f_inode = ip;
+		fp->f_flag = FPIPE | FREAD;
+		/* Dirty payload is cleared without collecting buffer error */
+		memset(ip->i_buf->b_addr, 0xa5, BSIZE);
+		ip->i_buf->b_flags |= B_ERROR;
+		ip->i_buf->b_error = SYS_EIO;
+		u.u_r.r_val1 = 101;
+		sched_stub_reset(&procs[0]);
+		CHECK(fd_close(&procs[1], fd) == 0);
+		iput(ip);
+		for (i = 0; i < 2; i++) {
+			CHECK(users[i].u_error == (i ? SYS_ENFILE : SYS_EPIPE));
+			CHECK(users[i].u_r.r_val1 == 101);
+			CHECK(users[i].u_r.r_val2 == 102);
+			CHECK(users[i].u_base == &byte);
+			CHECK(users[i].u_count == 103);
+			CHECK(users[i].u_offset == 104);
+			CHECK(users[i].u_procp == &procs[i]);
+		}
+		CHECK(file_in_use() == 0 && inode_in_use() == 0);
+		for (i = 0; i < NBUF; i++)
+			CHECK(!(buf[i].b_flags & B_BUSY));
+		ip = ialloc();
+		CHECK(ip != NULL && ip->i_size == 0 && ip->i_flag == 0);
+		for (i = 0; i < BSIZE; i++)
+			CHECK(ip->i_buf->b_addr[i] == 0);
+		CHECK(!(ip->i_buf->b_flags & B_ERROR));
+		iput(ip);
+	}
+	sched_stub_reset(NULL);
 }
 
 /* Check V7 results, sticky errors and current-user selection */

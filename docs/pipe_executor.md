@@ -1,6 +1,6 @@
 # ESH pipeline executor
 
-更新日: 2026-10-22
+更新日: 2026-10-24
 
 ## Scope
 
@@ -48,6 +48,11 @@ Thread backend uses native threads with execution tokens assigned sequentially
 by executor. Cleanup closes descriptors under kernel lock, then releases or
 joins backends outside lock. Dedicated user storage outlives backend unwind
 and join. `current_user()` resolves current proc's `p_addr` on each access.
+Cleanup uses descriptor management helpers, preserving each user's error,
+results and transfer state. Stopped threads return from pipe wait with EINVAL
+and finish on their original user before join returns. Suspended coroutines
+discard their stacks without executing continuation. Reuse calls proc_init()
+only after release has completed; old stack pointers in u_base are not read.
 
 Single command runs directly without backend. Executor sets current proc
 before applet call, closes all descriptors after return, and restores previous

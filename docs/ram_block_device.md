@@ -1,6 +1,6 @@
 # RAMブロックデバイスとbuffer I/O
 
-更新日: 2026-10-22
+更新日: 2026-10-24
 
 ## 配置と資源
 
@@ -52,6 +52,11 @@ cache、queue、所有中payloadの操作は呼出元がkernel lockで保護す�
 `B_ERROR`、`b_error`、`b_resid`、`iodone()`で結果と完了を通知する。
 呼出元は操作前に`u.u_error = 0`とする。成功は以前のerrorを消さず、
 `B_ERROR`があり`b_error == 0`なら`geterror()`は`SYS_EIO`を設定する。
+
+`iodone()`はbufferの完了と必要な解放だけを扱い、完了を実行したcontextの
+`u_error`を変更しない。要求元が自身のcurrent userで`geterror()`を呼び、
+bufferのerrorを取り込む。現行のbread/bwriteは同期strategyの復帰後に収集する。
+別contextでの完了試験はこの分離を確認するもので、非同期driverの追加ではない。
 I/O失敗でも`bread()`が非NULLのbusy bufferを返した場合は必ず解放する。
 
 `u`は`(*current_user())`マクロであり、current procの`p_addr`から専用userを

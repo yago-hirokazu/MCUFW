@@ -27,7 +27,8 @@ user移行の段階別の実装・試験結果は
 `struct proc.p_addr`で専用userを参照し、userは`u_error`、`u_r`、`u_procp`、`u_ofile[]`、
 `u_base/u_count/u_offset`を持つ。
 fd table、file割当・pipe作成の結果、inode/pipe I/Oとsys2はuserへ移行済み。
-後続Stepではerror・寿命・資源再利用と全回帰を検証する。
+Step 6でinode/bioのerror分離、終了・unwind・join後の資源再利用を検証した。
+後続Step 7では全回帰と最終文書を確認する。
 
 ## 作業記録・計画
 

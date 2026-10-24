@@ -219,7 +219,7 @@ void clrbuf(struct buf *bp)
 	bp->b_resid = 0;
 }
 
-/* Mark completion and release asynchronous request */
+/* Mark completion without collecting error into completing context */
 void iodone(struct buf *bp)
 {
 	bp->b_flags |= B_DONE;

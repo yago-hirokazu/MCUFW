@@ -165,6 +165,7 @@ int sched_prepare(struct proc *proc, void (*entry)(void *arg), void *arg)
 	return 0;
 }
 
+/* Retain caller-owned user until backend stop and join have completed */
 void sched_release(struct proc *proc)
 {
 	void *backend;
@@ -177,6 +178,7 @@ void sched_release(struct proc *proc)
 	backend = proc->p_backend;
 	proc->p_backend = NULL;
 	kernel_unlock();
+	/* Worker may still access p_addr while unwinding outside kernel lock */
 	sched_backend_release(backend);
 }
 

@@ -1,4 +1,7 @@
-/* test_sched.c */
+/*
+ * User tests => pipe wait / buffer completion => release => proc_init()
+ * Host user remains separate through worker unwind and slot reuse
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -81,6 +84,20 @@ struct user_wait_arg {
 	int after;
 };
 
+struct release_io_arg {
+	unsigned char data[PIPSIZ + 1];
+	int fd;
+	int write;
+	int returned;
+	ptrdiff_t result;
+};
+
+struct completion_arg {
+	struct buf *bp;
+	struct wait_chan *chan;
+	int error;
+};
+
 #ifdef SCHED_THREAD
 struct native_user_arg {
 	HANDLE ready;
@@ -134,6 +151,11 @@ static void test_parallel_ram(void);
 static void user_wait_entry(void *arg);
 static void user_peer_entry(void *arg);
 static void test_user_isolation(void);
+static void release_io_entry(void *arg);
+static void reuse_user_entry(void *arg);
+static void test_release_user_io(void);
+static void completion_entry(void *arg);
+static void test_completion_user(void);
 #ifdef SCHED_THREAD
 static unsigned __stdcall native_user_entry(void *arg);
 static void test_native_user_isolation(void);
@@ -158,6 +180,8 @@ static struct file *allocate_file(struct proc *proc, int *fd)
 int main(void)
 {
 	test_user_isolation();
+	test_release_user_io();
+	test_completion_user();
 #ifdef SCHED_THREAD
 	test_native_user_isolation();
 #endif
@@ -957,6 +981,163 @@ static void test_parallel_ram(void)
 }
 #endif
 #endif
+
+/* Resume stopped thread on original user before release returns */
+static void release_io_entry(void *arg)
+{
+	struct release_io_arg *io = arg;
+
+	if (io->write)
+		io->result = sys_write(io->fd, io->data, sizeof(io->data));
+	else
+		io->result = sys_read(io->fd, io->data, sizeof(io->data));
+	CHECK(current_user() == current_proc()->p_addr);
+	CHECK(u.u_procp == current_proc());
+	io->returned = 1;
+	close_all_locked(current_proc());
+}
+
+/* Reused slot starts with fresh user after prior worker has stopped */
+static void reuse_user_entry(void *arg)
+{
+	int *called = arg;
+	int fd;
+
+	CHECK(current_user() == current_proc()->p_addr);
+	CHECK(u.u_procp == current_proc());
+	CHECK(u.u_error == 0 && u.u_r.r_val1 == 0 && u.u_r.r_val2 == 0);
+	CHECK(u.u_base == NULL && u.u_count == 0 && u.u_offset == 0);
+	for (fd = 0; fd < NOFILE; fd++)
+		CHECK(u.u_ofile[fd] == NULL);
+	(*called)++;
+}
+
+/* Close while blocked, join before reinitialization, then reuse slot */
+static void test_release_user_io(void)
+{
+	struct proc proc;
+	struct user user;
+	struct user *host = current_user();
+	struct release_io_arg io;
+	unsigned char host_byte;
+	size_t transferred;
+	int fd[2];
+	int called;
+	int write;
+
+	for (write = 0; write < 2; write++) {
+		binit();
+		finit();
+		proc_init(&proc, &user);
+		memset(&io, 0, sizeof(io));
+		io.write = write;
+		host->u_error = SYS_EPIPE;
+		host->u_r.r_val1 = 71;
+		host->u_r.r_val2 = 72;
+		host->u_base = &host_byte;
+		host->u_count = 73;
+		host->u_offset = 74;
+		kernel_lock();
+		CHECK(pipe_for_proc(&proc, fd) == 0);
+		kernel_unlock();
+		io.fd = fd[write];
+		CHECK(sched_prepare(&proc, release_io_entry, &io) == 0);
+		CHECK(sched_resume(&proc) == 0);
+		CHECK(proc.p_state == (write ? PROC_WAIT_WRITE :
+						 PROC_WAIT_READ));
+		transferred = write ? PIPSIZ : 0;
+		CHECK(user.u_base == io.data + transferred);
+		CHECK(user.u_count == sizeof(io.data) - transferred);
+		CHECK(user.u_offset == (ptrdiff_t)transferred);
+		CHECK(user.u_error == 0 && !io.returned);
+		close_all_locked(&proc);
+		CHECK(user.u_count == sizeof(io.data) - transferred);
+		CHECK(user.u_error == 0);
+		sched_release(&proc);
+		CHECK(proc.p_backend == NULL && proc.p_wait_chan == NULL);
+		CHECK(proc.p_wait_next == NULL);
+		CHECK(proc.p_addr == &user && user.u_procp == &proc);
+		CHECK(user.u_base == io.data + transferred);
+		CHECK(user.u_count == sizeof(io.data) - transferred);
+		CHECK(user.u_offset == (ptrdiff_t)transferred);
+#ifdef SCHED_THREAD
+		CHECK(io.returned && io.result == -SYS_EINVAL);
+		CHECK(user.u_error == SYS_EINVAL);
+		CHECK(user.u_r.r_val1 == (ptrdiff_t)transferred);
+#else
+		CHECK(!io.returned && user.u_error == 0);
+		CHECK(user.u_r.r_val1 == 0);
+#endif
+		CHECK(current_user() == host && host->u_error == SYS_EPIPE);
+		CHECK(host->u_r.r_val1 == 71 && host->u_r.r_val2 == 72);
+		CHECK(host->u_base == &host_byte && host->u_count == 73);
+		CHECK(host->u_offset == 74);
+		check_resources();
+		proc_init(&proc, &user);
+		called = 0;
+		CHECK(sched_prepare(&proc, reuse_user_entry, &called) == 0);
+		CHECK(sched_resume(&proc) == 0 && called == 1);
+		sched_release(&proc);
+	}
+	memset(host, 0, sizeof(*host));
+}
+
+/* Collect completed buffer error only in requesting worker */
+static void completion_entry(void *arg)
+{
+	struct completion_arg *completion = arg;
+
+	kernel_lock();
+	u.u_error = SYS_EINVAL;
+	CHECK(sched_sleep(completion->chan, WAIT_READ) == 0);
+	CHECK(completion->bp->b_flags & B_DONE);
+	geterror(completion->bp);
+	completion->error = u.u_error;
+	brelse(completion->bp);
+	CHECK(u.u_error == completion->error);
+	kernel_unlock();
+}
+
+/* Completion context never inherits requesting user's error */
+static void test_completion_user(void)
+{
+	struct proc proc;
+	struct user user;
+	struct user *host = current_user();
+	struct wait_chan chan;
+	struct completion_arg completion;
+	int code;
+
+	for (code = 0; code < 2; code++) {
+		memset(&chan, 0, sizeof(chan));
+		binit();
+		finit();
+		proc_init(&proc, &user);
+		kernel_lock();
+		completion.bp = geteblk();
+		kernel_unlock();
+		CHECK(completion.bp != NULL);
+		completion.chan = &chan;
+		completion.error = 0;
+		CHECK(sched_prepare(&proc, completion_entry, &completion) == 0);
+		CHECK(sched_resume(&proc) == 0);
+		host->u_error = SYS_EPIPE;
+		kernel_lock();
+		completion.bp->b_flags |= B_ERROR;
+		completion.bp->b_error = code ? SYS_ENFILE : 0;
+		iodone(completion.bp);
+		CHECK(host->u_error == SYS_EPIPE);
+		CHECK(user.u_error == SYS_EINVAL);
+		sched_wakeup(&chan);
+		kernel_unlock();
+		CHECK(sched_resume(&proc) == 0);
+		CHECK(completion.error == (code ? SYS_ENFILE : SYS_EIO));
+		CHECK(host->u_error == SYS_EPIPE);
+		sched_release(&proc);
+		check_resources();
+	}
+	host->u_error = 0;
+}
 
 /* Retain originating user error across scheduler wait and resume */
 static void user_wait_entry(void *arg)

@@ -1,4 +1,7 @@
-/* test_pipeline_exec.c */
+/*
+ * Executor failure => close_all() => backend unwind / join => reuse
+ * Worker users survive cleanup without changing host user
+ */
 
 #include <ctype.h>
 #include <stdio.h>
@@ -64,6 +67,9 @@ static void test_pipe_exhaustion_cleanup(void);
 static void blocker_entry(void *arg);
 static void test_backend_exhaustion_cleanup(void);
 static void test_pipeline_bytecode(void);
+static int blocked_user_main(int argc, char **argv);
+static void check_released_users(struct exe_proc *proc, int count);
+static void test_blocked_user_cleanup(void);
 
 extern int echo(int argc, char **argv);
 
@@ -83,6 +89,8 @@ int main(void)
 	test_pipe_exhaustion_cleanup();
 	check_resources();
 	test_backend_exhaustion_cleanup();
+	check_resources();
+	test_blocked_user_cleanup();
 	check_resources();
 	test_pipeline_bytecode();
 	check_resources();
@@ -625,6 +633,7 @@ static void test_pipe_exhaustion_cleanup(void)
 	init_command(&proc[1], &filter);
 	init_command(&proc[2], &consumer);
 	CHECK(exe_run_pipeline(proc, 3) == -SYS_ENFILE);
+	check_released_users(proc, 3);
 	CHECK(pipe_in_use() == NINODE - 1);
 	CHECK(file_in_use() == (NINODE - 1) * 2);
 	for (i = 0; i < NINODE - 1; i++)
@@ -661,6 +670,7 @@ static void test_backend_exhaustion_cleanup(void)
 	init_command(&proc[0], &producer);
 	init_command(&proc[1], &consumer);
 	CHECK(exe_run_pipeline(proc, 2) == -SYS_ENOMEM);
+	check_released_users(proc, 2);
 	CHECK(file_in_use() == 0);
 	CHECK(pipe_in_use() == 0);
 	for (i = 0; i < PIPELINE_MAX - 1; i++)
@@ -706,6 +716,88 @@ static void test_pipeline_bytecode(void)
 	CHECK(executor.e_procs == 0);
 	CHECK(file_in_use() == 0);
 	CHECK(pipe_in_use() == 0);
+}
+
+/* Wait on private pipe until executor stops deadlocked pipeline */
+static int blocked_user_main(int argc, char **argv)
+{
+	unsigned char byte;
+	int fd[2];
+	int result;
+
+	(void)argc;
+	(void)argv;
+	CHECK(u.u_error == 0 && u.u_base == NULL && u.u_count == 0);
+	CHECK(sys_pipe(fd) == 0);
+	result = (int)sys_read(fd[0], &byte, 1);
+	CHECK(current_user() == current_proc()->p_addr);
+	CHECK(result == -SYS_EINVAL && u.u_error == SYS_EINVAL);
+	CHECK(u.u_count == 1 && u.u_r.r_val1 == 0);
+	/* Avoid retaining pointer into returned command stack */
+	u.u_base = NULL;
+	return result;
+}
+
+/* Cleanup keeps binding but removes every owned runtime resource */
+static void check_released_users(struct exe_proc *proc, int count)
+{
+	int i;
+	int fd;
+
+	for (i = 0; i < count; i++) {
+		CHECK(proc[i].p_exec.p_addr == &proc[i].p_user);
+		CHECK(proc[i].p_user.u_procp == &proc[i].p_exec);
+		CHECK(proc[i].p_exec.p_backend == NULL);
+		CHECK(proc[i].p_exec.p_wait_chan == NULL);
+		CHECK(proc[i].p_exec.p_wait_next == NULL);
+		for (fd = 0; fd < NOFILE; fd++)
+			CHECK(proc[i].p_user.u_ofile[fd] == NULL);
+	}
+}
+
+/* Deadlock unwind joins all users before same executor array is reused */
+static void test_blocked_user_cleanup(void)
+{
+	struct applet blocked = { "blocked", blocked_user_main };
+	struct exe_proc proc[2];
+	struct user *host = current_user();
+	unsigned char host_byte;
+	int iteration;
+
+	host->u_error = SYS_EPIPE;
+	host->u_r.r_val1 = 81;
+	host->u_r.r_val2 = 82;
+	host->u_base = &host_byte;
+	host->u_count = 83;
+	host->u_offset = 84;
+	init_command(&proc[0], &blocked);
+	init_command(&proc[1], &consumer);
+	for (iteration = 0; iteration < 2; iteration++) {
+		CHECK(exe_run_pipeline(proc, 2) == -SYS_EINVAL);
+		check_released_users(proc, 2);
+		CHECK(proc[0].p_user.u_count == 1);
+#ifdef SCHED_THREAD
+		CHECK(proc[0].p_user.u_error == SYS_EINVAL);
+		CHECK(proc[1].p_user.u_error == SYS_EINVAL);
+#else
+		CHECK(proc[0].p_user.u_error == 0);
+		CHECK(proc[1].p_user.u_error == 0);
+#endif
+		CHECK(current_proc() == NULL && current_user() == host);
+		CHECK(host->u_error == SYS_EPIPE);
+		CHECK(host->u_r.r_val1 == 81 && host->u_r.r_val2 == 82);
+		CHECK(host->u_base == &host_byte && host->u_count == 83);
+		CHECK(host->u_offset == 84);
+		check_resources();
+	}
+	proc[0].p_cmd = &producer;
+	proc[0].p_argv[0] = (char *)producer.name;
+	output_count = 0;
+	CHECK(exe_run_pipeline(proc, 2) == 37);
+	CHECK(output_count == source_count);
+	check_released_users(proc, 2);
+	CHECK(host->u_error == SYS_EPIPE && host->u_count == 83);
+	memset(host, 0, sizeof(*host));
 }
 
 /* Direct command execution uses proc-owned user instead of host user */
