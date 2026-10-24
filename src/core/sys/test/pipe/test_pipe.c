@@ -352,7 +352,7 @@ static void test_wait_rechecks(void)
 	binit();
 	finit();
 	init_proc(&proc, &proc_user);
-	proc.p_backend = &proc;
+	proc.p_xctx = &proc;
 	sched_stub_reset(&proc);
 	CHECK(sys_pipe(fd) == 0);
 	rf = getf_for_proc(&proc, fd[0]);
@@ -387,7 +387,7 @@ static void test_pipe_lock(void)
 	binit();
 	finit();
 	init_proc(&proc, &proc_user);
-	proc.p_backend = &proc;
+	proc.p_xctx = &proc;
 	sched_stub_reset(&proc);
 	CHECK(sys_pipe(fd) == 0);
 	ip = getf_for_proc(&proc, fd[0])->f_inode;
@@ -853,7 +853,7 @@ static void fail_lock_hook(struct wait_chan *chan, enum wait_reason reason)
 	CHECK(reason == WAIT_WRITE);
 	drain_write_hook(chan, reason);
 	hook_inode->i_flag |= ILOCK;
-	current_proc()->p_backend = NULL;
+	current_proc()->p_xctx = NULL;
 }
 
 /* Preserve partial progress on sleep failure and later lock failure */
@@ -869,7 +869,7 @@ static void test_partial_failures(void)
 	binit();
 	finit();
 	proc_init(&proc, &proc_user);
-	proc.p_backend = &proc;
+	proc.p_xctx = &proc;
 	sched_stub_reset(&proc);
 	CHECK(sys_pipe(fd) == 0);
 	ip = getf_for_proc(&proc, fd[0])->f_inode;
@@ -885,7 +885,7 @@ static void test_partial_failures(void)
 	binit();
 	finit();
 	proc_init(&proc, &proc_user);
-	proc.p_backend = &proc;
+	proc.p_xctx = &proc;
 	sched_stub_reset(&proc);
 	CHECK(sys_pipe(fd) == 0);
 	hook_file = getf_for_proc(&proc, fd[0]);
@@ -903,7 +903,7 @@ static void test_partial_failures(void)
 	binit();
 	finit();
 	proc_init(&proc, &proc_user);
-	proc.p_backend = &proc;
+	proc.p_xctx = &proc;
 	sched_stub_reset(&proc);
 	CHECK(sys_pipe(fd) == 0);
 	ip = getf_for_proc(&proc, fd[0])->f_inode;

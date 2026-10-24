@@ -312,9 +312,9 @@ static void test_three_stage_pipeline(void)
 		init_command(&proc[1], &filter);
 		init_command(&proc[2], &consumer);
 		CHECK(exe_run_pipeline(proc, 3) == 37);
-		CHECK(proc[0].p_exec.p_status == 11);
-		CHECK(proc[1].p_exec.p_status == 22);
-		CHECK(proc[2].p_exec.p_status == 37);
+		CHECK(proc[0].p_exec.p_ret == 11);
+		CHECK(proc[1].p_exec.p_ret == 22);
+		CHECK(proc[2].p_exec.p_ret == 37);
 		CHECK(output_count == sizeof(source));
 		for (i = 0; i < TEST_DATA_SIZE; i++)
 			CHECK(output[i] == (unsigned char)toupper(source[i]));
@@ -332,9 +332,9 @@ static void test_early_filter_exit(void)
 	init_command(&proc[1], &early_filter);
 	init_command(&proc[2], &consumer);
 	CHECK(exe_run_pipeline(proc, 3) == 37);
-	CHECK(proc[0].p_exec.p_status == -SYS_EPIPE);
-	CHECK(proc[1].p_exec.p_status == 23);
-	CHECK(proc[2].p_exec.p_status == 37);
+	CHECK(proc[0].p_exec.p_ret == -SYS_EPIPE);
+	CHECK(proc[1].p_exec.p_ret == 23);
+	CHECK(proc[2].p_exec.p_ret == 37);
 	CHECK(output_count == 0);
 	CHECK(file_in_use() == 0);
 	CHECK(pipe_in_use() == 0);
@@ -412,13 +412,13 @@ static void test_transfer_matrix(void)
 	init_command(&proc[0], &producer);
 	init_command(&proc[1], &error_applet);
 	CHECK(exe_run_pipeline(proc, 2) == -ESH_EINVAL);
-	CHECK(proc[0].p_exec.p_status == -SYS_EPIPE);
+	CHECK(proc[0].p_exec.p_ret == -SYS_EPIPE);
 	init_command(&proc[0], &producer);
 	init_command(&proc[1], &error_applet);
 	init_command(&proc[2], &consumer);
 	output_count = 0;
 	CHECK(exe_run_pipeline(proc, 3) == 37);
-	CHECK(proc[0].p_exec.p_status == -SYS_EPIPE);
+	CHECK(proc[0].p_exec.p_ret == -SYS_EPIPE);
 	CHECK(output_count == 0);
 	CHECK(file_in_use() == 0);
 	CHECK(pipe_in_use() == 0);
@@ -747,7 +747,7 @@ static void check_released_users(struct exe_proc *proc, int count)
 	for (i = 0; i < count; i++) {
 		CHECK(proc[i].p_exec.p_addr == &proc[i].p_user);
 		CHECK(proc[i].p_user.u_procp == &proc[i].p_exec);
-		CHECK(proc[i].p_exec.p_backend == NULL);
+		CHECK(proc[i].p_exec.p_xctx == NULL);
 		CHECK(proc[i].p_exec.p_wait_chan == NULL);
 		CHECK(proc[i].p_exec.p_wait_next == NULL);
 		for (fd = 0; fd < NOFILE; fd++)

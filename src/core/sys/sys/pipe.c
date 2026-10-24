@@ -137,7 +137,7 @@ void writep(struct file *fp)
 		}
 		if (ip->i_size == PIPSIZ) {
 			prele(ip);
-			if ((!u.u_procp || !u.u_procp->p_backend) &&
+			if ((!u.u_procp || !u.u_procp->p_xctx) &&
 			    remaining != requested)
 				break;
 			pipe_sleep(&ip->i_write_chan, WAIT_WRITE);
@@ -264,7 +264,7 @@ static void pipe_sleep(struct wait_chan *chan, enum wait_reason reason)
 {
 	int result;
 
-	if (!u.u_procp || !u.u_procp->p_backend) {
+	if (!u.u_procp || !u.u_procp->p_xctx) {
 		u.u_error = SYS_EAGAIN;
 		return;
 	}

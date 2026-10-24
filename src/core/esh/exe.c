@@ -234,8 +234,8 @@ static void exe_proc_entry(void *arg)
 	struct exe_proc *proc;
 
 	proc = arg;
-	proc->p_exec.p_status = proc->p_cmd->main(proc->p_argc,
-						    proc->p_argv);
+	proc->p_exec.p_ret = proc->p_cmd->main(proc->p_argc,
+						 proc->p_argv);
 	kernel_lock();
 	close_all(&proc->p_exec);
 	kernel_unlock();
@@ -343,7 +343,7 @@ int exe_run_pipeline(struct exe_proc *proc, int count)
 			progress = 1;
 		}
 		if (finished == count) {
-			result = proc[count - 1].p_exec.p_status;
+			result = proc[count - 1].p_exec.p_ret;
 			break;
 		}
 		if (!progress)

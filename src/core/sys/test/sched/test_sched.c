@@ -478,7 +478,7 @@ static void test_release_waiter(void)
 	CHECK(sched_resume(&proc) == 0);
 	CHECK(proc.p_state == PROC_WAIT_WRITE);
 	sched_release(&proc);
-	CHECK(proc.p_backend == NULL);
+	CHECK(proc.p_xctx == NULL);
 	CHECK(chan.wc_head == NULL);
 	CHECK(chan.wc_tail == NULL);
 }
@@ -501,7 +501,7 @@ static void test_wake_then_release(void)
 	kernel_unlock();
 	CHECK(proc.p_state == PROC_RUNNABLE);
 	sched_release(&proc);
-	CHECK(proc.p_backend == NULL);
+	CHECK(proc.p_xctx == NULL);
 	CHECK(chan.wc_head == NULL);
 }
 
@@ -1054,7 +1054,7 @@ static void test_release_user_io(void)
 		CHECK(user.u_count == sizeof(io.data) - transferred);
 		CHECK(user.u_error == 0);
 		sched_release(&proc);
-		CHECK(proc.p_backend == NULL && proc.p_wait_chan == NULL);
+		CHECK(proc.p_xctx == NULL && proc.p_wait_chan == NULL);
 		CHECK(proc.p_wait_next == NULL);
 		CHECK(proc.p_addr == &user && user.u_procp == &proc);
 		CHECK(user.u_base == io.data + transferred);

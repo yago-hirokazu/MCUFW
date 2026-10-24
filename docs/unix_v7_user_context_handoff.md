@@ -131,7 +131,7 @@ current_proc()
     |
     v
 struct proc
-    +-- p_state / wait state / p_backend
+    +-- p_state / wait state / p_xctx
     +-- p_addr ----------------> struct user
                                    +-- u_error
                                    +-- u_ofile[] --> file --> inode --> buffer

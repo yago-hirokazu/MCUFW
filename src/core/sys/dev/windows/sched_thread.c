@@ -126,7 +126,7 @@ void sched_backend_release(void *backend)
 
 int sched_backend_yield(struct proc *proc, enum wait_reason reason)
 {
-	struct sched_thread_slot *slot = proc->p_backend;
+	struct sched_thread_slot *slot = proc->p_xctx;
 
 	if (reason != WAIT_LOCK && reason != WAIT_READ &&
 	    reason != WAIT_WRITE)
@@ -143,7 +143,7 @@ int sched_backend_yield(struct proc *proc, enum wait_reason reason)
 
 int sched_backend_wake(struct proc *proc)
 {
-	struct sched_thread_slot *slot = proc->p_backend;
+	struct sched_thread_slot *slot = proc->p_xctx;
 
 	if (!slot->ts_used || slot->ts_done || slot->ts_stop)
 		return -SYS_EINVAL;
@@ -154,7 +154,7 @@ int sched_backend_wake(struct proc *proc)
 
 enum proc_state sched_backend_resume(struct proc *proc)
 {
-	struct sched_thread_slot *slot = proc->p_backend;
+	struct sched_thread_slot *slot = proc->p_xctx;
 	enum proc_state state;
 
 	kernel_lock();

@@ -49,7 +49,7 @@ int sched_sleep(struct wait_chan *chan, enum wait_reason reason)
 	int result;
 
 	proc = current_proc();
-	if (!chan || !proc || !proc->p_backend || !kernel_is_locked())
+	if (!chan || !proc || !proc->p_xctx || !kernel_is_locked())
 		return -SYS_EINVAL;
 	if (proc->p_wait_chan)
 		return -SYS_EINVAL;
@@ -104,7 +104,7 @@ void sched_wakeup(struct wait_chan *chan)
 		next = proc->p_wait_next;
 		proc->p_wait_chan = NULL;
 		proc->p_wait_next = NULL;
-		if (proc->p_backend && sched_backend_wake(proc) == 0)
+		if (proc->p_xctx && sched_backend_wake(proc) == 0)
 			proc->p_state = PROC_RUNNABLE;
 		else
 			proc->p_state = PROC_ERROR;
@@ -144,7 +144,7 @@ int proc_bind_backend(struct proc *proc, void *backend)
 {
 	if (!proc || !proc->p_addr || !backend || proc->p_state != PROC_NEW)
 		return -SYS_EINVAL;
-	proc->p_backend = backend;
+	proc->p_xctx = backend;
 	proc->p_state = PROC_RUNNABLE;
 	return 0;
 }
@@ -170,13 +170,13 @@ void sched_release(struct proc *proc)
 {
 	void *backend;
 
-	if (!proc || !proc->p_backend)
+	if (!proc || !proc->p_xctx)
 		return;
 	kernel_lock();
 	if (proc->p_wait_chan)
 		wait_remove(proc->p_wait_chan, proc);
-	backend = proc->p_backend;
-	proc->p_backend = NULL;
+	backend = proc->p_xctx;
+	proc->p_xctx = NULL;
 	kernel_unlock();
 	/* Worker may still access p_addr while unwinding outside kernel lock */
 	sched_backend_release(backend);
@@ -186,7 +186,7 @@ int sched_resume(struct proc *proc)
 {
 	int result;
 
-	if (!proc || !proc->p_backend || current_proc())
+	if (!proc || !proc->p_xctx || current_proc())
 		return -SYS_EINVAL;
 	kernel_lock();
 	if (proc->p_state != PROC_RUNNABLE) {

@@ -35,8 +35,8 @@ struct proc {
 	struct user *p_addr;	/* Dedicated user area owned by caller */
 	struct wait_chan *p_wait_chan;
 	struct proc *p_wait_next;
-	void *p_backend;
-	int p_status;
+	void *p_xctx;		/* eXecution ConTeXt owned by backend */
+	int p_ret;		/* Command function return value */
 };
 
 /* Channel storage belongs to waiting object; scheduler manages list */

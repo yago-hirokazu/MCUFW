@@ -35,7 +35,7 @@ Portable scheduler prepares one execution backend for each process and resumes
 runnable processes in round-robin order. Windows coroutine backend owns fixed
 four-slot coroutine and stack pool. No core allocation is dynamic.
 
-Command return stores status in `p_exec.p_status`. Command wrapper then closes every
+Command return stores status in `p_exec.p_ret`. Command wrapper then closes every
 remaining process descriptor before coroutine finishes. Endpoint close wakes
 blocked peers, producing EOF after final writer close or broken pipe after
 final reader close.
@@ -62,7 +62,7 @@ validated before execution.
 ## Pipeline status
 
 Pipeline status is final command status. Earlier command errors remain in each
-process `p_exec.p_status` and do not replace final status. Executor stores resulting
+process `p_exec.p_ret` and do not replace final status. Executor stores resulting
 status in `e_status`.
 
 ## Deliberate omissions
