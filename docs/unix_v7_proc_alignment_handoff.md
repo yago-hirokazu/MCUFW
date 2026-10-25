@@ -1,7 +1,7 @@
 # UNIX V7 proc 構造体整合 引き継ぎ書
 
 作成日: 2026-10-24
-更新日: 2026-10-25
+更新日: 2026-10-26
 対象: `C:\usr\src\MCUFW`
 計画作成時 HEAD: `82b7617` (`Rename proc members to p_xctx and p_ret`)
 
@@ -14,11 +14,11 @@ Step 0 の設計確定と Step 1 のメンバ改名・ヘッダ分離は完了�
 Step 2 の状態統合と関連試験は完了した。
 Step 3 の直接実行・管理用 proc・解放経路の監査と関連試験も完了した。
 Step 4 の状態遷移・異常系の集中検証も完了した。
-次は未着手の Step 5 で全回帰と最終文書確認を行う。
+Step 5 の全回帰と最終文書確認も完了し、本計画の Step 0～5 は全て完了した。
 状態・寿命・異常の確定契約は
 [Step 0 設計決定](unix_v7_proc_alignment_step0.md)を参照する。
 以下の「現在の実装」はメンバ改名後のソースを示す。
-Step 2 の検証結果と未完の監査・全回帰は末尾の記録を参照する。
+各 Step の実装・監査・検証結果は末尾の記録を参照する。
 実装を依頼された後続タスクは、各 Step の確認・実装・検証・記録を進める。
 通常の設計具体化を、追加のユーザー承認待ちとして扱う必要はない。
 
@@ -148,7 +148,7 @@ struct proc {
 
 ### 状態の対応
 
-| 現在 | 移行先 | 意味 |
+| 移行開始時 | 現在 | 意味 |
 |---|---|---|
 | PROC_NEW | SIDL | 初期化済み、実行準備中 |
 | PROC_RUNNABLE / PROC_RUNNING | SRUN | 実行可能または実行中 |
@@ -209,7 +209,7 @@ file/inode/buffer-cache の基本構造、I/O のエラー契約、shell 文法�
 | 2 | scheduler/backend/executor の状態統合 | complete |
 | 3 | 直接実行・管理用 proc・解放処理の整合 | complete |
 | 4 | 状態遷移と異常系の集中検証 | complete |
-| 5 | 全回帰、文書更新、完了確認 | pending |
+| 5 | 全回帰、文書更新、完了確認 | complete |
 
 ### Step 0: 状態・寿命・異常の契約
 
@@ -223,8 +223,8 @@ file/inode/buffer-cache の基本構造、I/O のエラー契約、shell 文法�
 - p_ret の書込担当と、結果回収時点
 - backend resume の返却状態と共有 p_stat が競合した場合の優先規則
 
-注意: 現行 test_yield_failure_cleanup は yield 失敗を呼出元が受け取り、
-entry が戻った後に PROC_FINISHED になることを確認している。
+設計確定時の test_yield_failure_cleanup は yield 失敗を呼出元が受け取り、
+entry が戻った後に PROC_FINISHED になることを確認していた。
 全ての一時失敗を永続的な PROC_ERROR にする変更は行わない。
 逆に再開不能な異常を通常終了で隠さないよう、異常経路ごとに確認する。
 
@@ -329,6 +329,7 @@ Step 2 の検証を成立させるため必要な整合は Step 2 内で行い�
 
 ### Step 5: 全回帰と文書
 
+完了。実行範囲・結果・既存問題は末尾の Step 5 完了記録を参照する。
 [回帰試験](pipe_regression.md)の現行入口に沿って全回帰する。
 sys header/table/bdev/ramdisk/bio/file/pipe/sched、esh cortn/pipe/sched、
 pipeline/pipeline_exec、parser、exe、cquote、Windows 本体を対象にする。
@@ -687,3 +688,90 @@ git diff --check 正常を確認し、一時 script/log は削除した。
 次の着手点: Step 5 の全回帰・最終文書確認。
 本記録時点は未コミット。対象は両 scheduler backend の試験用注入、sched.h の
 試験用宣言、scheduler 試験、本書、pipe_regression.md である。
+
+### Step 5 完了記録
+
+- 実施日: 2026-10-25～26
+- 開始 HEAD: `a7bd5b6`。Step 4 は同コミットで保存済み
+- 状態: complete。Step 0～5 は全て完了
+- 本体・試験コードの追加変更は不要。既存の試験入口・構成・timeout を維持した
+- Windows 本体は SCHED_TEST を定義しない通常 build を使用した
+
+#### Step 5 検証結果
+
+MSYS2 MINGW64 shell で実行した。PowerShell から gcc を直接起動していない。
+
+| 試験 | 構成・確認内容 | 結果 |
+|---|---|---|
+| sys header | C/C++、単独 include・順序入替え、O0/O2 | passed |
+| sys table/bdev/ramdisk/bio/file/pipe | 各 O0/O2、固定資源、I/O、user と所有権 | passed |
+| sys scheduler | cortn/thread、O0/O2、既定 NBUF=5 / 小容量 NBUF=3 | passed |
+| esh coroutine | O0/O2、context・ABI・stack guard | passed |
+| esh pipe/scheduler | 各 cortn/thread、O0/O2 | passed |
+| esh pipeline | backend なし、parser bytecode の O0/O2 | passed |
+| pipeline executor | cortn/thread、O0/O2、console・境界・異常・再利用 | passed |
+| parser | run_test1.sh / run_test2.sh の既存 golden 照合 | passed |
+| exe | run_test.sh の test1～10、既存 golden 照合 | passed |
+| cquote | 既存の出力表示型試験、assert/golden 照合なし | 終了値0、表示に既存問題あり |
+| Windows 本体 | cortn/thread、既定 O0、実 console 入力 | passed |
+
+自動判定 suite は全て成功した。strict suite は warning なしである。
+広い shell build には未変更の help.c、lex.c、par.c、test.c の既存 warning が残る。
+未使用引数・関数、format 引数過剰、文字列切詰め、char 添字の分類は従来どおりで、
+新規 warning はない。文法異常系の lexer/parser 診断も意図した結果である。
+
+cquote は正常終了したが、表示確認で単独引用引数の欠落・余分な連結を確認した。
+関連ソース・試験・Makefile は proc 整合前から未変更であり、proc/scheduler を
+link しない。Windows 本体の script 経路も cquote を使用しない。
+本移行の回帰とは区別し、表示型試験の正常終了を引用処理の正しさとは扱わない。
+具体例と別作業の範囲は[回帰ガイド](pipe_regression.md)に記録した。
+
+Windows 本体は両 backend で同じ入力を行い、次を確認した。
+
+- `sam1` は sample1 applet を表示した
+- `sam2 1 10 100` は argc=4、arg1=1、arg2=10、arg3=0x00000064 を表示した
+- `sam3 -a -b string` は -a option、-b option with string を表示した
+- `echo hello|cat` は hello、`echo four|cat|cat|cat` は four を表示した
+- `k=3` の次の入力 `echo "$k"|cat` は 3 を表示し、変数を保持した
+- 各入力後に prompt へ戻り、Ctrl-D で終了値 0 となった
+
+既存 DLL をコピーし直さず、`main.exe` target を build した。
+初回は `_output` 不足で build に失敗したため、`make _output` 後に再実行した。
+同 target が directory を作らない既存の前提であり、本体の変更は不要だった。
+両 backend の確認後に Windows directory の make clean は完了した。
+
+#### Step 5 文書整理
+
+- pipe_sched.md に全メンバの役割、V7 との対応・差分、wake 失敗時の扱いを整理した
+- pipe_executor.md に全段 SZOMB を結果採用の条件とし、PROC_ERROR の p_ret は
+  診断用であることを明記した
+- pipe_thread.md と cortn_windows.md に状態・異常系の結合試験範囲を追記した
+- pipe_thread.md の単独 main.exe build 例に出力 directory 作成を補った
+- pipe_regression.md に parser pipeline suite の入口、backend を使う suite との
+  区別、小容量 scheduler 構成を補った
+- README.md に現在の proc 定義・状態・所有権と記録への案内を追加した
+- Step 0 の設計確定時の観察と現在の実装を混同しないよう、時点を明示した
+
+#### 最終確認・残る範囲
+
+追跡済み src 全体を検索し、p_state/p_wait_chan/p_wait_next、p_backend/p_status、
+PROC_NEW/RUNNABLE/RUNNING/WAIT_LOCK/WAIT_READ/WAIT_WRITE/FINISHED の残存なしを
+確認した。PROC_ERROR は値 7 の意図した MCUFW 拡張であり、削除対象ではない。
+旧名は移行対応表・設計時の観察・過去の作業記録にだけ残す。
+
+本計画は proc の名前・意味・状態・寿命の整合であり、V7 kernel の完全移植ではない。
+MMU/trap/swap、PID・親子関係・wait、priority/signal、preemption は導入していない。
+固定容量・最大4段・単一controllerと、coroutine stack破棄 / thread unwind・join の
+違いを維持する。今回の実行確認は Windows x64 であり、STM32/RTOS 移植は別作業である。
+sanitizer は今回の試験対象外とし、過去の環境記録は回帰ガイドに残した。
+
+全構成の make clean は正常終了した。対象の sys/esh test directory と Windows
+本体に、今回生成した d/o/exe が残っていないことを確認した。
+一時 script/log は削除し、文書内の local link と git diff --check も確認した。
+既存未追跡の cscope、STM32 tree、DLL は変更していない。
+
+次の担当者が行う proc 整合 Step はない。cquote の既存問題の修正、STM32/RTOS 移植、
+新しい機能追加は別の依頼として扱う。
+本記録時点は未コミット。対象は README.md、pipe_sched.md、pipe_executor.md、
+pipe_thread.md、cortn_windows.md、pipe_regression.md、本書、Step 0 設計決定の
+計8文書であり、本体・試験コードに追加差分はない。

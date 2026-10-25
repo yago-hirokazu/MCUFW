@@ -1,6 +1,6 @@
 # Windows stackful coroutine
 
-更新日: 2026-10-25
+更新日: 2026-10-26
 
 ## 役割
 
@@ -97,6 +97,9 @@ MCU stack容量と配置はSTM32移植時に決定する。
 
 `src/core/sys/test/sched`とesh pipe/pipeline suiteがscheduler backendとの結合を
 coroutine/thread双方で確認する。
+結合試験では開始前と通常return後のguard異常を確認し、fatalを通常完了より
+優先する。回復可能なyield失敗後の再待機、wake失敗時の待機解除とPROC_ERROR、
+待機中・起床後のreleaseも確認する。故障注入はSCHED_TEST buildだけで有効となる。
 
 ## User参照
 

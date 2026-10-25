@@ -7,14 +7,14 @@
 ## 適用範囲
 
 [引き継ぎ書](unix_v7_proc_alignment_handoff.md)の状態・寿命・異常の契約を確定する。
-本書は移行後の仕様であり、現行コードが実装済みであることを示さない。
+本書は設計確定時の契約と調査記録であり、当時はコードを変更していない。
 設計確定時の p_state/p_wait_chan/p_wait_next は Step 1 の改名対象である。
 現在の実装状況は引き継ぎ書の Step 表と作業記録を参照する。
 以下では移行後の名前 p_stat/p_wchan/p_link を使う。
 p_xctx、p_ret、専用 user、固定容量 pool、協調的な実行方式を維持する。
 本書作成では本体・試験コードを変更せず、実行試験も行っていない。
 
-## 原典と現行コードから確認した事実
+## 原典と設計確定時のコードから確認した事実
 
 V7 の基準は `.agents/skills/ancient_unix/references/unix_v7/v7/usr/sys/`。
 
@@ -138,8 +138,8 @@ backend が継続不能を検出した場合は PROC_ERROR を明示してから
 sched_sleep は既存 PROC_ERROR または release による p_xctx 切離しを見たら、
 SRUN に戻さず失敗を返す。通常の失敗注入は fatal を設定しない。
 
-現行 sched_sleep は yield 失敗時に一律 PROC_ERROR を設定するが、
-現行 test_yield_failure_cleanup はその後の正常 entry return を確認している。
+設計確定時の sched_sleep は yield 失敗時に一律 PROC_ERROR を設定していたが、
+当時の test_yield_failure_cleanup はその後の正常 entry return を確認していた。
 移行後は回復可能な失敗を SRUN に戻すことで、この正常 return の動作を維持する。
 この修正は Step 2 に含め、PROC_ERROR を一時的なエラー表示として使わない。
 thread の完了処理と coroutine の報告統合には、fatal/cancel を消さない条件が必要になる。

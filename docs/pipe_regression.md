@@ -1,6 +1,6 @@
 # sys pipe移行回帰試験
 
-更新日: 2026-10-25
+更新日: 2026-10-26
 
 現行の試験入口と回帰点を示す。user移行各Stepの実行結果は
 [引き継ぎ書](unix_v7_user_context_handoff.md)を参照する。
@@ -93,6 +93,9 @@ proc状態統合の集中試験は、sys header/file/pipe/sched、esh pipe/sched
 pipeline_execの既存run_test.shを使う。契約と各試験の対応、段階別の結果は
 [proc整合引き継ぎ書](unix_v7_proc_alignment_handoff.md)を参照する。
 旧PROC_*分類の代わりにSIDL/SRUN/SSLEEP/SZOMBとPROC_ERRORを検証する。
+2026-10-25～26のproc整合Step 5で、以下の全入口と両backendのWindows本体を
+確認した。自動判定suiteはすべて成功し、cquoteは終了値0と表示内容を確認した。
+試験結果の構成一覧は引き継ぎ書、cquoteの判定制約と既存問題は末尾を参照する。
 
 scheduler試験の故障注入はSCHED_TEST限定である。yield・backend wake・native
 run wait・native report waitの失敗を制御し、正常終了との区別と待機解除を確認する。
@@ -104,7 +107,7 @@ OS自体の障害を発生させる試験ではない。productionのAPI・proc�
 
 | Directory | 主な確認内容 |
 |---|---|
-| src/core/sys/test/header | 公開headerの単独include、C/C++、user.h |
+| src/core/sys/test/header | 公開headerの単独include・順序入替え、C/C++、proc.h・user.h |
 | src/core/sys/test/table | device登録、固定table、初期化 |
 | src/core/sys/test/bdev | 要求検査、queue、strategy、error completion |
 | src/core/sys/test/ramdisk | minor・block境界、read/write、資源とerror |
@@ -126,6 +129,8 @@ cd ../pipe
 bash ./run_test.sh
 cd ../sched
 bash ./run_test.sh
+cd ../pipeline
+bash ./run_test.sh
 cd ../pipeline_exec
 bash ./run_test.sh
 cd ../par
@@ -140,7 +145,9 @@ make -B
 
 bio、file/inode、sys pipe、coroutineはO0/O2を試験する。file/inode、sys pipe、
 coroutine、esh pipe、schedulerは`-Wall -Wextra -Werror -pedantic`を使用する。
-esh pipe、scheduler、pipelineはcoroutine/threadをO0/O2で試験する。
+esh pipe、scheduler、pipeline executorはcoroutine/threadをO0/O2で試験する。
+esh/test/pipelineはbackendを使わず、parserのpipeline bytecodeをO0/O2で確認する。
+sys schedulerは両backend、O0/O2に加え、既定NBUF=5と小容量NBUF=3も確認する。
 
 pipelineは0、1、256、257、2089 byteと2/3/4段を確認する。各組合せを反復し、
 NULを含むbinary data、順序、変換結果、file/inode使用数0を確認する。2089 byteは
@@ -166,20 +173,32 @@ console自動試験は4段、while/if、変数と引用変数、数値command su
 - pipe stdinへ`scanf`を使用できない
 - STM32/Cortex-M/RTOS移植は未着手
 
-## 既存warning（2026-10-24再確認）
+## 既存warning
 
-user移行Step 7の全回帰で確認した。strictなsys、pipe、scheduler、coroutine suiteは
-warningなしで通過した。pipeline、executor等の広いbuildには次が残る。
+user移行Step 7に続き、proc整合Step 5（2026-10-25～26）の全回帰で再確認した。
+strictなsys、pipe、scheduler、coroutine suiteはwarningなしで通過した。
+pipeline、executor等の広いbuildには次が残る。
 
 - `help.c`: 未使用`argc`、`argv`
 - `lex.c`: 未使用static関数、`snprintf`/`strncpy`切詰め、過剰format引数
 - `par.c`: `char`型array subscript
 - `test.c`: 未使用static関数、過剰format引数
 
-これらのソースは今回のuser移行で変更していない。試験中に出るlexer/parserの
-error表示は異常系を確認する意図された診断であり、全suiteは成功した。
-cquoteは既存の出力表示型試験を実行し、正常終了を確認した。assert/golden照合を
-備える他suiteとは判定方法が異なる。
+これらのソースはproc整合Step 5で変更していない。試験中に出るlexer/parserの
+error表示は異常系を確認する意図された診断であり、自動判定suiteは成功した。
+
+## cquote表示型試験の既存問題
+
+cquoteはassert/golden照合がなく、表示後に終了値0を返す試験である。
+2026-10-26の表示確認では、単独で閉じた末尾引数`'argv4'`が出力から欠落し、
+途中の`'argv3'`へ後続`argv4`が連結される既存挙動を確認した。
+正常終了だけで引用処理が正しいと判定しない。
+
+proc整合前の`82b7617`と比較し、cquote.c、test_cquote.c、Makefileに差分はない。
+同suiteはproc/schedulerをlinkせず、現在のWindows本体もcquote.cをlinkしない。
+今回のproc整合による回帰とは区別し、引用処理と判定方法の修正は別作業とする。
+Windows scriptの引用変数展開はlexer経由であり、両backendの実入力とconsole suiteで
+別途確認済みである。
 
 ## 試験後のclean
 

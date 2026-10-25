@@ -1,6 +1,6 @@
 # ESH pipeline executor
 
-更新日: 2026-10-25
+更新日: 2026-10-26
 
 ## Scope
 
@@ -76,6 +76,11 @@ Release preserves completed `SZOMB` results and marks unfinished backends
 Pipeline status is final command status. Earlier command errors remain in each
 process `p_exec.p_ret` and do not replace final status. Executor stores resulting
 status in `e_status`.
+This result applies only after every stage reaches `SZOMB`. Preparation
+failure, backend failure and deadlock follow executor error path.
+`PROC_ERROR` retains diagnostic p_ret, including possible unwind return,
+without adopting it as normal pipeline result. Scheduler backends leave
+p_ret to command wrapper.
 
 ## Deliberate omissions
 

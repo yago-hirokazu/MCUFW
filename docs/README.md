@@ -1,10 +1,12 @@
 # MCUFW 文書案内
 
-更新日: 2026-10-24
+更新日: 2026-10-26
 
 現行ソースに基づく仕様と、過去の依頼・作業記録を案内する。
 user移行の段階別の実装・試験結果は
 [引き継ぎ書](unix_v7_user_context_handoff.md)を参照する。
+procの名前・状態・寿命・異常の契約と検証結果は
+[proc整合引き継ぎ書](unix_v7_proc_alignment_handoff.md)を参照する。
 
 ## 現行仕様
 
@@ -29,6 +31,13 @@ user移行の段階別の実装・試験結果は
 fd table、file割当・pipe作成の結果、inode/pipe I/Oとsys2はuserへ移行済み。
 Step 6でinode/bioのerror分離、終了・unwind・join後の資源再利用を検証した。
 Step 7の全回帰と最終文書確認も完了し、user導入計画の全Stepは完了した。
+
+`struct proc`は`core/sys/h/proc.h`に定義し、`p_stat/p_wchan/p_link`を使う。
+状態はV7と同じSSLEEP=1、SRUN=3、SIDL=4、SZOMB=5と、MCUFWの異常・取消を表す
+PROC_ERROR=7である。`p_addr`は専用user、`p_xctx`は実行contextを参照し、`p_ret`は
+mainのint戻り値を保持する。proc/userの再利用はbackendのrelease/join完了後に行う。
+proc整合のStep 0～5は完了した。全回帰結果とcquote表示型試験の既存問題は
+引き継ぎ書と回帰ガイドに記録した。
 
 ## 作業記録・計画
 

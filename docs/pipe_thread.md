@@ -1,6 +1,6 @@
 # Windows thread scheduler backend
 
-更新日: 2026-10-25
+更新日: 2026-10-26
 
 ## Backend選択
 
@@ -14,6 +14,7 @@ buildはMSYS2 MINGW64 shell内で実行する。
 
 ```sh
 cd src/target/windows
+make _output
 make -B SCHED_BACKEND=thread main.exe
 ./main.exe
 make -B SCHED_BACKEND=cortn main.exe
@@ -22,6 +23,8 @@ make clean
 
 backendごとに`OUTDIR`と`TARGET`を分ければ両buildを保持できる。回帰scriptは
 coroutine/threadをO0/O2の別directoryへbuildする。
+`main.exe`単独targetはDLLをコピーせず、出力directoryも作らないため、
+clean直後は先に`make _output`を行う。
 
 ## 実行と所有権
 
@@ -91,6 +94,11 @@ native scheduler試験はexternal waker raceを100回実行し、sleep前後のT
 thread identity、check/register/waitの不可分性、終了後のhandle数を確認する。
 専用userのerrorがsleep/wakeupをまたいで保持されること、hostとworkerの分離、
 current procのないnative thread間のbase user分離も試験する。
+状態契約の試験は回復可能なyield失敗後の再待機、複数waiterの取消、backend wake
+失敗と他waiterの継続、worker/controller両側のnative wait失敗を含む。
+故障注入はSCHED_TEST限定とし、controllerのreport wait失敗は実通知と実行token
+返却後に注入する。停止・unwind・join完了までproc/userを保持することを確認する。
+OS自体の障害を起こす試験ではない。
 
 ## V7との差分
 

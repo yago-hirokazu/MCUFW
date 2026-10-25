@@ -1,6 +1,6 @@
 # sys pipe sleep・wakeup
 
-更新日: 2026-10-25
+更新日: 2026-10-26
 
 ## 役割
 
@@ -11,6 +11,8 @@ context切替とlock実装をscheduler backendへ委譲する。Windows backend�
 `struct proc`と`enum proc_state`は`h/proc.h`で定義し、`h/sched.h`がincludeする。
 `p_stat`は実行状態、`p_wchan`は待機対象、`p_link`は待機リストの連結を表す。
 公開状態はV7型の分類を使い、継続不能・取消の`PROC_ERROR`をMCUFW拡張とする。
+`p_addr`は呼出元所有userへの直接参照、`p_xctx`はbackend所有の実行context、
+`p_ret`はexecutorが保存するmainのint戻り値である。
 
 `src/core/sys/dev/windows/sched_backend.mk`の`SCHED_BACKEND`でbackendを選ぶ。
 defaultは`cortn`で、`thread`指定時はnative Windows threadを使用する。
@@ -41,6 +43,8 @@ wait登録前に実行権を返さないため、条件検査直後のwakeupを�
 `sched_wakeup()`はchannel上の全processをwait listから外し、backendをwakeして
 `SRUN`へ変更する。wake後にI/O可能とは限らない。各processは条件を
 再検査し、満たされていなければ再びsleepする。
+backend wakeに失敗したprocessは`PROC_ERROR`とし、同じchannelの残りの
+processの起床を続ける。各processの`p_wchan/p_link`は成功・失敗とも解除する。
 
 使用するchannelは次のとおり。
 
@@ -117,3 +121,17 @@ mainの戻り値を`p_ret`に保持する。管理専用ownerは`SIDL`のまま�
 V7のwait channelと条件再検査を採用するが、process切替機構は移植可能backendへ
 分離する。priority、signal、timeout、swapping、CPU preemptionは実装しない。
 coroutineとthreadは同じ`struct proc`状態とpipe結果を公開する。
+
+| メンバ | V7との対応とMCUFWでの範囲 |
+|---|---|
+| `p_stat` | SSLEEP=1、SRUN=3、SIDL=4、SZOMB=5を採用。PROC_ERROR=7は独自拡張 |
+| `p_wchan` | 待機対象。MCUFWでは対象objectに埋め込むwait_chanへのpointer |
+| `p_link` | V7は実行・睡眠キューに使用。MCUFWはchannelごとの睡眠キューだけに使用 |
+| `p_addr` | V7はswap可能imageの配置。MCUFWは専用userへの直接pointer |
+| `p_xctx` | MCUFW固有。eXecution ConTeXtを指し、backendが資源を所有 |
+| `p_ret` | MCUFW固有。V7 xproc.xp_xstatのoverlayやwait用bit encodingは採用しない |
+
+SIDLは管理専用procにも使い、SZOMBは論理的なentry完了を示す。
+PID・親子関係・wait system callや、native threadのjoin完了は意味しない。
+設計根拠は[Step 0契約](unix_v7_proc_alignment_step0.md)、実装・全回帰結果は
+[proc整合引き継ぎ書](unix_v7_proc_alignment_handoff.md)を参照する。
