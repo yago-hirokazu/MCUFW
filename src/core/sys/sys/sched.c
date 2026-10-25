@@ -1,6 +1,8 @@
 /*
  * current_user() => current_proc() => p_addr => dedicated user area
  * Host without proc => backend-local base user area
+ * sleep / wakeup => proc wait list => scheduler backend
+ * backend report => resume_report() => wakeup / fatal state preserved
  */
 
 #include <assert.h>
@@ -13,18 +15,28 @@
 
 #ifdef SCHED_TEST
 static int test_fail_yield;
+static void (*test_resume_hook)(struct proc *, enum proc_state *);
 #endif
 
 static void wait_remove(struct wait_chan *chan, struct proc *proc);
+static void proc_error(struct proc *proc);
+static int resume_report(struct proc *proc, enum proc_state report);
 
 #ifdef SCHED_TEST
 void sched_test_fail_next_yield(void);
+void sched_test_set_resume_hook(void (*hook)(struct proc *, enum proc_state *));
 #endif
 
 #ifdef SCHED_TEST
 void sched_test_fail_next_yield(void)
 {
 	test_fail_yield = 1;
+}
+
+/* Inject event or report at backend/portable scheduler boundary */
+void sched_test_set_resume_hook(void (*hook)(struct proc *, enum proc_state *))
+{
+	test_resume_hook = hook;
 }
 #endif
 
@@ -51,18 +63,14 @@ int sched_sleep(struct wait_chan *chan, enum wait_reason reason)
 	proc = current_proc();
 	if (!chan || !proc || !proc->p_xctx || !kernel_is_locked())
 		return -SYS_EINVAL;
-	if (proc->p_wchan)
+	if (proc->p_stat != SRUN || proc->p_wchan || proc->p_link)
 		return -SYS_EINVAL;
 
-	if (reason == WAIT_LOCK)
-		proc->p_stat = PROC_WAIT_LOCK;
-	else if (reason == WAIT_READ)
-		proc->p_stat = PROC_WAIT_READ;
-	else if (reason == WAIT_WRITE)
-		proc->p_stat = PROC_WAIT_WRITE;
-	else
+	if (reason != WAIT_LOCK && reason != WAIT_READ &&
+	    reason != WAIT_WRITE)
 		return -SYS_EINVAL;
 
+	proc->p_stat = SSLEEP;
 	proc->p_wchan = chan;
 	proc->p_link = NULL;
 	if (chan->wc_tail)
@@ -81,12 +89,19 @@ int sched_sleep(struct wait_chan *chan, enum wait_reason reason)
 #else
 	result = sched_backend_yield(proc, reason);
 #endif
-	if (result != 0) {
+	if (result != 0 || proc->p_stat == PROC_ERROR || !proc->p_xctx) {
 		wait_remove(chan, proc);
-		proc->p_stat = PROC_ERROR;
+		/* Safe return from failed wait does not terminate execution */
+		if (proc->p_stat != PROC_ERROR && proc->p_xctx)
+			proc->p_stat = SRUN;
+		else
+			proc_error(proc);
 		return -SYS_EINVAL;
 	}
-	proc->p_stat = PROC_RUNNING;
+	if (proc->p_stat != SRUN || proc->p_wchan || proc->p_link) {
+		proc_error(proc);
+		return -SYS_EINVAL;
+	}
 	return 0;
 }
 
@@ -104,8 +119,9 @@ void sched_wakeup(struct wait_chan *chan)
 		next = proc->p_link;
 		proc->p_wchan = NULL;
 		proc->p_link = NULL;
-		if (proc->p_xctx && sched_backend_wake(proc) == 0)
-			proc->p_stat = PROC_RUNNABLE;
+		if (proc->p_stat == SSLEEP && proc->p_xctx &&
+		    sched_backend_wake(proc) == 0)
+			proc->p_stat = SRUN;
 		else
 			proc->p_stat = PROC_ERROR;
 		proc = next;
@@ -137,15 +153,21 @@ void proc_init(struct proc *proc, struct user *user)
 	memset(user, 0, sizeof(*user));
 	proc->p_addr = user;
 	user->u_procp = proc;
-	proc->p_stat = PROC_NEW;
+	proc->p_stat = SIDL;
 }
 
 int proc_bind_backend(struct proc *proc, void *backend)
 {
-	if (!proc || !proc->p_addr || !backend || proc->p_stat != PROC_NEW)
+	if (!proc || !proc->p_addr || !backend)
 		return -SYS_EINVAL;
+	kernel_lock();
+	if (proc->p_stat != SIDL || proc->p_xctx) {
+		kernel_unlock();
+		return -SYS_EINVAL;
+	}
 	proc->p_xctx = backend;
-	proc->p_stat = PROC_RUNNABLE;
+	proc->p_stat = SRUN;
+	kernel_unlock();
 	return 0;
 }
 
@@ -153,7 +175,7 @@ int sched_prepare(struct proc *proc, void (*entry)(void *arg), void *arg)
 {
 	void *backend;
 
-	if (!proc || !proc->p_addr || !entry || proc->p_stat != PROC_NEW)
+	if (!proc || !proc->p_addr || !entry || proc->p_stat != SIDL)
 		return -SYS_EINVAL;
 	backend = sched_backend_prepare(entry, arg);
 	if (!backend)
@@ -173,8 +195,12 @@ void sched_release(struct proc *proc)
 	if (!proc || !proc->p_xctx)
 		return;
 	kernel_lock();
+	if (proc->p_stat != SZOMB)
+		proc->p_stat = PROC_ERROR;
 	if (proc->p_wchan)
 		wait_remove(proc->p_wchan, proc);
+	proc->p_wchan = NULL;
+	proc->p_link = NULL;
 	backend = proc->p_xctx;
 	proc->p_xctx = NULL;
 	kernel_unlock();
@@ -185,32 +211,32 @@ void sched_release(struct proc *proc)
 int sched_resume(struct proc *proc)
 {
 	int result;
+	enum proc_state report;
+#ifdef SCHED_TEST
+	void (*hook)(struct proc *, enum proc_state *);
+#endif
 
 	if (!proc || !proc->p_xctx || current_proc())
 		return -SYS_EINVAL;
 	kernel_lock();
-	if (proc->p_stat != PROC_RUNNABLE) {
+	if (proc->p_stat != SRUN || proc->p_wchan || proc->p_link) {
 		kernel_unlock();
 		return -SYS_EINVAL;
 	}
 	sched_set_current_proc(proc);
-	proc->p_stat = PROC_RUNNING;
 	kernel_unlock();
-	result = sched_backend_resume(proc);
+	report = sched_backend_resume(proc);
 	sched_set_current_proc(NULL);
-	if (result == PROC_ERROR) {
-		kernel_lock();
-		proc->p_stat = PROC_ERROR;
-		kernel_unlock();
-		return -SYS_EINVAL;
-	}
-	/* Keep wakeup published after backend reported wait state */
 	kernel_lock();
-	if (result != PROC_WAIT_LOCK && result != PROC_WAIT_READ &&
-	    result != PROC_WAIT_WRITE)
-		proc->p_stat = (enum proc_state)result;
+#ifdef SCHED_TEST
+	hook = test_resume_hook;
+	test_resume_hook = NULL;
+	if (hook)
+		hook(proc, &report);
+#endif
+	result = resume_report(proc, report);
 	kernel_unlock();
-	return 0;
+	return result;
 }
 
 void sched_set_current_proc(struct proc *proc)
@@ -218,6 +244,7 @@ void sched_set_current_proc(struct proc *proc)
 	sched_backend_set_current(proc);
 }
 
+/* Remove process from waiting object with kernel lock held */
 static void wait_remove(struct wait_chan *chan, struct proc *proc)
 {
 	struct proc *current;
@@ -241,4 +268,46 @@ static void wait_remove(struct wait_chan *chan, struct proc *proc)
 		chan->wc_tail = previous;
 	current->p_wchan = NULL;
 	current->p_link = NULL;
+}
+
+/* Keep fatal state and remove stale wait registration */
+static void proc_error(struct proc *proc)
+{
+	if (proc->p_wchan)
+		wait_remove(proc->p_wchan, proc);
+	proc->p_wchan = NULL;
+	proc->p_link = NULL;
+	proc->p_stat = PROC_ERROR;
+}
+
+/* Merge backend report without losing wakeup or fatal state */
+static int resume_report(struct proc *proc, enum proc_state report)
+{
+	if (report == PROC_ERROR || proc->p_stat == PROC_ERROR)
+		goto error;
+	switch (report) {
+	case SSLEEP:
+		if (proc->p_stat == SSLEEP && proc->p_wchan)
+			return 0;
+		/* Wakeup may precede collection of backend wait report */
+		if (proc->p_stat == SRUN && !proc->p_wchan && !proc->p_link)
+			return 0;
+		break;
+	case SRUN:
+		if (proc->p_stat == SRUN && !proc->p_wchan && !proc->p_link)
+			return 0;
+		break;
+	case SZOMB:
+		if ((proc->p_stat == SRUN || proc->p_stat == SZOMB) &&
+		    !proc->p_wchan && !proc->p_link) {
+			proc->p_stat = SZOMB;
+			return 0;
+		}
+		break;
+	default:
+		break;
+	}
+error:
+	proc_error(proc);
+	return -SYS_EINVAL;
 }

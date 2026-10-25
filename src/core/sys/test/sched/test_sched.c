@@ -26,6 +26,10 @@
 #include "sys_error.h"
 #include "user.h"
 
+#ifndef SCHED_THREAD
+#include "cortn.h"
+#endif
+
 #define TEST_DATA_SIZE	(PIPSIZ * 2 + 37)
 #define SCHED_LIMIT	1000
 
@@ -58,6 +62,7 @@ struct wait_arg {
 	enum wait_reason reason;
 	int result;
 	int lock_held;
+	enum proc_state state;
 };
 
 struct io_stage {
@@ -110,6 +115,7 @@ struct native_user_arg {
 static int failures;
 static void (*saved_ram_strategy)(struct buf *bp);
 static unsigned int max_pipe_io;
+static enum proc_state injected_report;
 
 static ptrdiff_t proc_read(int fd, void *buf, size_t count);
 static ptrdiff_t proc_write(int fd, const void *buf, size_t count);
@@ -129,6 +135,18 @@ static void test_release_waiter(void);
 static void test_wake_then_release(void);
 static void test_yield_failure_cleanup(void);
 static void test_prepare_exhaustion(void);
+static void wake_before_report(struct proc *proc, enum proc_state *report);
+static void override_report(struct proc *proc, enum proc_state *report);
+static void fatal_entry(void *arg);
+static void test_state_reports(void);
+static void test_fatal_completion(void);
+#ifdef SCHED_THREAD
+static void test_native_wait_failure(void);
+#endif
+#ifndef SCHED_THREAD
+static void corrupt_guard_entry(void *arg);
+static void test_guard_completion(void);
+#endif
 static void check_resources(void);
 static void check_buffer_lists(void);
 static void ram_test_begin(void);
@@ -194,6 +212,14 @@ int main(void)
 	test_wake_then_release();
 	test_yield_failure_cleanup();
 	test_prepare_exhaustion();
+	test_state_reports();
+	test_fatal_completion();
+#ifdef SCHED_THREAD
+	test_native_wait_failure();
+#endif
+#ifndef SCHED_THREAD
+	test_guard_completion();
+#endif
 	check_resources();
 	test_ram_capacity();
 #if NBUF >= NINODE + 2
@@ -274,13 +300,13 @@ static int run_scheduler(struct proc *procs, int count)
 		finished = 0;
 		progress = 0;
 		for (i = 0; i < count; i++) {
-			if (procs[i].p_stat == PROC_FINISHED) {
+			if (procs[i].p_stat == SZOMB) {
 				finished++;
 				continue;
 			}
 			if (procs[i].p_stat == PROC_ERROR)
 				return -1;
-			if (procs[i].p_stat != PROC_RUNNABLE)
+			if (procs[i].p_stat != SRUN)
 				continue;
 			if (sched_resume(&procs[i]) < 0)
 				return -1;
@@ -328,6 +354,7 @@ static void wait_entry(void *arg)
 	kernel_lock();
 	wait->result = sched_sleep(wait->chan, wait->reason);
 	wait->lock_held = kernel_is_locked();
+	wait->state = current_proc()->p_stat;
 	kernel_unlock();
 }
 
@@ -371,7 +398,7 @@ static void test_blocking_transfer(void)
 	CHECK(sched_prepare(&procs[0], writer_entry, &writer) == 0);
 	CHECK(sched_prepare(&procs[1], reader_entry, &reader) == 0);
 	CHECK(sched_resume(&procs[1]) == 0);
-	CHECK(procs[1].p_stat == PROC_WAIT_READ);
+	CHECK(procs[1].p_stat == SSLEEP);
 	CHECK(run_scheduler(procs, 2) == 0);
 	CHECK(writer.result == TEST_DATA_SIZE);
 	CHECK(reader.last_result == 0);
@@ -420,7 +447,7 @@ static void test_wait_lock(void)
 	reader.last_result = -1;
 	CHECK(sched_prepare(&sleeper, reader_entry, &reader) == 0);
 	CHECK(sched_resume(&sleeper) == 0);
-	CHECK(sleeper.p_stat == PROC_WAIT_LOCK);
+	CHECK(sleeper.p_stat == SSLEEP);
 	kernel_lock();
 	prele(ip);
 	kernel_unlock();
@@ -448,7 +475,7 @@ static void test_multiple_waiters(void)
 		wait[i].lock_held = 0;
 		CHECK(sched_prepare(&procs[i], wait_entry, &wait[i]) == 0);
 		CHECK(sched_resume(&procs[i]) == 0);
-		CHECK(procs[i].p_stat == PROC_WAIT_READ);
+		CHECK(procs[i].p_stat == SSLEEP);
 	}
 	kernel_lock();
 	sched_wakeup(&chan);
@@ -476,9 +503,13 @@ static void test_release_waiter(void)
 	wait.reason = WAIT_WRITE;
 	CHECK(sched_prepare(&proc, wait_entry, &wait) == 0);
 	CHECK(sched_resume(&proc) == 0);
-	CHECK(proc.p_stat == PROC_WAIT_WRITE);
+	CHECK(proc.p_stat == SSLEEP);
 	sched_release(&proc);
 	CHECK(proc.p_xctx == NULL);
+	CHECK(proc.p_stat == PROC_ERROR);
+#ifdef SCHED_THREAD
+	CHECK(wait.state == PROC_ERROR);
+#endif
 	CHECK(chan.wc_head == NULL);
 	CHECK(chan.wc_tail == NULL);
 }
@@ -499,9 +530,10 @@ static void test_wake_then_release(void)
 	kernel_lock();
 	sched_wakeup(&chan);
 	kernel_unlock();
-	CHECK(proc.p_stat == PROC_RUNNABLE);
+	CHECK(proc.p_stat == SRUN);
 	sched_release(&proc);
 	CHECK(proc.p_xctx == NULL);
+	CHECK(proc.p_stat == PROC_ERROR);
 	CHECK(chan.wc_head == NULL);
 }
 
@@ -523,7 +555,8 @@ static void test_yield_failure_cleanup(void)
 	CHECK(sched_resume(&proc) == 0);
 	CHECK(wait.result == -SYS_EINVAL);
 	CHECK(wait.lock_held);
-	CHECK(proc.p_stat == PROC_FINISHED);
+	CHECK(wait.state == SRUN);
+	CHECK(proc.p_stat == SZOMB);
 	CHECK(proc.p_wchan == NULL);
 	CHECK(proc.p_link == NULL);
 	CHECK(chan.wc_head == NULL);
@@ -545,13 +578,165 @@ static void test_prepare_exhaustion(void)
 		CHECK(sched_prepare(&procs[i], unused_entry, &called) == 0);
 	CHECK(sched_prepare(&procs[i], unused_entry, &called) ==
 	      -SYS_ENOMEM);
-	for (i = 0; i < PIPELINE_MAX; i++)
+	CHECK(procs[i].p_stat == SIDL && procs[i].p_xctx == NULL);
+	for (i = 0; i < PIPELINE_MAX; i++) {
 		sched_release(&procs[i]);
+		CHECK(procs[i].p_stat == PROC_ERROR);
+	}
 	CHECK(called == 0);
 	CHECK(sched_prepare(&procs[i], unused_entry, &called) == 0);
 	sched_release(&procs[i]);
 	CHECK(called == 0);
 }
+
+/* Wake at report boundary while backend still reports sleep */
+static void wake_before_report(struct proc *proc, enum proc_state *report)
+{
+	CHECK(kernel_is_locked());
+	CHECK(*report == SSLEEP && proc->p_stat == SSLEEP);
+	CHECK(proc->p_wchan != NULL);
+	sched_wakeup(proc->p_wchan);
+}
+
+/* Inject invalid or fatal report after real backend suspension */
+static void override_report(struct proc *proc, enum proc_state *report)
+{
+	CHECK(proc->p_stat == SSLEEP);
+	*report = injected_report;
+}
+
+/* Exercise real wait/wake and reject inconsistent completion reports */
+static void test_state_reports(void)
+{
+	const enum wait_reason reasons[] = { WAIT_LOCK, WAIT_READ, WAIT_WRITE };
+	const enum proc_state reports[] = { SIDL, 0, 99, SZOMB, PROC_ERROR };
+	struct wait_chan chan;
+	struct wait_arg wait;
+	struct proc proc;
+	struct user user;
+	size_t i;
+
+	memset(&chan, 0, sizeof(chan));
+	for (i = 0; i < sizeof(reasons) / sizeof(reasons[0]); i++) {
+		proc_init(&proc, &user);
+		CHECK(proc.p_stat == SIDL);
+		sched_release(&proc);
+		CHECK(proc.p_stat == SIDL);
+		wait.chan = &chan;
+		wait.reason = reasons[i];
+		CHECK(sched_prepare(&proc, wait_entry, &wait) == 0);
+		CHECK(proc.p_stat == SRUN);
+		CHECK(sched_prepare(&proc, wait_entry, &wait) == -SYS_EINVAL);
+		sched_test_set_resume_hook(wake_before_report);
+		CHECK(sched_resume(&proc) == 0);
+		CHECK(proc.p_stat == SRUN && proc.p_wchan == NULL);
+		CHECK(proc.p_link == NULL && chan.wc_head == NULL);
+		CHECK(sched_resume(&proc) == 0);
+		CHECK(wait.result == 0 && wait.state == SRUN);
+		CHECK(proc.p_stat == SZOMB);
+		CHECK(sched_resume(&proc) == -SYS_EINVAL);
+		CHECK(proc.p_stat == SZOMB);
+		proc.p_ret = -SYS_EPIPE;
+		sched_release(&proc);
+		sched_release(&proc);
+		CHECK(proc.p_stat == SZOMB && proc.p_ret == -SYS_EPIPE);
+	}
+	for (i = 0; i < sizeof(reports) / sizeof(reports[0]); i++) {
+		proc_init(&proc, &user);
+		wait.chan = &chan;
+		wait.reason = WAIT_READ;
+		CHECK(sched_prepare(&proc, wait_entry, &wait) == 0);
+		injected_report = reports[i];
+		sched_test_set_resume_hook(override_report);
+		CHECK(sched_resume(&proc) == -SYS_EINVAL);
+		CHECK(proc.p_stat == PROC_ERROR);
+		CHECK(proc.p_wchan == NULL && proc.p_link == NULL);
+		CHECK(chan.wc_head == NULL && chan.wc_tail == NULL);
+		sched_release(&proc);
+		CHECK(proc.p_stat == PROC_ERROR);
+	}
+	proc_init(&proc, &user);
+	wait.chan = &chan;
+	wait.reason = (enum wait_reason)99;
+	CHECK(sched_prepare(&proc, wait_entry, &wait) == 0);
+	CHECK(sched_resume(&proc) == 0);
+	CHECK(wait.result == -SYS_EINVAL && wait.state == SRUN);
+	CHECK(proc.p_stat == SZOMB && chan.wc_head == NULL);
+	sched_release(&proc);
+}
+
+/* Publish fatal state before entry returns normally */
+static void fatal_entry(void *arg)
+{
+	(void)arg;
+	kernel_lock();
+	current_proc()->p_stat = PROC_ERROR;
+	kernel_unlock();
+}
+
+/* Completion must not erase earlier fatal state or diagnostic result */
+static void test_fatal_completion(void)
+{
+	struct proc proc;
+	struct user user;
+
+	proc_init(&proc, &user);
+	proc.p_ret = 37;
+	CHECK(sched_prepare(&proc, fatal_entry, NULL) == 0);
+	CHECK(sched_resume(&proc) == -SYS_EINVAL);
+	CHECK(proc.p_stat == PROC_ERROR && proc.p_ret == 37);
+	CHECK(sched_resume(&proc) == -SYS_EINVAL);
+	sched_release(&proc);
+	CHECK(proc.p_stat == PROC_ERROR && proc.p_ret == 37);
+}
+
+#ifdef SCHED_THREAD
+/* Native wait failure is fatal even when entry handles error and returns */
+static void test_native_wait_failure(void)
+{
+	struct wait_chan chan;
+	struct wait_arg wait;
+	struct proc proc;
+	struct user user;
+
+	memset(&chan, 0, sizeof(chan));
+	proc_init(&proc, &user);
+	wait.chan = &chan;
+	wait.reason = WAIT_READ;
+	CHECK(sched_prepare(&proc, wait_entry, &wait) == 0);
+	sched_test_fail_next_thread_wait();
+	CHECK(sched_resume(&proc) == -SYS_EINVAL);
+	CHECK(wait.result == -SYS_EINVAL && wait.state == PROC_ERROR);
+	CHECK(proc.p_stat == PROC_ERROR && proc.p_wchan == NULL);
+	CHECK(proc.p_link == NULL && chan.wc_head == NULL);
+	CHECK(chan.wc_tail == NULL);
+	sched_release(&proc);
+	CHECK(proc.p_stat == PROC_ERROR);
+}
+#else
+/* Corrupt guard before normal completion to exercise post-switch check */
+static void corrupt_guard_entry(void *arg)
+{
+	struct cortn *cortn = current_proc()->p_xctx;
+
+	(void)arg;
+	cortn->c_stack[0] ^= 1;
+}
+
+/* Stack corruption overrides otherwise normal backend completion */
+static void test_guard_completion(void)
+{
+	struct proc proc;
+	struct user user;
+
+	proc_init(&proc, &user);
+	CHECK(sched_prepare(&proc, corrupt_guard_entry, NULL) == 0);
+	CHECK(sched_resume(&proc) == -SYS_EINVAL);
+	CHECK(proc.p_stat == PROC_ERROR);
+	sched_release(&proc);
+	CHECK(proc.p_stat == PROC_ERROR);
+}
+#endif
 
 static void check_resources(void)
 {
@@ -1043,8 +1228,7 @@ static void test_release_user_io(void)
 		io.fd = fd[write];
 		CHECK(sched_prepare(&proc, release_io_entry, &io) == 0);
 		CHECK(sched_resume(&proc) == 0);
-		CHECK(proc.p_stat == (write ? PROC_WAIT_WRITE :
-						 PROC_WAIT_READ));
+		CHECK(proc.p_stat == SSLEEP);
 		transferred = write ? PIPSIZ : 0;
 		CHECK(user.u_base == io.data + transferred);
 		CHECK(user.u_count == sizeof(io.data) - transferred);
@@ -1055,6 +1239,7 @@ static void test_release_user_io(void)
 		CHECK(user.u_error == 0);
 		sched_release(&proc);
 		CHECK(proc.p_xctx == NULL && proc.p_wchan == NULL);
+		CHECK(proc.p_stat == PROC_ERROR);
 		CHECK(proc.p_link == NULL);
 		CHECK(proc.p_addr == &user && user.u_procp == &proc);
 		CHECK(user.u_base == io.data + transferred);

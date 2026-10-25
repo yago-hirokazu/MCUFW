@@ -1,6 +1,6 @@
 # ESH pipeline executor
 
-更新日: 2026-10-24
+更新日: 2026-10-25
 
 ## Scope
 
@@ -35,6 +35,12 @@ Portable scheduler prepares one execution backend for each process and resumes
 runnable processes in round-robin order. Windows coroutine backend owns fixed
 four-slot coroutine and stack pool. No core allocation is dynamic.
 
+Prepared processes are `SRUN`; execution uses same state. Waits publish
+`SSLEEP`, normal entry return publishes `SZOMB`, and backend failure or
+cancellation publishes `PROC_ERROR`. Executor collects final result only when
+every stage reached `SZOMB`. Main returning nonzero or negative value still
+counts as normal entry completion.
+
 Command return stores status in `p_exec.p_ret`. Command wrapper then closes every
 remaining process descriptor before coroutine finishes. Endpoint close wakes
 blocked peers, producing EOF after final writer close or broken pipe after
@@ -58,6 +64,12 @@ Single command runs directly without backend. Executor sets current proc
 before applet call, closes all descriptors after return, and restores previous
 current proc. Bytecode, operands, command IDs, stack and process limits are
 validated before execution.
+Direct execution publishes `SRUN` before main, stores return value in p_ret,
+and publishes `SZOMB` after descriptor close. Temporary owner stays `SIDL`.
+Fatal direct execution keeps p_ret for diagnostics and returns `-SYS_EINVAL`
+instead of adopting command result as normal completion.
+Release preserves completed `SZOMB` results and marks unfinished backends
+`PROC_ERROR`; worker unwind cannot turn cancellation into normal completion.
 
 ## Pipeline status
 

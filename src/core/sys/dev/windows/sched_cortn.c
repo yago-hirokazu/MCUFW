@@ -1,4 +1,7 @@
-/* sched_cortn.c */
+/*
+ * sched.c => cortn resume / yield / wake => fixed execution stack
+ * CORTN state => portable report => scheduler state reconciliation
+ */
 
 #include <string.h>
 
@@ -114,6 +117,8 @@ int sched_backend_yield(struct proc *proc, enum wait_reason reason)
 	kernel_unlock();
 	if (cortn_yield(cortn, yield_reason) != CORTN_SUCCESS) {
 		kernel_lock();
+		/* Invalid context cannot resume safely */
+		proc->p_stat = PROC_ERROR;
 		return -SYS_EINVAL;
 	}
 	kernel_lock();
@@ -139,15 +144,13 @@ enum proc_state sched_backend_resume(struct proc *proc)
 		return PROC_ERROR;
 	switch (cortn->c_state) {
 	case CORTN_RUNNABLE:
-		return PROC_RUNNABLE;
+		return SRUN;
 	case CORTN_WAIT_LOCK:
-		return PROC_WAIT_LOCK;
 	case CORTN_WAIT_READ:
-		return PROC_WAIT_READ;
 	case CORTN_WAIT_WRITE:
-		return PROC_WAIT_WRITE;
+		return SSLEEP;
 	case CORTN_FINISHED:
-		return PROC_FINISHED;
+		return SZOMB;
 	default:
 		return PROC_ERROR;
 	}

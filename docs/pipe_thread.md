@@ -1,6 +1,6 @@
 # Windows thread scheduler backend
 
-更新日: 2026-10-24
+更新日: 2026-10-25
 
 ## Backend選択
 
@@ -34,7 +34,7 @@ coroutine/threadをO0/O2の別directoryへbuildする。
 - TLSがthreadごとのcurrent processとkernel lock所有状態を保持する
 - `current_user()`はcurrentの`p_addr`を返し、currentなしではTLSのbase userを使う
 - workerはapplet呼出し前に自身をcurrent processへ設定する
-- entry returnは`PROC_FINISHED`を通知する
+- entry returnは`SZOMB`を通知するが、既存`PROC_ERROR`は保持する
 - releaseはthreadをjoinし、handleを閉じ、slotを再利用可能にする
 - 未開始threadのreleaseはentryを呼ばずに終了させる
 - 待機中threadのreleaseは協調的なunwindを要求する
@@ -63,6 +63,14 @@ releaseとjoinはkernel lock外で行う。workerがI/Oをunwindしてfdを閉�
 userもrelease完了まで保持する。releaseはuserをゼロ化せず、停止したworkerは
 元のp_addrで残量とerror/resultを確定する。全fd解放とjoinの完了後、proc_initで
 procとuserを再初期化する。sleep/wakeup中もu_base/u_count/u_offsetとu_rを保持する。
+
+未完了backendのreleaseは、待機解除とp_xctx切離しと同じlock区間で
+`PROC_ERROR`を公開する。workerが停止通知から戻ってentryを終了しても、
+`SZOMB`に上書きしない。通常完了後のreleaseは`SZOMB`とp_retを保持する。
+native wait APIの失敗も継続不能として`PROC_ERROR`を保持する。
+worker側のwait失敗は実行tokenを戻して終了報告までcontrollerの早期復帰を防ぐ。
+controller側の報告待ち失敗は停止を通知し、lock外でworker停止を待ってから戻る。
+安全に処理を続ける試験用yield失敗とは分類を分ける。
 
 ## 試験
 

@@ -33,7 +33,7 @@ void proc_init(struct proc *proc, struct user *user)
 	memset(user, 0, sizeof(*user));
 	proc->p_addr = user;
 	user->u_procp = proc;
-	proc->p_stat = PROC_NEW;
+	proc->p_stat = SIDL;
 }
 
 void sched_stub_reset(struct proc *proc)

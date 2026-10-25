@@ -803,12 +803,18 @@ static void test_blocked_user_cleanup(void)
 /* Direct command execution uses proc-owned user instead of host user */
 static int user_probe_main(int argc, char **argv)
 {
-	(void)argc;
 	(void)argv;
 	CHECK(current_proc() != NULL);
+	CHECK(current_proc()->p_stat == SRUN);
+	CHECK(current_proc()->p_xctx == NULL);
 	CHECK(current_user() == current_proc()->p_addr);
 	CHECK(u.u_error == 0);
 	u.u_error = SYS_EIO;
+	if (argc > 1) {
+		kernel_lock();
+		current_proc()->p_stat = PROC_ERROR;
+		kernel_unlock();
+	}
 	return 37;
 }
 
@@ -830,11 +836,26 @@ static void test_single_user(void)
 		executor.e_procs = 1;
 		CHECK(exe_run_codes(&code, &executor) == EXIT_SUCCESS);
 		CHECK(executor.e_status == 37);
+		CHECK(executor.e_proc[0].p_exec.p_stat == SZOMB);
+		CHECK(executor.e_proc[0].p_exec.p_ret == 37);
 		CHECK(executor.e_proc[0].p_exec.p_addr ==
 		      &executor.e_proc[0].p_user);
 		CHECK(executor.e_proc[0].p_user.u_error == SYS_EIO);
 		CHECK(current_proc() == previous && current_user() == host);
 		CHECK(host->u_error == SYS_EINVAL);
 	}
+	/* Fatal direct execution keeps return value only for diagnostics */
+	init_executor_instruction(&code, &executor, OP_CMD_EXE, 0);
+	code.c_codes = 1;
+	init_command(&executor.e_proc[0], &probe);
+	executor.e_proc[0].p_argc = 2;
+	executor.e_proc[0].p_argv[1] = "fatal";
+	executor.e_procs = 1;
+	CHECK(exe_run_codes(&code, &executor) == EXIT_SUCCESS);
+	CHECK(executor.e_status == -SYS_EINVAL);
+	CHECK(executor.e_proc[0].p_exec.p_stat == PROC_ERROR);
+	CHECK(executor.e_proc[0].p_exec.p_ret == 37);
+	CHECK(current_proc() == previous && current_user() == host);
+	CHECK(host->u_error == SYS_EINVAL);
 	host->u_error = 0;
 }

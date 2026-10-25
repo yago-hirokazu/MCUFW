@@ -11,11 +11,12 @@
 可能な限り UNIX V7 に合わせ、無理なく組み込むことである。
 本書は別タスクから実装を継続できるよう、設計方針、順序、検証条件を整理する。
 Step 0 の設計確定と Step 1 のメンバ改名・ヘッダ分離は完了した。
-Step 2～5 は未着手である。次は Step 2 の状態統合を進める。
+Step 2 の状態統合と関連試験は完了した。Step 3～5 は未着手である。
+次は Step 3 の直接実行・管理用 proc・解放経路の全体監査を行う。
 状態・寿命・異常の確定契約は
 [Step 0 設計決定](unix_v7_proc_alignment_step0.md)を参照する。
 以下の「現在の実装」はメンバ改名後のソースを示す。
-状態分類・異常契約の移行は未実装であり、確定契約の実装完了を意味しない。
+Step 2 の検証結果と未完の監査・全回帰は末尾の記録を参照する。
 実装を依頼された後続タスクは、各 Step の確認・実装・検証・記録を進める。
 通常の設計具体化を、追加のユーザー承認待ちとして扱う必要はない。
 
@@ -98,7 +99,9 @@ struct proc {
 };
 ```
 
-- 状態は NEW、RUNNABLE、RUNNING、WAIT_LOCK/READ/WRITE、FINISHED、ERROR
+- 状態は SIDL=4、SRUN=3、SSLEEP=1、SZOMB=5、PROC_ERROR=7
+- 待機理由 WAIT_LOCK/READ/WRITE は引数と backend の内部表現で維持する
+- 回復可能な待機失敗は SRUN、継続不能・取消は PROC_ERROR とする
 - `proc_init()` は caller 所有 user と proc を初期化し、相互参照を設定する
 - `p_xctx` は coroutine では `struct cortn *`、thread では slot への参照
 - 実行機構は固定容量 pool を使い、`PIPELINE_MAX` は現在 4
@@ -201,7 +204,7 @@ file/inode/buffer-cache の基本構造、I/O のエラー契約、shell 文法�
 |---|---|---|
 | 0 | 状態・寿命・異常の契約を確定 | complete |
 | 1 | メンバ改名と proc.h 分離 | complete |
-| 2 | scheduler/backend/executor の状態統合 | pending |
+| 2 | scheduler/backend/executor の状態統合 | complete |
 | 3 | 直接実行・管理用 proc・解放処理の整合 | pending |
 | 4 | 状態遷移と異常系の集中検証 | pending |
 | 5 | 全回帰、文書更新、完了確認 | pending |
@@ -258,6 +261,7 @@ proc.h を header 試験の単独 include、順序入替え、C/C++ の対象へ
 
 ### Step 2: 状態統合
 
+完了。実装・検証結果と前倒しした整合は末尾の Step 2 完了記録を参照する。
 SIDL/SRUN/SSLEEP/SZOMB と MCUFW 異常状態へ移行する。
 portable scheduler、両 backend、executor、関連試験を一まとまりで変更する。
 片方の backend だけ旧状態を返す中間状態で Step 完了としない。
@@ -453,3 +457,75 @@ SRUN 復帰、fatal/cancel の保持を両 backend・executor と一緒に実装
 現在はまだ従来の PROC_* 状態分類と一時的な PROC_ERROR 動作である。
 本記録時点は未コミット。対象は proc.h、改名した本体/stub/試験、header 試験、
 本書、pipe_sched.md、proc Step 0 文書、user 引き継ぎ書である。
+
+### Step 2 完了記録
+
+- 実施日: 2026-10-25
+- 開始 HEAD: `3fd0091`。Step 1 は同コミットで保存済み
+- 状態: complete。Step 3～5 は pending
+- SSLEEP=1、SRUN=3、SIDL=4、SZOMB=5、PROC_ERROR=7 へ状態を統合した
+- scheduler、両 backend、executor、stub と関連試験を同時に更新した
+- 待機理由 WAIT_LOCK/READ/WRITE と内部 CORTN_* は維持した
+- proc_bind_backend は kernel lock 内で context と SRUN を公開する
+- resume_report で共有状態と backend 報告を照合し、早い起床と fatal を保持する
+- 回復可能な yield 失敗は待機解除後 SRUN、継続不能・取消は PROC_ERROR とした
+- 不正な状態報告、未解除の待機を伴う完了報告は、登録を解除して異常扱いとする
+- coroutine の完了後 guard 異常も正常完了より優先する
+- 未完了 backend の release は PROC_ERROR と p_xctx 切離しを同時に公開する
+- thread の entry return は fatal/cancel を SZOMB で上書きしない
+- native run wait 失敗では fatal を公開し、実行tokenを保持して unwind する
+- controller の報告待ち失敗では停止を通知し、lock 外で worker 停止を待つ
+
+Step 2 の状態契約を成立させるため、Step 3 対象の単一コマンド経路も整合させた。
+backend なしで SIDL→SRUN→SZOMB とし、main 戻り値を p_ret に保存する。
+直接実行が fatal となった場合は PROC_ERROR と診断用 p_ret を保持し、
+executor の結果は -SYS_EINVAL として正常結果に採用しない。
+管理用 owner は SIDL のまま、元の current の復元と fd close 順序を維持する。
+Step 3 ではこの実装を再作成せず、全経路の監査と必要な補強を行う。
+
+#### Step 2 検証結果
+
+MSYS2 MINGW64 shell で既存 run_test.sh を実行した。
+native wait 失敗の修正・試験追加後に、scheduler、esh pipe、pipeline executor を再実行した。
+直接実行の fatal 結果を拒否する修正後も、pipeline executor の全構成を再実行した。
+
+| 試験 | 構成 | 結果 |
+|---|---|---|
+| sys header | C/C++、単独・順序入替え、O0/O2、V7 状態値 | passed |
+| sys file/pipe | 各 O0/O2、stub 経由の初期化・I/O | passed |
+| sys scheduler | cortn/thread、O0/O2、既定/NBUF=3 | passed |
+| esh pipe/scheduler | 各 cortn/thread、O0/O2 | passed |
+| pipeline executor | cortn/thread、O0/O2、既存 timeout 維持 | passed |
+
+既存の EOF/EPIPE、部分転送、複数待機者、資源不足、user 保持・再利用に加え、
+以下を試験した。
+
+- 3 種の待機理由で SSLEEP を公開し、早い wakeup 後の古い報告でも SRUN を保持
+- 回復可能な yield 失敗は SRUN に復帰し、その後の通常 return は SZOMB
+- 未定義・SIDL・不整合な完了報告を拒否し、待機情報を解除
+- fatal 設定後の通常 entry return でも PROC_ERROR を保持
+- coroutine の guard を entry 内で破損させ、resume 後の検査で fatal を公開
+- native worker の run wait 失敗を注入し、entry return 後も fatal を保持
+- 準備済み未開始、待機中、起床後の release は取消状態を保持
+- SZOMB の通常 release、backend なし release、繰返し release の状態を保持
+- 単一コマンドの実行中 SRUN、終了後 SZOMB と p_ret、current 復元を確認
+- 直接実行の fatal では、main 戻り値 37 を保持しても正常結果には採用しない
+
+報告境界の早い wakeup と不正報告には SCHED_TEST 限定の one-shot hook を使う。
+native run wait 失敗も SCHED_TEST/SCHED_THREAD 限定で注入した。
+production API・proc メンバの追加はない。controller 側 OS wait 失敗の実故障は
+誘発しておらず、その停止・join 経路はソース確認である。
+
+strict suite は warning なし。pipeline executor の広い shell build には、
+未変更の help.c、lex.c、par.c、test.c の既存 warning が残る。
+文法異常系の意図された診断を含めて全 suite は成功した。
+Step 4 の追加監査・集中検証、Step 5 の全回帰・Windows 対話試験は未実施である。
+
+各構成の make clean は正常終了した。生成した d/o/exe の残存なし、
+旧 PROC_NEW/RUNNABLE/RUNNING/WAIT_*/FINISHED のソース残存なし、
+git diff --check 正常を確認した。一時 script/log は削除した。
+既存未追跡ファイルは変更していない。
+
+次の着手点: Step 3。直接実行、管理用 proc、各 release 経路、p_ret 有効性を監査する。
+本記録時点は未コミット。対象は scheduler/両 backend/executor と関連 header・
+stub・試験、本書、pipe_sched/pipe_thread/cortn_windows/pipe_executor の文書である。

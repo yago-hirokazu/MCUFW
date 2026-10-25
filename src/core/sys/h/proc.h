@@ -8,14 +8,11 @@
 #define __PROC_H__
 
 enum proc_state {
-	PROC_NEW,
-	PROC_RUNNABLE,
-	PROC_RUNNING,
-	PROC_WAIT_LOCK,
-	PROC_WAIT_READ,
-	PROC_WAIT_WRITE,
-	PROC_FINISHED,
-	PROC_ERROR
+	SSLEEP = 1,
+	SRUN = 3,
+	SIDL = 4,
+	SZOMB = 5,
+	PROC_ERROR = 7		/* MCUFW fatal error or cancellation */
 };
 
 struct user;

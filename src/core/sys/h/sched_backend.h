@@ -18,6 +18,7 @@ void sched_backend_set_current(struct proc *proc);
 void *sched_backend_prepare(void (*entry)(void *arg), void *arg);
 void sched_backend_release(void *backend);
 /* Yield enters and returns with kernel lock held */
+/* Fatal yield failure also publishes PROC_ERROR */
 int sched_backend_yield(struct proc *proc, enum wait_reason reason);
 int sched_backend_wake(struct proc *proc);
 enum proc_state sched_backend_resume(struct proc *proc);

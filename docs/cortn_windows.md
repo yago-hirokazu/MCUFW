@@ -1,6 +1,6 @@
 # Windows stackful coroutine
 
-更新日: 2026-10-24
+更新日: 2026-10-25
 
 ## 役割
 
@@ -29,7 +29,9 @@ coroutine engine本体と公開headerはWindows固有context実装と同じdirec
 - `cortn_stack_used()`：stack watermarkから最大使用量を返す
 
 entry関数がreturnすると`CORTN_FINISHED`へ遷移する。FINISHEDまたはERROR状態の
-coroutineは再開できない。scheduler backendがcoroutine状態を`PROC_*`へ写す。
+coroutineは再開できない。scheduler backendはRUNNABLEを`SRUN`、各WAITを
+`SSLEEP`、FINISHEDを`SZOMB`、継続不能を`PROC_ERROR`へ写す。
+portable schedulerは既存のfatal状態を保持し、完了後のguard異常も優先する。
 
 ## Scheduler backend選択
 

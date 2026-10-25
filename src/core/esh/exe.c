@@ -330,13 +330,13 @@ int exe_run_pipeline(struct exe_proc *proc, int count)
 		finished = 0;
 		progress = 0;
 		for (i = 0; i < count; i++) {
-			if (proc[i].p_exec.p_stat == PROC_FINISHED) {
+			if (proc[i].p_exec.p_stat == SZOMB) {
 				finished++;
 				continue;
 			}
 			if (proc[i].p_exec.p_stat == PROC_ERROR)
 				goto out;
-			if (proc[i].p_exec.p_stat != PROC_RUNNABLE)
+			if (proc[i].p_exec.p_stat != SRUN)
 				continue;
 			if (sched_resume(&proc[i].p_exec) < 0)
 				goto out;
@@ -372,10 +372,18 @@ static int exe_execute_commands(struct exe *exe)
 	proc = &exe->e_proc[0];
 	proc_init(&proc->p_exec, &proc->p_user);
 	previous = current_proc();
+	kernel_lock();
+	proc->p_exec.p_stat = SRUN;
 	sched_set_current_proc(&proc->p_exec);
+	kernel_unlock();
 	result = proc->p_cmd->main(proc->p_argc, proc->p_argv);
+	proc->p_exec.p_ret = result;
 	kernel_lock();
 	close_all(&proc->p_exec);
+	if (proc->p_exec.p_stat == PROC_ERROR)
+		result = -SYS_EINVAL;
+	else
+		proc->p_exec.p_stat = SZOMB;
 	kernel_unlock();
 	sched_set_current_proc(previous);
 	return result;

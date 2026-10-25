@@ -1,4 +1,7 @@
-/* sched_thread.c */
+/*
+ * sched.c => execution token / condition variables => native worker
+ * stop / wait failure => PROC_ERROR => unwind => join
+ */
 
 #ifndef _WIN32_WINNT
 #define _WIN32_WINNT 0x0600
@@ -31,8 +34,22 @@ static _Thread_local struct proc *current;
 static _Thread_local struct user base_user;
 static struct sched_thread_slot thread_slots[PIPELINE_MAX];
 
+#ifdef SCHED_TEST
+static int test_fail_thread_wait;
+#endif
+
 static int sched_thread_wait(CONDITION_VARIABLE *cv);
 static unsigned __stdcall sched_thread_entry(void *arg);
+
+#ifdef SCHED_TEST
+/* Fail native run wait after worker publishes suspension */
+void sched_test_fail_next_thread_wait(void)
+{
+	kernel_lock();
+	test_fail_thread_wait = 1;
+	kernel_unlock();
+}
+#endif
 
 /* Host-side operations retain separate error state from workers */
 struct user *sched_backend_base_user(void)
@@ -127,6 +144,7 @@ void sched_backend_release(void *backend)
 int sched_backend_yield(struct proc *proc, enum wait_reason reason)
 {
 	struct sched_thread_slot *slot = proc->p_xctx;
+	int result;
 
 	if (reason != WAIT_LOCK && reason != WAIT_READ &&
 	    reason != WAIT_WRITE)
@@ -135,8 +153,19 @@ int sched_backend_yield(struct proc *proc, enum wait_reason reason)
 	WakeAllConditionVariable(&slot->ts_report_cv);
 	/* Predicate survives wakeup preceding native wait */
 	while (!slot->ts_run && !slot->ts_stop) {
-		if (sched_thread_wait(&slot->ts_run_cv) < 0)
+#ifdef SCHED_TEST
+		if (test_fail_thread_wait) {
+			test_fail_thread_wait = 0;
+			result = -SYS_EINVAL;
+		} else
+#endif
+			result = sched_thread_wait(&slot->ts_run_cv);
+		if (result < 0) {
+			proc->p_stat = PROC_ERROR;
+			/* Keep run token while unwinding failed wait */
+			slot->ts_run = 1;
 			return -SYS_EINVAL;
+		}
 	}
 	return slot->ts_stop ? -SYS_EINVAL : 0;
 }
@@ -167,7 +196,12 @@ enum proc_state sched_backend_resume(struct proc *proc)
 	WakeAllConditionVariable(&slot->ts_run_cv);
 	while (slot->ts_run && !slot->ts_done) {
 		if (sched_thread_wait(&slot->ts_report_cv) < 0) {
+			proc->p_stat = PROC_ERROR;
+			slot->ts_stop = 1;
+			WakeAllConditionVariable(&slot->ts_run_cv);
 			kernel_unlock();
+			/* Keep proc/user alive until worker stops */
+			WaitForSingleObject(slot->ts_thread, INFINITE);
 			return PROC_ERROR;
 		}
 	}
@@ -201,7 +235,8 @@ static unsigned __stdcall sched_thread_entry(void *arg)
 		kernel_unlock();
 		slot->ts_entry(slot->ts_arg);
 		kernel_lock();
-		slot->ts_proc->p_stat = PROC_FINISHED;
+		if (slot->ts_proc->p_stat != PROC_ERROR)
+			slot->ts_proc->p_stat = SZOMB;
 	}
 	slot->ts_done = 1;
 	slot->ts_run = 0;
