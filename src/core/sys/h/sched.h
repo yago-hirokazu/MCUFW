@@ -40,10 +40,12 @@ int sched_resume(struct proc *proc);
 void sched_set_current_proc(struct proc *proc);
 #ifdef SCHED_TEST
 void sched_test_fail_next_yield(void);
+void sched_test_fail_next_wake(void);
 /* One-shot hook runs with kernel lock held after backend report */
 void sched_test_set_resume_hook(void (*hook)(struct proc *, enum proc_state *));
 #ifdef SCHED_THREAD
 void sched_test_fail_next_thread_wait(void);
+void sched_test_fail_next_report_wait(void);
 #endif
 #endif
 

@@ -65,6 +65,13 @@ struct wait_arg {
 	enum proc_state state;
 };
 
+struct retry_arg {
+	struct wait_chan *chan;
+	int recovered;
+	int wakes;
+	int ready;
+};
+
 struct io_stage {
 	const unsigned char *source;
 	unsigned char *output;
@@ -140,8 +147,13 @@ static void override_report(struct proc *proc, enum proc_state *report);
 static void fatal_entry(void *arg);
 static void test_state_reports(void);
 static void test_fatal_completion(void);
+static void test_waiter_removal(void);
+static void retry_entry(void *arg);
+static void test_retry_wait(void);
+static void test_wake_failure(void);
 #ifdef SCHED_THREAD
 static void test_native_wait_failure(void);
+static void test_report_wait_failure(void);
 #endif
 #ifndef SCHED_THREAD
 static void corrupt_guard_entry(void *arg);
@@ -214,8 +226,12 @@ int main(void)
 	test_prepare_exhaustion();
 	test_state_reports();
 	test_fatal_completion();
+	test_waiter_removal();
+	test_retry_wait();
+	test_wake_failure();
 #ifdef SCHED_THREAD
 	test_native_wait_failure();
+	test_report_wait_failure();
 #endif
 #ifndef SCHED_THREAD
 	test_guard_completion();
@@ -695,7 +711,173 @@ static void test_fatal_completion(void)
 	CHECK(proc.p_stat == PROC_ERROR && proc.p_ret == 37);
 }
 
+/* Remove head, middle or tail without disturbing surviving waiters */
+static void test_waiter_removal(void)
+{
+	struct wait_chan chan;
+	struct wait_arg wait[3];
+	struct proc procs[3];
+	struct user users[3];
+	struct proc *left[2];
+	int victim;
+	int i;
+	int count;
+
+	for (victim = 0; victim < 3; victim++) {
+		memset(&chan, 0, sizeof(chan));
+		for (i = 0; i < 3; i++) {
+			proc_init(&procs[i], &users[i]);
+			wait[i].chan = &chan;
+			wait[i].reason = WAIT_READ;
+			CHECK(sched_prepare(&procs[i], wait_entry,
+					    &wait[i]) == 0);
+			CHECK(sched_resume(&procs[i]) == 0);
+		}
+		CHECK(chan.wc_head == &procs[0] && chan.wc_tail == &procs[2]);
+		CHECK(procs[0].p_link == &procs[1]);
+		CHECK(procs[1].p_link == &procs[2] && !procs[2].p_link);
+		CHECK(sched_resume(&procs[victim]) == -SYS_EINVAL);
+		CHECK(procs[victim].p_stat == SSLEEP);
+		sched_release(&procs[victim]);
+		CHECK(procs[victim].p_stat == PROC_ERROR);
+		CHECK(!procs[victim].p_wchan && !procs[victim].p_link);
+		count = 0;
+		for (i = 0; i < 3; i++) {
+			if (i != victim)
+				left[count++] = &procs[i];
+		}
+		CHECK(chan.wc_head == left[0] && chan.wc_tail == left[1]);
+		CHECK(left[0]->p_link == left[1] && !left[1]->p_link);
+		CHECK(left[0]->p_wchan == &chan && left[1]->p_wchan == &chan);
+		kernel_lock();
+		sched_wakeup(&chan);
+		kernel_unlock();
+		CHECK(!chan.wc_head && !chan.wc_tail);
+		for (i = 0; i < 2; i++) {
+			CHECK(left[i]->p_stat == SRUN);
+			CHECK(!left[i]->p_wchan && !left[i]->p_link);
+			CHECK(sched_resume(left[i]) == 0);
+			CHECK(left[i]->p_stat == SZOMB);
+			sched_release(left[i]);
+		}
+	}
+}
+
+/* Recover from failed yield, then recheck condition after each wake */
+static void retry_entry(void *arg)
+{
+	struct retry_arg *retry = arg;
+
+	kernel_lock();
+	CHECK(sched_sleep(retry->chan, WAIT_READ) == -SYS_EINVAL);
+	CHECK(current_proc()->p_stat == SRUN);
+	CHECK(!current_proc()->p_wchan && !current_proc()->p_link);
+	retry->recovered = 1;
+	while (!retry->ready) {
+		CHECK(sched_sleep(retry->chan, WAIT_READ) == 0);
+		CHECK(kernel_is_locked());
+		retry->wakes++;
+	}
+	kernel_unlock();
+}
+
+/* Failed wait and premature wake must permit later successful sleep */
+static void test_retry_wait(void)
+{
+	struct wait_chan chan;
+	struct retry_arg retry;
+	struct proc proc;
+	struct user user;
+	int i;
+
+	memset(&chan, 0, sizeof(chan));
+	memset(&retry, 0, sizeof(retry));
+	retry.chan = &chan;
+	proc_init(&proc, &user);
+	CHECK(sched_prepare(&proc, retry_entry, &retry) == 0);
+	sched_test_fail_next_yield();
+	CHECK(sched_resume(&proc) == 0);
+	CHECK(retry.recovered && retry.wakes == 0);
+	for (i = 0; i < 2; i++) {
+		CHECK(proc.p_stat == SSLEEP && proc.p_wchan == &chan);
+		CHECK(chan.wc_head == &proc && chan.wc_tail == &proc);
+		CHECK(proc.p_link == NULL);
+		kernel_lock();
+		retry.ready = i;
+		sched_wakeup(&chan);
+		kernel_unlock();
+		CHECK(sched_resume(&proc) == 0);
+		CHECK(retry.wakes == i + 1);
+	}
+	CHECK(proc.p_stat == SZOMB && !chan.wc_head && !chan.wc_tail);
+	sched_release(&proc);
+}
+
+/* Failed wake cancels one peer while other peers remain runnable */
+static void test_wake_failure(void)
+{
+	struct wait_chan chan;
+	struct wait_arg wait[2];
+	struct proc procs[2];
+	struct user users[2];
+	int i;
+
+	memset(&chan, 0, sizeof(chan));
+	for (i = 0; i < 2; i++) {
+		proc_init(&procs[i], &users[i]);
+		wait[i].chan = &chan;
+		wait[i].reason = WAIT_READ;
+		CHECK(sched_prepare(&procs[i], wait_entry, &wait[i]) == 0);
+		CHECK(sched_resume(&procs[i]) == 0);
+	}
+	sched_test_fail_next_wake();
+	kernel_lock();
+	sched_wakeup(&chan);
+	kernel_unlock();
+	CHECK(procs[0].p_stat == PROC_ERROR && procs[1].p_stat == SRUN);
+	CHECK(!chan.wc_head && !chan.wc_tail);
+	for (i = 0; i < 2; i++)
+		CHECK(!procs[i].p_wchan && !procs[i].p_link);
+	CHECK(sched_resume(&procs[0]) == -SYS_EINVAL);
+	CHECK(sched_resume(&procs[1]) == 0 && procs[1].p_stat == SZOMB);
+	sched_release(&procs[0]);
+	sched_release(&procs[1]);
+	CHECK(procs[0].p_stat == PROC_ERROR && !procs[0].p_xctx);
+	CHECK(procs[1].p_stat == SZOMB && !procs[1].p_xctx);
+}
+
 #ifdef SCHED_THREAD
+/* Report failure must stop and join worker before returning to owner */
+static void test_report_wait_failure(void)
+{
+	struct wait_chan chan;
+	struct wait_arg wait;
+	struct proc proc;
+	struct user user;
+	void *context;
+
+	memset(&chan, 0, sizeof(chan));
+	proc_init(&proc, &user);
+	proc.p_ret = 37;
+	wait.chan = &chan;
+	wait.reason = WAIT_READ;
+	wait.result = 1;
+	user.u_error = SYS_EIO;
+	CHECK(sched_prepare(&proc, wait_entry, &wait) == 0);
+	context = proc.p_xctx;
+	sched_test_fail_next_report_wait();
+	CHECK(sched_resume(&proc) == -SYS_EINVAL);
+	CHECK(wait.result == -SYS_EINVAL && wait.lock_held);
+	CHECK(wait.state == PROC_ERROR && proc.p_stat == PROC_ERROR);
+	CHECK(proc.p_xctx == context && proc.p_ret == 37);
+	CHECK(user.u_procp == &proc && proc.p_addr == &user);
+	CHECK(user.u_error == SYS_EIO);
+	CHECK(!chan.wc_head && !chan.wc_tail);
+	CHECK(!proc.p_wchan && !proc.p_link);
+	sched_release(&proc);
+	CHECK(proc.p_stat == PROC_ERROR && !proc.p_xctx);
+}
+
 /* Native wait failure is fatal even when entry handles error and returns */
 static void test_native_wait_failure(void)
 {
@@ -733,6 +915,17 @@ static void test_guard_completion(void)
 {
 	struct proc proc;
 	struct user user;
+	struct cortn *cortn;
+	int called;
+
+	called = 0;
+	proc_init(&proc, &user);
+	CHECK(sched_prepare(&proc, unused_entry, &called) == 0);
+	cortn = proc.p_xctx;
+	cortn->c_stack[0] ^= 1;
+	CHECK(sched_resume(&proc) == -SYS_EINVAL);
+	CHECK(called == 0 && proc.p_stat == PROC_ERROR);
+	sched_release(&proc);
 
 	proc_init(&proc, &user);
 	CHECK(sched_prepare(&proc, corrupt_guard_entry, NULL) == 0);

@@ -13,7 +13,8 @@
 Step 0 の設計確定と Step 1 のメンバ改名・ヘッダ分離は完了した。
 Step 2 の状態統合と関連試験は完了した。
 Step 3 の直接実行・管理用 proc・解放経路の監査と関連試験も完了した。
-Step 4～5 は未着手であり、次は Step 4 の状態遷移・異常系の集中検証を行う。
+Step 4 の状態遷移・異常系の集中検証も完了した。
+次は未着手の Step 5 で全回帰と最終文書確認を行う。
 状態・寿命・異常の確定契約は
 [Step 0 設計決定](unix_v7_proc_alignment_step0.md)を参照する。
 以下の「現在の実装」はメンバ改名後のソースを示す。
@@ -207,7 +208,7 @@ file/inode/buffer-cache の基本構造、I/O のエラー契約、shell 文法�
 | 1 | メンバ改名と proc.h 分離 | complete |
 | 2 | scheduler/backend/executor の状態統合 | complete |
 | 3 | 直接実行・管理用 proc・解放処理の整合 | complete |
-| 4 | 状態遷移と異常系の集中検証 | pending |
+| 4 | 状態遷移と異常系の集中検証 | complete |
 | 5 | 全回帰、文書更新、完了確認 | pending |
 
 ### Step 0: 状態・寿命・異常の契約
@@ -308,6 +309,7 @@ Step 2 の検証を成立させるため必要な整合は Step 2 内で行い�
 
 ### Step 4: 集中検証
 
+完了。契約と試験の対応、補強内容、検証結果は末尾の Step 4 完了記録を参照する。
 既存試験を新状態へ更新し、統合で見落としやすい条件のみ追加・補強する。
 実装をそのまま写した試験や、既存試験と同じ検証を大量に増やさない。
 
@@ -605,3 +607,83 @@ git diff --check 正常を確認し、一時 script/log は削除した。
 次の着手点: Step 4。既存・追加試験と契約の対応を確認し、状態遷移・異常系の不足を補う。
 本記録時点は未コミット。対象は sys file/sched と pipeline executor の試験、
 本書、pipe_sched.md、pipe_executor.md である。
+
+### Step 4 完了記録
+
+- 実施日: 2026-10-25
+- 開始 HEAD: `ee9ad2e`。Step 3 は同コミットで保存済み
+- 状態: complete。Step 5 は pending
+- Step 0 の状態・寿命・異常契約と、Step 1～3 の試験を対応付けて不足を補った
+- 新しい試験でも動作不整合は見つからず、通常ビルドの状態契約・API・proc メンバは未変更
+- backend wake と native report wait の故障注入を SCHED_TEST 限定で追加した
+- native report wait の結果を局所変数へ受ける形に整理し、試験用の失敗置換を分離した
+- OS wait API の呼出し・停止通知・join の通常ビルドでの処理順序は変更していない
+
+#### Step 4 契約と試験の対応
+
+| 契約 | 主な試験 | 確認する動作 |
+|---|---|---|
+| 状態値・初期化・bind | header/test_headers、test_state_reports、test_prepare_exhaustion、test_user_isolation | V7 値、SIDL/SRUN、user 相互参照、二重 prepare 拒否、容量不足 |
+| 待機理由・登録・lock | test_state_reports、test_wait_lock、test_multiple_waiters | 各 WAIT 理由で SSLEEP、p_wchan、待機登録と lock 保持 |
+| 待機キューの取消 | test_waiter_removal | head/middle/tail の取消、残存順序と tail、拒否した resume の状態保持 |
+| 早い起床と条件再検査 | wake_before_report、test_retry_wait、pipe の test_wait_rechecks | 古い SSLEEP 報告の抑止、条件未成立時の再待機、重複登録防止 |
+| pipe データ・peer 終了 | test_blocking_transfer、test_full_and_offset_reset、test_eof_epipe_and_close_wakeup、test_early_filter_exit | 空/full、部分転送、close 後の EOF/EPIPE、資源回収 |
+| 回復可能な失敗 | test_yield_failure_cleanup、test_retry_wait | 失敗後 SRUN に復帰し、同じ entry が再待機・通常完了できる |
+| wake 不能 | test_wake_failure | 失敗した peer は PROC_ERROR、他の peer は起床し正常完了 |
+| 報告の異常・fatal 保持 | test_state_reports、test_fatal_completion | 不正・矛盾する報告の拒否、登録除去、通常 return より fatal を優先 |
+| coroutine 再開不能 | test_guard_completion | 開始前 guard 異常は entry を実行せず拒否、完了後 guard 異常も fatal |
+| native wait 異常 | test_native_wait_failure、test_report_wait_failure | worker/controller 両側の待機失敗、停止・unwind・join、元の user 保持 |
+| 結果の有効性 | test_three_stage_pipeline、test_blocked_user_cleanup、test_single_user、test_direct_io_context | 最終段結果、非ゼロ・負の正常 return、fatal/cancel の診断値を正常結果に採用しない |
+| 解放・再利用 | test_release_waiter、test_wake_then_release、test_release_user_io、test_blocked_user_cleanup | 待機/起床後の取消、link/context 除去、join 後にだけ proc/user を再利用 |
+| 直接実行・管理用 proc | test_direct_io_context、test_user_descriptors、準備失敗 cleanup 試験 | SRUN/SZOMB と SIDL の区別、caller 復元、fd close、backend なし I/O |
+
+test_ 名は原則 src/core/sys/test/sched/test_sched.c を指す。
+pipe のデータ試験は sys/test/pipe、executor と直接実行の試験は
+esh/test/pipeline_exec、test_user_descriptors は sys/test/file にある。
+esh/test/sched は sys scheduler と同じ試験ソースを別の include 経路で実行する。
+
+#### Step 4 追加した集中試験
+
+1. 3 waiter の head/middle/tail をそれぞれ取消し、残存者の順序、p_wchan/p_link、
+   channel head/tail を確認した。取消前の SSLEEP proc の resume 拒否も確認した。
+2. yield の回復可能な失敗後に、同じ entry が実際に再待機する経路を追加した。
+   条件未成立で一度起こし、再度 SSLEEP に入り、条件成立後だけ SZOMB になることを確認した。
+3. backend wake の一度だけの失敗を両 backend へ注入した。
+   失敗者を PROC_ERROR として除去しても、同じ channel の他の待機者を起床できた。
+4. native controller の report wait に、実際の worker 通知後の失敗を注入した。
+   worker が失敗復帰を終えるまで sched_resume が戻らず、user/error/診断用 p_ret と
+   backend 参照を保持し、owner の release で context を回収できることを確認した。
+5. coroutine 開始前の guard 異常を追加し、entry が呼ばれないことを確認した。
+   既存の通常 return 後の guard 異常と合わせ、切替前後の再開不能を検証した。
+
+故障注入の関数・flag は SCHED_TEST 限定で、report wait 注入は SCHED_THREAD も必要である。
+report wait 注入は、実待機から戻り実行 token が返った後にだけ発火するため、
+spurious notification で処理開始前に失敗を消費しない。
+OS 自体の障害や無効な native handle を作った試験ではなく、既存の失敗経路を
+制御して状態・資源の契約を確認する試験である。
+Step 2 でソース確認のみだった controller の停止・join 経路も今回実行できた。
+
+#### Step 4 検証結果
+
+MSYS2 MINGW64 shell で既存 run_test.sh の構成・timeout を維持して実行した。
+
+| 試験 | 構成 | 結果 |
+|---|---|---|
+| sys header | C/C++、単独 include・順序入替え、O0/O2 | passed |
+| sys file/pipe | 各 O0/O2、管理用 proc・I/O の既存回帰 | passed |
+| sys scheduler | cortn/thread、O0/O2、既定/NBUF=3、追加故障注入を含む | passed |
+| esh pipe/scheduler | 各 cortn/thread、O0/O2 | passed |
+| pipeline executor | cortn/thread、O0/O2、結果・cleanup・直接実行 | passed |
+
+strict suite は warning なし。pipeline executor の広い shell build には、
+未変更の help.c、lex.c、par.c、test.c の既存 warning と文法異常系の診断が残る。
+これらを含め全 suite は成功した。parser/exe 全体、RAM/device 系、Windows 本体の
+対話試験を含む全回帰は Step 5 で実施する。
+
+全構成の make clean は正常終了した。生成した d/o/exe の残存なし、
+git diff --check 正常を確認し、一時 script/log は削除した。
+既存未追跡ファイルは変更していない。
+
+次の着手点: Step 5 の全回帰・最終文書確認。
+本記録時点は未コミット。対象は両 scheduler backend の試験用注入、sched.h の
+試験用宣言、scheduler 試験、本書、pipe_regression.md である。

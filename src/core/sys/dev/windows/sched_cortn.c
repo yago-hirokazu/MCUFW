@@ -24,7 +24,21 @@ static struct proc *current;
 static struct user base_user;
 static struct sched_cortn_slot cortn_slots[PIPELINE_MAX];
 
+#ifdef SCHED_TEST
+static int test_fail_wake;
+#endif
+
 static void sched_cortn_entry(struct cortn *cortn, void *arg);
+
+#ifdef SCHED_TEST
+/* Fail wake without changing saved coroutine context */
+void sched_test_fail_next_wake(void)
+{
+	kernel_lock();
+	test_fail_wake = 1;
+	kernel_unlock();
+}
+#endif
 
 /* Host-side operations retain separate error state from workers */
 struct user *sched_backend_base_user(void)
@@ -129,6 +143,12 @@ int sched_backend_wake(struct proc *proc)
 {
 	struct cortn *cortn;
 
+#ifdef SCHED_TEST
+	if (test_fail_wake) {
+		test_fail_wake = 0;
+		return -SYS_EINVAL;
+	}
+#endif
 	cortn = proc->p_xctx;
 	if (cortn_wake(cortn) != CORTN_SUCCESS)
 		return -SYS_EINVAL;

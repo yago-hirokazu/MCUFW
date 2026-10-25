@@ -36,6 +36,8 @@ static struct sched_thread_slot thread_slots[PIPELINE_MAX];
 
 #ifdef SCHED_TEST
 static int test_fail_thread_wait;
+static int test_fail_wake;
+static int test_fail_report_wait;
 #endif
 
 static int sched_thread_wait(CONDITION_VARIABLE *cv);
@@ -47,6 +49,22 @@ void sched_test_fail_next_thread_wait(void)
 {
 	kernel_lock();
 	test_fail_thread_wait = 1;
+	kernel_unlock();
+}
+
+/* Fail wake without changing native wait predicate */
+void sched_test_fail_next_wake(void)
+{
+	kernel_lock();
+	test_fail_wake = 1;
+	kernel_unlock();
+}
+
+/* Fail report wait after actual worker notification */
+void sched_test_fail_next_report_wait(void)
+{
+	kernel_lock();
+	test_fail_report_wait = 1;
 	kernel_unlock();
 }
 #endif
@@ -174,6 +192,12 @@ int sched_backend_wake(struct proc *proc)
 {
 	struct sched_thread_slot *slot = proc->p_xctx;
 
+#ifdef SCHED_TEST
+	if (test_fail_wake) {
+		test_fail_wake = 0;
+		return -SYS_EINVAL;
+	}
+#endif
 	if (!slot->ts_used || slot->ts_done || slot->ts_stop)
 		return -SYS_EINVAL;
 	/* Executor grants run token after shared state becomes runnable */
@@ -185,6 +209,7 @@ enum proc_state sched_backend_resume(struct proc *proc)
 {
 	struct sched_thread_slot *slot = proc->p_xctx;
 	enum proc_state state;
+	int result;
 
 	kernel_lock();
 	if (slot->ts_done || slot->ts_stop) {
@@ -195,7 +220,14 @@ enum proc_state sched_backend_resume(struct proc *proc)
 	slot->ts_run = 1;
 	WakeAllConditionVariable(&slot->ts_run_cv);
 	while (slot->ts_run && !slot->ts_done) {
-		if (sched_thread_wait(&slot->ts_report_cv) < 0) {
+		result = sched_thread_wait(&slot->ts_report_cv);
+#ifdef SCHED_TEST
+		if (test_fail_report_wait && !slot->ts_run) {
+			test_fail_report_wait = 0;
+			result = -SYS_EINVAL;
+		}
+#endif
+		if (result < 0) {
 			proc->p_stat = PROC_ERROR;
 			slot->ts_stop = 1;
 			WakeAllConditionVariable(&slot->ts_run_cv);

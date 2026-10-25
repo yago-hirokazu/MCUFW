@@ -1,6 +1,6 @@
 # sys pipe移行回帰試験
 
-更新日: 2026-10-24
+更新日: 2026-10-25
 
 現行の試験入口と回帰点を示す。user移行各Stepの実行結果は
 [引き継ぎ書](unix_v7_user_context_handoff.md)を参照する。
@@ -88,6 +88,16 @@ lock外でbackendをreleaseまたはjoinする。
 [RAM I/O](ram_block_device.md)の前提・所有権と[pipe core](pipe_core.md)も参照する。
 
 ## 回帰試験
+
+proc状態統合の集中試験は、sys header/file/pipe/sched、esh pipe/sched、
+pipeline_execの既存run_test.shを使う。契約と各試験の対応、段階別の結果は
+[proc整合引き継ぎ書](unix_v7_proc_alignment_handoff.md)を参照する。
+旧PROC_*分類の代わりにSIDL/SRUN/SSLEEP/SZOMBとPROC_ERRORを検証する。
+
+scheduler試験の故障注入はSCHED_TEST限定である。yield・backend wake・native
+run wait・native report waitの失敗を制御し、正常終了との区別と待機解除を確認する。
+report wait失敗は実際のworker通知後に注入し、停止・join完了までuserを保持する。
+OS自体の障害を発生させる試験ではない。productionのAPI・procメンバは増やさない。
 
 以下に加え、RAM導入後のheader/table/bdev/ramdisk suiteも対象にする。
 各directoryでMSYS2 MINGW64 shellからbash ./run_test.shを実行する。
