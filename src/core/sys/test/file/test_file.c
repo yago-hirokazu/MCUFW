@@ -171,6 +171,7 @@ static void test_user_descriptors(void)
 	for (i = 0; i < 2; i++) {
 		init_proc(&procs[i], &users[i]);
 		CHECK(users[i].u_procp == &procs[i]);
+		CHECK(procs[i].p_stat == SIDL && !procs[i].p_xctx);
 		files[i] = allocate_file(&procs[i], &fd);
 		CHECK(files[i] != NULL && fd == 0);
 	}
@@ -193,6 +194,11 @@ static void test_user_descriptors(void)
 	CHECK(file_in_use() == 0);
 	CHECK(users[0].u_error == SYS_EIO && users[1].u_error == SYS_EPIPE);
 	sched_stub_reset(NULL);
+	for (i = 0; i < 2; i++) {
+		CHECK(procs[i].p_stat == SIDL && !procs[i].p_xctx);
+		CHECK(procs[i].p_addr == &users[i] &&
+		      users[i].u_procp == &procs[i]);
+	}
 }
 
 static void test_fd_exhaustion(void)

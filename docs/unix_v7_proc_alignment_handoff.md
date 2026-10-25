@@ -11,8 +11,9 @@
 可能な限り UNIX V7 に合わせ、無理なく組み込むことである。
 本書は別タスクから実装を継続できるよう、設計方針、順序、検証条件を整理する。
 Step 0 の設計確定と Step 1 のメンバ改名・ヘッダ分離は完了した。
-Step 2 の状態統合と関連試験は完了した。Step 3～5 は未着手である。
-次は Step 3 の直接実行・管理用 proc・解放経路の全体監査を行う。
+Step 2 の状態統合と関連試験は完了した。
+Step 3 の直接実行・管理用 proc・解放経路の監査と関連試験も完了した。
+Step 4～5 は未着手であり、次は Step 4 の状態遷移・異常系の集中検証を行う。
 状態・寿命・異常の確定契約は
 [Step 0 設計決定](unix_v7_proc_alignment_step0.md)を参照する。
 以下の「現在の実装」はメンバ改名後のソースを示す。
@@ -205,7 +206,7 @@ file/inode/buffer-cache の基本構造、I/O のエラー契約、shell 文法�
 | 0 | 状態・寿命・異常の契約を確定 | complete |
 | 1 | メンバ改名と proc.h 分離 | complete |
 | 2 | scheduler/backend/executor の状態統合 | complete |
-| 3 | 直接実行・管理用 proc・解放処理の整合 | pending |
+| 3 | 直接実行・管理用 proc・解放処理の整合 | complete |
 | 4 | 状態遷移と異常系の集中検証 | pending |
 | 5 | 全回帰、文書更新、完了確認 | pending |
 
@@ -290,6 +291,7 @@ SIDL -- prepare/bind --> SRUN -- command completion --> SZOMB
 
 ### Step 3: 実行経路と解放の整合
 
+完了。監査結果・追加試験は末尾の Step 3 完了記録を参照する。
 exe_execute_commands の単一コマンド経路を確認し、直接実行中は SRUN、
 処理完了後は SZOMB とし、main の戻り値を p_ret に保存する。
 直接実行は p_xctx なしを維持し、元の current の復元と fd close を維持する。
@@ -529,3 +531,77 @@ git diff --check 正常を確認した。一時 script/log は削除した。
 次の着手点: Step 3。直接実行、管理用 proc、各 release 経路、p_ret 有効性を監査する。
 本記録時点は未コミット。対象は scheduler/両 backend/executor と関連 header・
 stub・試験、本書、pipe_sched/pipe_thread/cortn_windows/pipe_executor の文書である。
+
+### Step 3 完了記録
+
+- 実施日: 2026-10-25
+- 開始 HEAD: `2afbec4`。Step 2 は同コミットで保存済み
+- 状態: complete。Step 4～5 は pending
+- Step 0 の確定契約と Step 2 の実装を、直接実行から解放・再利用まで照合した
+- 本体の動作修正が必要な不整合は見つからず、本体ソース・API・状態契約は未変更
+- 試験を補強し、既存仕様の所有権説明と本書の進行状況を更新した
+
+#### Step 3 経路別の監査結果
+
+| 経路 | 主なソース・関数 | 確認結果 |
+|---|---|---|
+| 単一コマンド | esh/exe.c: exe_execute_commands | backend なし SRUN、main return を p_ret へ保存、fd close 後 SZOMB、元の current 復元 |
+| 直接実行の fatal | 同上 | PROC_ERROR を保持し、p_ret は診断用、executor は -SYS_EINVAL を採用 |
+| 管理用 owner | exe_connect_proc、pipe_for_proc、fd_install_at | SIDL を維持。専用 user で fd を構築・受渡しし、実行候補へ入れない |
+| pipe 構築途中の失敗 | exe_connect_proc、exe_cleanup_pipeline | 一時 owner の fd と部分接続を回収。未準備 proc は SIDL、p_ret は未実行値 |
+| backend 準備途中の失敗 | sched_prepare、exe_cleanup_pipeline | 準備済みだけを取消・release、未準備は SIDL。全接続 fd を先に close |
+| 通常 pipeline 終了 | exe_proc_entry、sched_resume | main 戻り値を保持し fd close 後に完了。全段 SZOMB 時のみ最終段結果を回収 |
+| 開始前・待機中・起床後の取消 | sched_release、両 sched backend | PROC_ERROR と context 切離しを lock 内で公開し、待機 link を解除 |
+| thread の unwind/join | sched_thread.c | 保存済み slot と元の user を使い、lock 外で停止・join。entry return でも取消を消さない |
+| coroutine の取消 | sched_cortn.c | 停止中 stack を破棄。待機後の処理と main return は実行しない |
+| fd 最終 close | fio.c: close_all/closef、iget.c: iput | 参照回収と peer 起床。user の error/result を保持し、終了・取消の公開は scheduler が担当 |
+| backend なしの I/O | pipe.c、sys2.c | 空/full では EAGAIN、転送済みなら部分成功。待機登録をせず、直接実行の SRUN を維持 |
+| release 後の再利用 | proc_init、executor の再実行 | backend 停止・join と fd close 完了後にだけ proc/user を初期化 |
+
+原典の V7 sys/sys1.c: exit と sys/fio.c: closef も参照し、fd 解放・peer 起床と
+終了結果の役割を照合した。V7 の MMU、親子関係、xproc overlay は導入しない。
+
+release は fd close と user 初期化を代行しない。backend のない管理用 owner では、
+release は live fd があっても状態・参照を変更しない。owner の明示 close が必要である。
+SZOMB と p_xctx == NULL は join 完了の代わりにならず、既存の release 完了契約を維持する。
+破棄した coroutine stack を指す u_base は参照しない。既存の pipeline 取消試験も
+残量等の値だけを確認し、古い stack の転送先を dereference していない。
+
+#### Step 3 試験補強
+
+- 直接実行を、live pipe を持つ非 NULL の caller proc から行い current/user 復元を確認
+- caller の fd、file 参照数、u_procp、error/result/転送状態を子コマンドの cleanup 前後で保持
+- 直接コマンドが自分で開いた pipe の fd を残して return し、executor の close を確認
+- backend なしの空 read/full write の EAGAIN、容量を超える write の部分成功を確認
+- main の戻り値 0、37、-SYS_EPIPE の全てが通常完了の SZOMB/p_ret として保持されることを確認
+- 同じ executor 領域の再実行で、前回の fd/error/result/転送状態を引き継がないことを確認
+- fd 受渡しと close 後も管理用 proc が SIDL、backend なし、専用 user の相互参照を保持
+- pipe 構築失敗後の全 proc が SIDL、backend 部分準備失敗では準備済みだけ PROC_ERROR と確認
+- deadlock 取消では両 proc が PROC_ERROR。thread は unwind の main return 値を診断用に保持
+- coroutine では取消後の main return がなく p_ret=0 のままでも、pipeline が成功扱いしないことを確認
+- thread の I/O unwind 中に、p_xctx 切離し済み、PROC_ERROR、元の user が有効であることを確認
+- 起床後 release の待機解除、lock 保持での失敗復帰、取消状態を確認
+
+#### Step 3 検証結果
+
+MSYS2 MINGW64 shell で既存 run_test.sh を実行した。
+
+| 試験 | 構成 | 結果 |
+|---|---|---|
+| sys file | O0/O2、管理用 proc の fd 受渡しと状態保持 | passed |
+| sys pipe | O0/O2、既存の EAGAIN/部分転送/close 回帰 | passed |
+| sys scheduler | cortn/thread、O0/O2、既定/NBUF=3、取消・unwind・再利用 | passed |
+| pipeline executor | cortn/thread、O0/O2、直接実行・部分準備失敗・取消・再利用 | passed |
+
+strict suite は warning なし。広い shell build には未変更の
+help.c、lex.c、par.c、test.c の既存 warning が残り、文法異常系の診断も出る。
+これらを含め全 suite は成功した。新規 production 分岐や test hook の追加はない。
+Step 4 の集中検証監査と Step 5 の全回帰・Windows 本体対話試験は未実施である。
+
+各構成の make clean は正常終了した。今回生成した d/o/exe の残存なし、
+git diff --check 正常を確認し、一時 script/log は削除した。
+既存未追跡ファイルは変更していない。
+
+次の着手点: Step 4。既存・追加試験と契約の対応を確認し、状態遷移・異常系の不足を補う。
+本記録時点は未コミット。対象は sys file/sched と pipeline executor の試験、
+本書、pipe_sched.md、pipe_executor.md である。

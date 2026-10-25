@@ -102,6 +102,8 @@ plockの競合やsched_sleepの失敗は`u_error`へ記録し、取得してい�
 解放する。thread join中にworkerがlockを必要とするため、lock内でjoinしない。
 未完了backendは`PROC_ERROR`を公開してから`p_xctx`を切り離す。
 通常完了した`SZOMB`と`p_ret`は保持し、backendなしのreleaseは状態を変えない。
+fdのcloseは所有者が行い、release自体はfdを閉じない。管理用procの
+backendなしreleaseも、fd参照やuserのerror/resultを変更しない。
 releaseはuserを初期化しない。threadは停止通知により待機からEINVALで戻り、
 同じp_addrのuserでI/Oの残量・結果を確定してから終了する。coroutineは停止中の
 stackを破棄するため、待機後の処理を実行しない。両方式ともrelease完了後にのみ

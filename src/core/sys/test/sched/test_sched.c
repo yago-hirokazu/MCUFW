@@ -535,6 +535,11 @@ static void test_wake_then_release(void)
 	CHECK(proc.p_xctx == NULL);
 	CHECK(proc.p_stat == PROC_ERROR);
 	CHECK(chan.wc_head == NULL);
+	CHECK(chan.wc_tail == NULL);
+#ifdef SCHED_THREAD
+	CHECK(wait.state == PROC_ERROR);
+	CHECK(wait.result == -SYS_EINVAL && wait.lock_held);
+#endif
 }
 
 static void test_yield_failure_cleanup(void)
@@ -1179,6 +1184,8 @@ static void release_io_entry(void *arg)
 	CHECK(current_user() == current_proc()->p_addr);
 	CHECK(u.u_procp == current_proc());
 	io->returned = 1;
+	CHECK(current_proc()->p_stat == PROC_ERROR);
+	CHECK(current_proc()->p_xctx == NULL);
 	close_all_locked(current_proc());
 }
 

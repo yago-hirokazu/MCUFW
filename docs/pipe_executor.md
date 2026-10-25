@@ -88,3 +88,6 @@ These do not alter current anonymous pipe ownership and EOF rules.
 
 See [regression tests](pipe_regression.md) for coroutine/thread O0/O2 suites,
 stdio routing, rollback, reuse and single-command user context checks.
+Direct-command tests also keep non-NULL caller context and live caller pipe,
+check EAGAIN/partial transfer without backend, and leave command descriptors
+for executor cleanup. Caller user and descriptors survive command cleanup.

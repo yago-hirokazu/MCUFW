@@ -38,12 +38,15 @@ static unsigned char source[TEST_DATA_SIZE];
 static unsigned char output[TEST_DATA_SIZE + 2];
 static size_t output_count;
 static size_t source_count = TEST_DATA_SIZE;
+static int direct_status;
 
 static size_t busy_buffer_count(void);
 static void check_resources(void);
 static void test_startup_ram(void);
 static int user_probe_main(int argc, char **argv);
 static void test_single_user(void);
+static int direct_io_main(int argc, char **argv);
+static void test_direct_io_context(void);
 static int producer_main(int argc, char **argv);
 static int filter_main(int argc, char **argv);
 static int consumer_main(int argc, char **argv);
@@ -77,6 +80,8 @@ int main(void)
 {
 	test_startup_ram();
 	test_single_user();
+	check_resources();
+	test_direct_io_context();
 	check_resources();
 	test_stdio_pipeline();
 	check_resources();
@@ -634,10 +639,14 @@ static void test_pipe_exhaustion_cleanup(void)
 	init_command(&proc[2], &consumer);
 	CHECK(exe_run_pipeline(proc, 3) == -SYS_ENFILE);
 	check_released_users(proc, 3);
+	for (i = 0; i < 3; i++)
+		CHECK(proc[i].p_exec.p_stat == SIDL && !proc[i].p_exec.p_ret);
 	CHECK(pipe_in_use() == NINODE - 1);
 	CHECK(file_in_use() == (NINODE - 1) * 2);
-	for (i = 0; i < NINODE - 1; i++)
+	for (i = 0; i < NINODE - 1; i++) {
 		close_all(&blockers[i]);
+		CHECK(blockers[i].p_stat == SIDL && !blockers[i].p_xctx);
+	}
 	CHECK(pipe_in_use() == 0);
 	CHECK(file_in_use() == 0);
 
@@ -671,10 +680,15 @@ static void test_backend_exhaustion_cleanup(void)
 	init_command(&proc[1], &consumer);
 	CHECK(exe_run_pipeline(proc, 2) == -SYS_ENOMEM);
 	check_released_users(proc, 2);
+	CHECK(proc[0].p_exec.p_stat == PROC_ERROR);
+	CHECK(proc[1].p_exec.p_stat == SIDL);
+	CHECK(proc[0].p_exec.p_ret == 0 && proc[1].p_exec.p_ret == 0);
 	CHECK(file_in_use() == 0);
 	CHECK(pipe_in_use() == 0);
-	for (i = 0; i < PIPELINE_MAX - 1; i++)
+	for (i = 0; i < PIPELINE_MAX - 1; i++) {
 		sched_release(&blockers[i]);
+		CHECK(blockers[i].p_stat == PROC_ERROR);
+	}
 
 	output_count = 0;
 	CHECK(exe_run_pipeline(proc, 2) == 37);
@@ -732,6 +746,8 @@ static int blocked_user_main(int argc, char **argv)
 	result = (int)sys_read(fd[0], &byte, 1);
 	CHECK(current_user() == current_proc()->p_addr);
 	CHECK(result == -SYS_EINVAL && u.u_error == SYS_EINVAL);
+	CHECK(current_proc()->p_stat == PROC_ERROR);
+	CHECK(current_proc()->p_xctx == NULL);
 	CHECK(u.u_count == 1 && u.u_r.r_val1 == 0);
 	/* Avoid retaining pointer into returned command stack */
 	u.u_base = NULL;
@@ -775,11 +791,15 @@ static void test_blocked_user_cleanup(void)
 	for (iteration = 0; iteration < 2; iteration++) {
 		CHECK(exe_run_pipeline(proc, 2) == -SYS_EINVAL);
 		check_released_users(proc, 2);
+		CHECK(proc[0].p_exec.p_stat == PROC_ERROR);
+		CHECK(proc[1].p_exec.p_stat == PROC_ERROR);
 		CHECK(proc[0].p_user.u_count == 1);
 #ifdef SCHED_THREAD
+		CHECK(proc[0].p_exec.p_ret == -SYS_EINVAL);
 		CHECK(proc[0].p_user.u_error == SYS_EINVAL);
 		CHECK(proc[1].p_user.u_error == SYS_EINVAL);
 #else
+		CHECK(proc[0].p_exec.p_ret == 0);
 		CHECK(proc[0].p_user.u_error == 0);
 		CHECK(proc[1].p_user.u_error == 0);
 #endif
@@ -796,6 +816,8 @@ static void test_blocked_user_cleanup(void)
 	CHECK(exe_run_pipeline(proc, 2) == 37);
 	CHECK(output_count == source_count);
 	check_released_users(proc, 2);
+	CHECK(proc[0].p_exec.p_stat == SZOMB && proc[0].p_exec.p_ret == 11);
+	CHECK(proc[1].p_exec.p_stat == SZOMB && proc[1].p_exec.p_ret == 37);
 	CHECK(host->u_error == SYS_EPIPE && host->u_count == 83);
 	memset(host, 0, sizeof(*host));
 }
@@ -858,4 +880,106 @@ static void test_single_user(void)
 	CHECK(current_proc() == previous && current_user() == host);
 	CHECK(host->u_error == SYS_EINVAL);
 	host->u_error = 0;
+}
+
+/* Direct command leaves descriptors for executor and never sleeps */
+static int direct_io_main(int argc, char **argv)
+{
+	unsigned char input[PIPSIZ + 1];
+	int pipefd[2];
+	int fd;
+	size_t i;
+
+	(void)argc;
+	(void)argv;
+	CHECK(current_proc()->p_stat == SRUN && !current_proc()->p_xctx);
+	CHECK(u.u_error == 0 && u.u_count == 0 && u.u_base == NULL);
+	CHECK(u.u_r.r_val1 == 0 && u.u_r.r_val2 == 0);
+	for (fd = 0; fd < NOFILE; fd++)
+		CHECK(u.u_ofile[fd] == NULL);
+	for (i = 0; i < sizeof(input); i++)
+		input[i] = (unsigned char)i;
+	CHECK(sys_pipe(pipefd) == 0);
+	CHECK(sys_read(pipefd[0], output, 1) == -SYS_EAGAIN);
+	CHECK(u.u_error == SYS_EAGAIN && u.u_count == 1);
+	CHECK(sys_write(pipefd[1], input, sizeof(input)) == PIPSIZ);
+	CHECK(u.u_error == 0 && u.u_count == 1);
+	CHECK(u.u_r.r_val1 == PIPSIZ);
+	CHECK(sys_write(pipefd[1], input, 1) == -SYS_EAGAIN);
+	CHECK(sys_read(pipefd[0], output, PIPSIZ) == PIPSIZ);
+	CHECK(!memcmp(input, output, PIPSIZ));
+	CHECK(current_proc()->p_stat == SRUN && !current_proc()->p_wchan);
+	CHECK(current_proc()->p_link == NULL);
+	return direct_status;
+}
+
+/* Keep caller user/fds intact across direct command close and reuse */
+static void test_direct_io_context(void)
+{
+	const int results[] = { 0, 37, -SYS_EPIPE };
+	struct applet probe = { "direct_io", direct_io_main };
+	struct proc caller;
+	struct user caller_user;
+	struct proc *previous = current_proc();
+	struct file *read_file;
+	struct file *write_file;
+	struct code code;
+	struct exe executor;
+	int pipefd[2];
+	int fd;
+	size_t i;
+
+	proc_init(&caller, &caller_user);
+	kernel_lock();
+	CHECK(pipe_for_proc(&caller, pipefd) == 0);
+	read_file = getf_for_proc(&caller, pipefd[0]);
+	write_file = getf_for_proc(&caller, pipefd[1]);
+	kernel_unlock();
+	caller_user.u_error = SYS_EINVAL;
+	caller_user.u_r.r_val1 = 81;
+	caller_user.u_r.r_val2 = 82;
+	caller_user.u_base = source;
+	caller_user.u_count = 83;
+	caller_user.u_offset = 84;
+	sched_set_current_proc(&caller);
+	for (i = 0; i < sizeof(results) / sizeof(results[0]); i++) {
+		direct_status = results[i];
+		init_executor_instruction(&code, &executor, OP_CMD_EXE, 0);
+		code.c_codes = 1;
+		init_command(&executor.e_proc[0], &probe);
+		executor.e_procs = 1;
+		CHECK(exe_run_codes(&code, &executor) == EXIT_SUCCESS);
+		CHECK(executor.e_status == direct_status);
+		CHECK(executor.e_proc[0].p_exec.p_ret == direct_status);
+		CHECK(executor.e_proc[0].p_exec.p_stat == SZOMB);
+		check_released_users(executor.e_proc, 1);
+		CHECK(current_proc() == &caller &&
+		      current_user() == &caller_user);
+		CHECK(caller.p_stat == SIDL && !caller.p_xctx);
+		CHECK(caller_user.u_error == SYS_EINVAL);
+		CHECK(caller_user.u_r.r_val1 == 81 &&
+		      caller_user.u_r.r_val2 == 82);
+		CHECK(caller_user.u_base == source &&
+		      caller_user.u_count == 83);
+		CHECK(caller_user.u_offset == 84);
+		CHECK(caller_user.u_procp == &caller &&
+		      caller.p_addr == &caller_user);
+		CHECK(caller_user.u_ofile[pipefd[0]] == read_file);
+		CHECK(caller_user.u_ofile[pipefd[1]] == write_file);
+		CHECK(read_file->f_count == 1 && write_file->f_count == 1);
+		CHECK(file_in_use() == 2 && pipe_in_use() == 1);
+		sched_release(&executor.e_proc[0].p_exec);
+		CHECK(executor.e_proc[0].p_exec.p_stat == SZOMB);
+		CHECK(executor.e_proc[0].p_exec.p_ret == direct_status);
+	}
+	sched_set_current_proc(previous);
+	sched_release(&caller);
+	CHECK(file_in_use() == 2 && pipe_in_use() == 1);
+	kernel_lock();
+	close_all(&caller);
+	kernel_unlock();
+	sched_release(&caller);
+	CHECK(caller.p_stat == SIDL && !caller.p_xctx && !caller.p_ret);
+	for (fd = 0; fd < NOFILE; fd++)
+		CHECK(caller_user.u_ofile[fd] == NULL);
 }
