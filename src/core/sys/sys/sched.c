@@ -47,9 +47,9 @@ int sched_sleep(struct wait_chan *chan, enum wait_reason reason)
 	int result;
 
 	proc = current_proc();
-	if (!chan || !proc || !proc->p_backend || !kernel_is_locked())
+	if (!chan || !proc || !proc->p_ctx || !kernel_is_locked())
 		return -SYS_EINVAL;
-	if (proc->p_wait_chan)
+	if (proc->p_wchan)
 		return -SYS_EINVAL;
 
 	if (reason == WAIT_LOCK)
@@ -61,10 +61,10 @@ int sched_sleep(struct wait_chan *chan, enum wait_reason reason)
 	else
 		return -SYS_EINVAL;
 
-	proc->p_wait_chan = chan;
-	proc->p_wait_next = NULL;
+	proc->p_wchan = chan;
+	proc->p_link = NULL;
 	if (chan->wc_tail)
-		chan->wc_tail->p_wait_next = proc;
+		chan->wc_tail->p_link = proc;
 	else
 		chan->wc_head = proc;
 	chan->wc_tail = proc;
@@ -99,10 +99,10 @@ void sched_wakeup(struct wait_chan *chan)
 	chan->wc_head = NULL;
 	chan->wc_tail = NULL;
 	while (proc) {
-		next = proc->p_wait_next;
-		proc->p_wait_chan = NULL;
-		proc->p_wait_next = NULL;
-		if (proc->p_backend && sched_backend_wake(proc) == 0)
+		next = proc->p_link;
+		proc->p_wchan = NULL;
+		proc->p_link = NULL;
+		if (proc->p_ctx && sched_backend_wake(proc) == 0)
 			proc->p_state = PROC_RUNNABLE;
 		else
 			proc->p_state = PROC_ERROR;
@@ -116,7 +116,7 @@ struct proc *current_proc(void)
 }
 
 /* Initialize process before descriptors or backend setup */
-void proc_init(struct proc *proc)
+void pinit(struct proc *proc)
 {
 	assert(proc != NULL);
 	memset(proc, 0, sizeof(*proc));
@@ -127,7 +127,7 @@ int proc_bind_backend(struct proc *proc, void *backend)
 {
 	if (!proc || !backend || proc->p_state != PROC_NEW)
 		return -SYS_EINVAL;
-	proc->p_backend = backend;
+	proc->p_ctx = backend;
 	proc->p_state = PROC_RUNNABLE;
 	return 0;
 }
@@ -152,13 +152,13 @@ void sched_release(struct proc *proc)
 {
 	void *backend;
 
-	if (!proc || !proc->p_backend)
+	if (!proc || !proc->p_ctx)
 		return;
 	kernel_lock();
-	if (proc->p_wait_chan)
-		wait_remove(proc->p_wait_chan, proc);
-	backend = proc->p_backend;
-	proc->p_backend = NULL;
+	if (proc->p_wchan)
+		wait_remove(proc->p_wchan, proc);
+	backend = proc->p_ctx;
+	proc->p_ctx = NULL;
 	kernel_unlock();
 	sched_backend_release(backend);
 }
@@ -167,7 +167,7 @@ int sched_resume(struct proc *proc)
 {
 	int result;
 
-	if (!proc || !proc->p_backend || current_proc())
+	if (!proc || !proc->p_ctx || current_proc())
 		return -SYS_EINVAL;
 	kernel_lock();
 	if (proc->p_state != PROC_RUNNABLE) {
@@ -210,16 +210,16 @@ static void wait_remove(struct wait_chan *chan, struct proc *proc)
 		if (current == proc)
 			break;
 		previous = current;
-		current = current->p_wait_next;
+		current = current->p_link;
 	}
 	if (!current)
 		return;
 	if (previous)
-		previous->p_wait_next = current->p_wait_next;
+		previous->p_link = current->p_link;
 	else
-		chan->wc_head = current->p_wait_next;
+		chan->wc_head = current->p_link;
 	if (chan->wc_tail == current)
 		chan->wc_tail = previous;
-	current->p_wait_chan = NULL;
-	current->p_wait_next = NULL;
+	current->p_wchan = NULL;
+	current->p_link = NULL;
 }

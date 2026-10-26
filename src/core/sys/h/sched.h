@@ -33,10 +33,10 @@ struct wait_chan;
 struct proc {
 	enum proc_state p_state;
 	struct file *p_ofile[NOFILE];
-	struct wait_chan *p_wait_chan;
-	struct proc *p_wait_next;
-	void *p_backend;
-	int p_status;
+	struct wait_chan *p_wchan;
+	struct proc *p_link;
+	void *p_ctx;
+	int p_ret;
 };
 
 /* Channel storage belongs to waiting object; scheduler manages list */
@@ -54,7 +54,7 @@ int sched_sleep(struct wait_chan *chan, enum wait_reason reason);
 void sched_wakeup(struct wait_chan *chan);
 struct proc *current_proc(void);
 /* Initialize process before descriptors or backend setup */
-void proc_init(struct proc *proc);
+void pinit(struct proc *proc);
 int proc_bind_backend(struct proc *proc, void *backend);
 int sched_prepare(struct proc *proc, void (*entry)(void *arg), void *arg);
 void sched_release(struct proc *proc);

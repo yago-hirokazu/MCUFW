@@ -290,7 +290,7 @@ static void test_wait_rechecks(void)
 	binit();
 	finit();
 	init_proc(&proc);
-	proc.p_backend = &proc;
+	proc.p_ctx = &proc;
 	sched_stub_reset(&proc);
 	CHECK(sys_pipe(fd) == 0);
 	rf = getf(&proc, fd[0]);
@@ -325,7 +325,7 @@ static void test_pipe_lock(void)
 	binit();
 	finit();
 	init_proc(&proc);
-	proc.p_backend = &proc;
+	proc.p_ctx = &proc;
 	sched_stub_reset(&proc);
 	CHECK(sys_pipe(fd) == 0);
 	ip = getf(&proc, fd[0])->f_inode;

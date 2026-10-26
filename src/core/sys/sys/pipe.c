@@ -88,7 +88,7 @@ ptrdiff_t readp(struct proc *proc, struct file *fp, void *buf, size_t count)
 		case PIPE_IO_EOF:
 			return status.io_count;
 		case PIPE_IO_WAIT_READ:
-			if (!proc || !proc->p_backend)
+			if (!proc || !proc->p_ctx)
 				return -SYS_EAGAIN;
 			result = sched_sleep(&fp->f_inode->i_read_chan,
 					     WAIT_READ);
@@ -129,7 +129,7 @@ ptrdiff_t writep(struct proc *proc, struct file *fp, const void *buf,
 				return (ptrdiff_t)transferred;
 			break;
 		case PIPE_IO_WAIT_WRITE:
-			if (!proc || !proc->p_backend) {
+			if (!proc || !proc->p_ctx) {
 				if (transferred)
 					return (ptrdiff_t)transferred;
 				return -SYS_EAGAIN;
@@ -155,7 +155,7 @@ int plock(struct inode *ip)
 	while (ip->i_flag & ILOCK) {
 		ip->i_flag |= IWANT;
 		proc = current_proc();
-		if (!proc || !proc->p_backend)
+		if (!proc || !proc->p_ctx)
 			return -SYS_EAGAIN;
 		result = sched_sleep(&ip->i_lock_chan, WAIT_LOCK);
 		if (result < 0)

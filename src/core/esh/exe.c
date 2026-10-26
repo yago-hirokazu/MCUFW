@@ -234,7 +234,7 @@ static void exe_proc_entry(void *arg)
 	struct exe_proc *proc;
 
 	proc = arg;
-	proc->p_exec.p_status = proc->p_cmd->main(proc->p_argc,
+	proc->p_exec.p_ret = proc->p_cmd->main(proc->p_argc,
 						    proc->p_argv);
 	kernel_lock();
 	close_all(&proc->p_exec);
@@ -269,7 +269,7 @@ static int exe_connect_proc(struct exe_proc *writer, struct exe_proc *reader)
 	int fd[2];
 	int result;
 
-	proc_init(&owner);
+	pinit(&owner);
 	kernel_lock();
 	result = pipe_for_proc(&owner, fd);
 	if (result < 0)
@@ -306,7 +306,7 @@ int exe_run_pipeline(struct exe_proc *proc, int count)
 			return -SYS_EINVAL;
 	}
 	for (i = 0; i < count; i++) {
-		proc_init(&proc[i].p_exec);
+		pinit(&proc[i].p_exec);
 	}
 	pipe_count = 0;
 	prepared = 0;
@@ -342,7 +342,7 @@ int exe_run_pipeline(struct exe_proc *proc, int count)
 			progress = 1;
 		}
 		if (finished == count) {
-			result = proc[count - 1].p_exec.p_status;
+			result = proc[count - 1].p_exec.p_ret;
 			break;
 		}
 		if (!progress)
@@ -369,7 +369,7 @@ static int exe_execute_commands(struct exe *exe)
 	if (exe->e_procs > 1)
 		return exe_run_pipeline(exe->e_proc, exe->e_procs);
 	proc = &exe->e_proc[0];
-	proc_init(&proc->p_exec);
+	pinit(&proc->p_exec);
 	previous = current_proc();
 	sched_set_current_proc(&proc->p_exec);
 	result = proc->p_cmd->main(proc->p_argc, proc->p_argv);

@@ -94,7 +94,7 @@ int sched_backend_yield(struct proc *proc, enum wait_reason reason)
 	struct cortn *cortn;
 	enum cortn_yield_reason yield_reason;
 
-	cortn = proc->p_backend;
+	cortn = proc->p_ctx;
 	if (reason == WAIT_LOCK)
 		yield_reason = CORTN_YIELD_WAIT_LOCK;
 	else if (reason == WAIT_READ)
@@ -116,7 +116,7 @@ int sched_backend_wake(struct proc *proc)
 {
 	struct cortn *cortn;
 
-	cortn = proc->p_backend;
+	cortn = proc->p_ctx;
 	if (cortn_wake(cortn) != CORTN_SUCCESS)
 		return -SYS_EINVAL;
 	return 0;
@@ -126,7 +126,7 @@ enum proc_state sched_backend_resume(struct proc *proc)
 {
 	struct cortn *cortn;
 
-	cortn = proc->p_backend;
+	cortn = proc->p_ctx;
 	if (cortn_resume(cortn) != CORTN_SUCCESS)
 		return PROC_ERROR;
 	switch (cortn->c_state) {

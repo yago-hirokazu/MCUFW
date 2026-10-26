@@ -320,8 +320,8 @@ static void test_blocking_transfer(void)
 	memset(result, 0, sizeof(result));
 	binit();
 	finit();
-	proc_init(&procs[0]);
-	proc_init(&procs[1]);
+	pinit(&procs[0]);
+	pinit(&procs[1]);
 	CHECK(connect_pipe(&procs[0], &procs[1], &write_fd, &read_fd) == 0);
 	writer.data = source;
 	writer.count = sizeof(source);
@@ -361,8 +361,8 @@ static void test_wait_lock(void)
 	output = 0;
 	binit();
 	finit();
-	proc_init(&owner);
-	proc_init(&sleeper);
+	pinit(&owner);
+	pinit(&sleeper);
 	CHECK(connect_pipe(&owner, &sleeper, &write_fd, &read_fd) == 0);
 	ip = getf(&sleeper, read_fd)->f_inode;
 	kernel_lock();
@@ -397,7 +397,7 @@ static void test_multiple_waiters(void)
 
 	memset(&chan, 0, sizeof(chan));
 	for (i = 0; i < 2; i++) {
-		proc_init(&procs[i]);
+		pinit(&procs[i]);
 		wait[i].chan = &chan;
 		wait[i].reason = WAIT_READ;
 		wait[i].result = -1;
@@ -426,14 +426,14 @@ static void test_release_waiter(void)
 	struct proc proc;
 
 	memset(&chan, 0, sizeof(chan));
-	proc_init(&proc);
+	pinit(&proc);
 	wait.chan = &chan;
 	wait.reason = WAIT_WRITE;
 	CHECK(sched_prepare(&proc, wait_entry, &wait) == 0);
 	CHECK(sched_resume(&proc) == 0);
 	CHECK(proc.p_state == PROC_WAIT_WRITE);
 	sched_release(&proc);
-	CHECK(proc.p_backend == NULL);
+	CHECK(proc.p_ctx == NULL);
 	CHECK(chan.wc_head == NULL);
 	CHECK(chan.wc_tail == NULL);
 }
@@ -445,7 +445,7 @@ static void test_wake_then_release(void)
 	struct proc proc;
 
 	memset(&chan, 0, sizeof(chan));
-	proc_init(&proc);
+	pinit(&proc);
 	wait.chan = &chan;
 	wait.reason = WAIT_READ;
 	CHECK(sched_prepare(&proc, wait_entry, &wait) == 0);
@@ -455,7 +455,7 @@ static void test_wake_then_release(void)
 	kernel_unlock();
 	CHECK(proc.p_state == PROC_RUNNABLE);
 	sched_release(&proc);
-	CHECK(proc.p_backend == NULL);
+	CHECK(proc.p_ctx == NULL);
 	CHECK(chan.wc_head == NULL);
 }
 
@@ -466,7 +466,7 @@ static void test_yield_failure_cleanup(void)
 	struct proc proc;
 
 	memset(&chan, 0, sizeof(chan));
-	proc_init(&proc);
+	pinit(&proc);
 	wait.chan = &chan;
 	wait.reason = WAIT_READ;
 	wait.result = 0;
@@ -477,8 +477,8 @@ static void test_yield_failure_cleanup(void)
 	CHECK(wait.result == -SYS_EINVAL);
 	CHECK(wait.lock_held);
 	CHECK(proc.p_state == PROC_FINISHED);
-	CHECK(proc.p_wait_chan == NULL);
-	CHECK(proc.p_wait_next == NULL);
+	CHECK(proc.p_wchan == NULL);
+	CHECK(proc.p_link == NULL);
 	CHECK(chan.wc_head == NULL);
 	CHECK(chan.wc_tail == NULL);
 	sched_release(&proc);
@@ -492,7 +492,7 @@ static void test_prepare_exhaustion(void)
 
 	called = 0;
 	for (i = 0; i < PIPELINE_MAX + 1; i++)
-		proc_init(&procs[i]);
+		pinit(&procs[i]);
 	for (i = 0; i < PIPELINE_MAX; i++)
 		CHECK(sched_prepare(&procs[i], unused_entry, &called) == 0);
 	CHECK(sched_prepare(&procs[i], unused_entry, &called) ==
@@ -635,7 +635,7 @@ static void test_ram_capacity(void)
 	int i;
 
 	ram_test_begin();
-	proc_init(&owner);
+	pinit(&owner);
 	kernel_lock();
 	make_full_pipes(&owner, pipes);
 	extra = NBUF - NINODE;
@@ -804,7 +804,7 @@ static void test_pipeline_ram(void)
 	for (i = 0; i < TEST_DATA_SIZE; i++)
 		source[i] = (unsigned char)(i * 37);
 	for (i = 0; i < PIPELINE_MAX; i++) {
-		proc_init(&procs[i]);
+		pinit(&procs[i]);
 		stages[i].source = source;
 		stages[i].output = output;
 		stages[i].total = sizeof(source);
@@ -877,7 +877,7 @@ static void test_parallel_ram(void)
 	int i;
 
 	ram_test_begin();
-	proc_init(&owner);
+	pinit(&owner);
 	kernel_lock();
 	make_full_pipes(&owner, pipes);
 	kernel_unlock();
@@ -963,7 +963,7 @@ static void test_buffer_error_isolation(void)
 	raminit();
 	binit();
 	for (i = 0; i < 2; i++)
-		proc_init(&procs[i]);
+		pinit(&procs[i]);
 	CHECK(sched_prepare(&procs[0], buffer_wait_entry, &waiter) == 0);
 	CHECK(sched_prepare(&procs[1], buffer_peer_entry, &chan) == 0);
 	CHECK(run_scheduler(procs, 2) == 0);

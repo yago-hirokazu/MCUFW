@@ -183,7 +183,7 @@ static void test_public_api(void)
 
 	binit();
 	finit();
-	proc_init(&proc);
+	pinit(&proc);
 	sched_set_current_proc(&proc);
 	CHECK(sys_pipe(fd) == 0);
 	rf = getf(&proc, fd[0]);
@@ -224,7 +224,7 @@ static void test_v7_offset(void)
 	memset(data, 0x5a, sizeof(data));
 	binit();
 	finit();
-	proc_init(&proc);
+	pinit(&proc);
 	sched_set_current_proc(&proc);
 	CHECK(sys_pipe(fd) == 0);
 	CHECK(sys_write(fd[1], data, sizeof(data)) == PIPSIZ);
@@ -249,7 +249,7 @@ static void test_peer_close(void)
 
 	binit();
 	finit();
-	proc_init(&proc);
+	pinit(&proc);
 	sched_set_current_proc(&proc);
 	CHECK(sys_pipe(fd) == 0);
 	CHECK(sys_close(fd[1]) == 0);
@@ -280,8 +280,8 @@ static void test_blocking_transfer(void)
 	memset(result, 0, sizeof(result));
 	binit();
 	finit();
-	proc_init(&procs[0]);
-	proc_init(&procs[1]);
+	pinit(&procs[0]);
+	pinit(&procs[1]);
 	CHECK(connect_pipe(&procs[0], &procs[1], &write_fd, &read_fd) == 0);
 	writer.data = source;
 	writer.count = sizeof(source);
@@ -317,8 +317,8 @@ static void test_reader_close_wakeup(void)
 
 	binit();
 	finit();
-	proc_init(&procs[0]);
-	proc_init(&procs[1]);
+	pinit(&procs[0]);
+	pinit(&procs[1]);
 	CHECK(connect_pipe(&procs[0], &procs[1], &write_fd, &read_fd) == 0);
 	reader.data = &byte;
 	reader.capacity = 1;
@@ -349,8 +349,8 @@ static void test_writer_close_wakeup(void)
 	memset(data, 0x3c, sizeof(data));
 	binit();
 	finit();
-	proc_init(&procs[0]);
-	proc_init(&procs[1]);
+	pinit(&procs[0]);
+	pinit(&procs[1]);
 	CHECK(connect_pipe(&procs[0], &procs[1], &write_fd, &read_fd) == 0);
 	writer.data = data;
 	writer.count = sizeof(data);
