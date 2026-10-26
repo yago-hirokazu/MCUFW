@@ -14,7 +14,6 @@ extern "C" {
 #include "esh_adapt.h"
 #include "param.h"
 #include "sched.h"
-#include "user.h"
 #include "tty.h"
 
 #if PROCS != PIPELINE_MAX
@@ -24,7 +23,6 @@ extern "C" {
 
 struct exe_proc {
 	struct proc p_exec;		/* Portable execution state */
-	struct user p_user;		/* User area referenced by p_addr */
 	struct applet *p_cmd;		/* Command */
 	char p_argc;			/* # of command arguments */
 	char *p_argv[TTY_NARG];		/* Command arguments */

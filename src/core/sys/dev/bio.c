@@ -2,7 +2,7 @@
  * getblk() / geteblk() => bawrite() => bwrite() => driver strategy
  * bread() => driver strategy => iodone() => brelse() for B_ASYNC
  * bdwrite() => brelse(); bflush() => bawrite()
- * bread() / bwrite() => geterror() => u.u_error
+ * bread() / bwrite() => geterror() => b_error
  */
 
 #include <assert.h>
@@ -11,7 +11,6 @@
 #include "buf.h"
 #include "conf.h"
 #include "sys_error.h"
-#include "user.h"
 
 unsigned char buffers[NBUF][BSIZE];
 
@@ -113,10 +112,8 @@ struct buf *bread(unsigned int dev, unsigned long blkno)
 	struct buf *bp;
 
 	bp = getblk(dev, blkno);
-	if (!bp) {
-		u.u_error = SYS_EAGAIN;
+	if (!bp)
 		return NULL;
-	}
 	if (bp->b_flags & B_DONE)
 		return bp;
 	bp->b_flags |= B_READ;
@@ -135,6 +132,7 @@ void bwrite(struct buf *bp)
 	flag = bp->b_flags;
 	bp->b_flags &= ~(B_READ | B_DONE | B_ERROR | B_DELWRI | B_AGE);
 	bp->b_bcount = BSIZE;
+	bp->b_error = 0;
 	/* Synchronous driver may release async buffer before returning */
 	if ((flag & (B_ASYNC | B_DELWRI)) == (B_ASYNC | B_DELWRI))
 		bp->b_flags |= B_AGE;
@@ -142,8 +140,7 @@ void bwrite(struct buf *bp)
 	if (!(flag & B_ASYNC)) {
 		geterror(bp);
 		brelse(bp);
-	} else if (!(flag & B_DELWRI))
-		geterror(bp);
+	}
 }
 
 /* Mark delayed write and release buffer */
@@ -176,13 +173,14 @@ loop:
 	}
 }
 
-/* Copy device error to user context, defaulting to generic I/O error */
+/* Normalize device error, defaulting to generic I/O error */
 void geterror(struct buf *bp)
 {
 	if (bp->b_flags & B_ERROR) {
-		u.u_error = bp->b_error;
-		if (!u.u_error)
-			u.u_error = SYS_EIO;
+		if (!bp->b_error)
+			bp->b_error = SYS_EIO;
+	} else {
+		bp->b_error = 0;
 	}
 }
 
@@ -222,6 +220,7 @@ void clrbuf(struct buf *bp)
 /* Mark completion and release asynchronous request */
 void iodone(struct buf *bp)
 {
+	geterror(bp);
 	bp->b_flags |= B_DONE;
 	if (bp->b_flags & B_ASYNC)
 		brelse(bp);
@@ -298,6 +297,7 @@ static void assign_buffer_to_block(struct buf *bp, struct buf *head,
 	b_list_remove(bp);
 	b_list_insert(head, bp);
 	bp->b_flags = B_BUSY;
+	bp->b_error = 0;
 	bp->b_dev = dev;
 	bp->b_blkno = blkno;
 }

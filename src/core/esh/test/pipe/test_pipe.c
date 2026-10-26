@@ -8,7 +8,6 @@
 #include "inode.h"
 #include "pipe.h"
 #include "sched.h"
-#include "user.h"
 #include "sys_error.h"
 
 #define TEST_DATA_SIZE	(PIPSIZ * 2 + 37)
@@ -176,7 +175,6 @@ static void read_entry(void *arg)
 static void test_public_api(void)
 {
 	struct proc proc;
-	struct user proc_user;
 	struct file *rf;
 	struct file *wf;
 	struct inode *ip;
@@ -185,7 +183,7 @@ static void test_public_api(void)
 
 	binit();
 	finit();
-	proc_init(&proc, &proc_user);
+	proc_init(&proc);
 	sched_set_current_proc(&proc);
 	CHECK(sys_pipe(fd) == 0);
 	rf = getf(&proc, fd[0]);
@@ -218,7 +216,6 @@ static void test_public_api(void)
 static void test_v7_offset(void)
 {
 	struct proc proc;
-	struct user proc_user;
 	struct file *rf;
 	unsigned char data[PIPSIZ];
 	unsigned char byte;
@@ -227,7 +224,7 @@ static void test_v7_offset(void)
 	memset(data, 0x5a, sizeof(data));
 	binit();
 	finit();
-	proc_init(&proc, &proc_user);
+	proc_init(&proc);
 	sched_set_current_proc(&proc);
 	CHECK(sys_pipe(fd) == 0);
 	CHECK(sys_write(fd[1], data, sizeof(data)) == PIPSIZ);
@@ -247,13 +244,12 @@ static void test_v7_offset(void)
 static void test_peer_close(void)
 {
 	struct proc proc;
-	struct user proc_user;
 	unsigned char byte;
 	int fd[2];
 
 	binit();
 	finit();
-	proc_init(&proc, &proc_user);
+	proc_init(&proc);
 	sched_set_current_proc(&proc);
 	CHECK(sys_pipe(fd) == 0);
 	CHECK(sys_close(fd[1]) == 0);
@@ -273,7 +269,6 @@ static void test_blocking_transfer(void)
 	struct write_arg writer;
 	struct read_arg reader;
 	struct proc procs[2];
-	struct user procs_user[2];
 	unsigned char source[TEST_DATA_SIZE];
 	unsigned char result[TEST_DATA_SIZE];
 	int write_fd;
@@ -285,8 +280,8 @@ static void test_blocking_transfer(void)
 	memset(result, 0, sizeof(result));
 	binit();
 	finit();
-	proc_init(&procs[0], &procs_user[0]);
-	proc_init(&procs[1], &procs_user[1]);
+	proc_init(&procs[0]);
+	proc_init(&procs[1]);
 	CHECK(connect_pipe(&procs[0], &procs[1], &write_fd, &read_fd) == 0);
 	writer.data = source;
 	writer.count = sizeof(source);
@@ -316,15 +311,14 @@ static void test_reader_close_wakeup(void)
 {
 	struct read_arg reader;
 	struct proc procs[2];
-	struct user procs_user[2];
 	unsigned char byte;
 	int write_fd;
 	int read_fd;
 
 	binit();
 	finit();
-	proc_init(&procs[0], &procs_user[0]);
-	proc_init(&procs[1], &procs_user[1]);
+	proc_init(&procs[0]);
+	proc_init(&procs[1]);
 	CHECK(connect_pipe(&procs[0], &procs[1], &write_fd, &read_fd) == 0);
 	reader.data = &byte;
 	reader.capacity = 1;
@@ -348,7 +342,6 @@ static void test_writer_close_wakeup(void)
 {
 	struct write_arg writer;
 	struct proc procs[2];
-	struct user procs_user[2];
 	unsigned char data[PIPSIZ + 1];
 	int write_fd;
 	int read_fd;
@@ -356,8 +349,8 @@ static void test_writer_close_wakeup(void)
 	memset(data, 0x3c, sizeof(data));
 	binit();
 	finit();
-	proc_init(&procs[0], &procs_user[0]);
-	proc_init(&procs[1], &procs_user[1]);
+	proc_init(&procs[0]);
+	proc_init(&procs[1]);
 	CHECK(connect_pipe(&procs[0], &procs[1], &write_fd, &read_fd) == 0);
 	writer.data = data;
 	writer.count = sizeof(data);

@@ -21,7 +21,6 @@
 #include "ramdisk.h"
 #include "sched.h"
 #include "sys_error.h"
-#include "user.h"
 
 #define TEST_DATA_SIZE	(PIPSIZ * 2 + 37)
 #define SCHED_LIMIT	1000
@@ -75,20 +74,12 @@ struct native_arg {
 };
 #endif
 
-struct user_wait_arg {
+
+struct buffer_wait_arg {
 	struct wait_chan *chan;
 	int before;
 	int after;
 };
-
-#ifdef SCHED_THREAD
-struct native_user_arg {
-	HANDLE ready;
-	HANDLE resume;
-	int expected;
-	int actual;
-};
-#endif
 
 static int failures;
 static void (*saved_ram_strategy)(struct buf *bp);
@@ -131,20 +122,13 @@ static void test_parallel_ram(void);
 #endif
 #endif
 
-static void user_wait_entry(void *arg);
-static void user_peer_entry(void *arg);
-static void test_user_isolation(void);
-#ifdef SCHED_THREAD
-static unsigned __stdcall native_user_entry(void *arg);
-static void test_native_user_isolation(void);
-#endif
+static void buffer_wait_entry(void *arg);
+static void buffer_peer_entry(void *arg);
+static void test_buffer_error_isolation(void);
 
 int main(void)
 {
-	test_user_isolation();
-#ifdef SCHED_THREAD
-	test_native_user_isolation();
-#endif
+	test_buffer_error_isolation();
 	test_blocking_transfer();
 	check_resources();
 	test_wait_lock();
@@ -325,7 +309,6 @@ static void test_blocking_transfer(void)
 	struct writer_arg writer;
 	struct reader_arg reader;
 	struct proc procs[2];
-	struct user procs_user[2];
 	unsigned char source[TEST_DATA_SIZE];
 	unsigned char result[TEST_DATA_SIZE];
 	int write_fd;
@@ -337,8 +320,8 @@ static void test_blocking_transfer(void)
 	memset(result, 0, sizeof(result));
 	binit();
 	finit();
-	proc_init(&procs[0], &procs_user[0]);
-	proc_init(&procs[1], &procs_user[1]);
+	proc_init(&procs[0]);
+	proc_init(&procs[1]);
 	CHECK(connect_pipe(&procs[0], &procs[1], &write_fd, &read_fd) == 0);
 	writer.data = source;
 	writer.count = sizeof(source);
@@ -366,9 +349,7 @@ static void test_wait_lock(void)
 {
 	struct reader_arg reader;
 	struct proc owner;
-	struct user owner_user;
 	struct proc sleeper;
-	struct user sleeper_user;
 	struct inode *ip;
 	unsigned char input;
 	unsigned char output;
@@ -380,8 +361,8 @@ static void test_wait_lock(void)
 	output = 0;
 	binit();
 	finit();
-	proc_init(&owner, &owner_user);
-	proc_init(&sleeper, &sleeper_user);
+	proc_init(&owner);
+	proc_init(&sleeper);
 	CHECK(connect_pipe(&owner, &sleeper, &write_fd, &read_fd) == 0);
 	ip = getf(&sleeper, read_fd)->f_inode;
 	kernel_lock();
@@ -412,12 +393,11 @@ static void test_multiple_waiters(void)
 	struct wait_arg wait[2];
 	struct wait_chan chan;
 	struct proc procs[2];
-	struct user procs_user[2];
 	int i;
 
 	memset(&chan, 0, sizeof(chan));
 	for (i = 0; i < 2; i++) {
-		proc_init(&procs[i], &procs_user[i]);
+		proc_init(&procs[i]);
 		wait[i].chan = &chan;
 		wait[i].reason = WAIT_READ;
 		wait[i].result = -1;
@@ -444,10 +424,9 @@ static void test_release_waiter(void)
 	struct wait_arg wait;
 	struct wait_chan chan;
 	struct proc proc;
-	struct user proc_user;
 
 	memset(&chan, 0, sizeof(chan));
-	proc_init(&proc, &proc_user);
+	proc_init(&proc);
 	wait.chan = &chan;
 	wait.reason = WAIT_WRITE;
 	CHECK(sched_prepare(&proc, wait_entry, &wait) == 0);
@@ -464,10 +443,9 @@ static void test_wake_then_release(void)
 	struct wait_arg wait;
 	struct wait_chan chan;
 	struct proc proc;
-	struct user proc_user;
 
 	memset(&chan, 0, sizeof(chan));
-	proc_init(&proc, &proc_user);
+	proc_init(&proc);
 	wait.chan = &chan;
 	wait.reason = WAIT_READ;
 	CHECK(sched_prepare(&proc, wait_entry, &wait) == 0);
@@ -486,10 +464,9 @@ static void test_yield_failure_cleanup(void)
 	struct wait_arg wait;
 	struct wait_chan chan;
 	struct proc proc;
-	struct user proc_user;
 
 	memset(&chan, 0, sizeof(chan));
-	proc_init(&proc, &proc_user);
+	proc_init(&proc);
 	wait.chan = &chan;
 	wait.reason = WAIT_READ;
 	wait.result = 0;
@@ -510,13 +487,12 @@ static void test_yield_failure_cleanup(void)
 static void test_prepare_exhaustion(void)
 {
 	struct proc procs[PIPELINE_MAX + 1];
-	struct user procs_user[PIPELINE_MAX + 1];
 	int called;
 	int i;
 
 	called = 0;
 	for (i = 0; i < PIPELINE_MAX + 1; i++)
-		proc_init(&procs[i], &procs_user[i]);
+		proc_init(&procs[i]);
 	for (i = 0; i < PIPELINE_MAX; i++)
 		CHECK(sched_prepare(&procs[i], unused_entry, &called) == 0);
 	CHECK(sched_prepare(&procs[i], unused_entry, &called) ==
@@ -596,7 +572,7 @@ static void ram_test_begin(void)
 {
 	CHECK(current_proc() == NULL);
 	CHECK(!kernel_is_locked());
-	u.u_error = 0;
+
 	raminit();
 	binit();
 	finit();
@@ -651,7 +627,6 @@ static void drain_full_pipes(struct proc *owner, int pipes[NINODE][2])
 static void test_ram_capacity(void)
 {
 	struct proc owner;
-	struct user owner_user;
 	struct buf *held[NBUF];
 	struct buf *bp;
 	int pipes[NINODE][2];
@@ -660,42 +635,42 @@ static void test_ram_capacity(void)
 	int i;
 
 	ram_test_begin();
-	proc_init(&owner, &owner_user);
+	proc_init(&owner);
 	kernel_lock();
 	make_full_pipes(&owner, pipes);
 	extra = NBUF - NINODE;
 	for (i = 0; i < extra; i++) {
 		held[i] = bread(makedev(RAM_MAJOR, 0), (unsigned long)i);
-		CHECK(held[i] != NULL && u.u_error == 0);
+		CHECK(held[i] != NULL && held[i]->b_error == 0);
 		held[i]->b_addr[0] = (unsigned char)(0x70 + i);
 		CHECK(kernel_is_locked());
 	}
 	CHECK(bread(makedev(RAM_MAJOR, 0), NBUF) == NULL);
-	CHECK(u.u_error == SYS_EAGAIN);
+
 	if (extra) {
 		CHECK(bread(makedev(RAM_MAJOR, 0), 0) == NULL);
-		CHECK(u.u_error == SYS_EAGAIN);
+
 	}
 	CHECK(pipe_for_proc(&owner, fd) == -SYS_ENFILE);
 	CHECK(file_in_use() == NINODE * 2);
-	u.u_error = 0;
+
 	for (i = 0; i < extra; i++)
 		bdwrite(held[i]);
 	if (extra) {
 		for (i = 0; i < extra * 2 + 1; i++) {
 			bp = bread(makedev(RAM_MAJOR, 1), (unsigned long)i);
-			CHECK(bp != NULL && u.u_error == 0);
+			CHECK(bp != NULL && bp->b_error == 0);
 			bp->b_addr[0] = (unsigned char)i;
 			bdwrite(bp);
 		}
 		bp = getblk(makedev(RAM_MAJOR, 0), RAM_NBLK);
 		CHECK(bp != NULL);
-		u.u_error = 0;
+
 		bwrite(bp);
-		CHECK(u.u_error == SYS_EIO);
-		u.u_error = 0;
+		CHECK(bp->b_error == SYS_EIO);
+
 		bp = bread(makedev(RAM_MAJOR, 0), 0);
-		CHECK(bp != NULL && u.u_error == 0 && bp->b_addr[0] == 0x70);
+		CHECK(bp != NULL && bp->b_error == 0 && bp->b_addr[0] == 0x70);
 		brelse(bp);
 		CHECK(max_pipe_io > 0);
 	}
@@ -724,7 +699,7 @@ static int ram_increment(void)
 	int error;
 
 	kernel_lock();
-	u.u_error = 0;
+
 	bp = bread(makedev(RAM_MAJOR, 0), 0);
 	if (bp) {
 		value = bp->b_addr[0] | ((unsigned int)bp->b_addr[1] << 8);
@@ -737,7 +712,7 @@ static int ram_increment(void)
 #endif
 		bwrite(bp);
 	}
-	error = -u.u_error;
+	error = bp ? -bp->b_error : -SYS_EAGAIN;
 	kernel_unlock();
 	return error;
 }
@@ -749,9 +724,9 @@ static unsigned int ram_counter(void)
 
 	value = 0;
 	kernel_lock();
-	u.u_error = 0;
+
 	bp = bread(makedev(RAM_MAJOR, 0), 0);
-	CHECK(bp != NULL && u.u_error == 0);
+	CHECK(bp != NULL && bp->b_error == 0);
 	if (bp) {
 		value = bp->b_addr[0] | ((unsigned int)bp->b_addr[1] << 8);
 		brelse(bp);
@@ -816,7 +791,6 @@ static void io_stage_entry(void *arg)
 static void test_pipeline_ram(void)
 {
 	struct proc procs[PIPELINE_MAX];
-	struct user procs_user[PIPELINE_MAX];
 	struct io_stage stages[PIPELINE_MAX];
 	unsigned char source[TEST_DATA_SIZE];
 	unsigned char output[TEST_DATA_SIZE];
@@ -830,7 +804,7 @@ static void test_pipeline_ram(void)
 	for (i = 0; i < TEST_DATA_SIZE; i++)
 		source[i] = (unsigned char)(i * 37);
 	for (i = 0; i < PIPELINE_MAX; i++) {
-		proc_init(&procs[i], &procs_user[i]);
+		proc_init(&procs[i]);
 		stages[i].source = source;
 		stages[i].output = output;
 		stages[i].total = sizeof(source);
@@ -894,7 +868,6 @@ static unsigned __stdcall native_ram_entry(void *arg)
 static void test_parallel_ram(void)
 {
 	struct proc owner;
-	struct user owner_user;
 	struct native_arg workers[2];
 	HANDLE threads[2];
 	HANDLE start;
@@ -904,7 +877,7 @@ static void test_parallel_ram(void)
 	int i;
 
 	ram_test_begin();
-	proc_init(&owner, &owner_user);
+	proc_init(&owner);
 	kernel_lock();
 	make_full_pipes(&owner, pipes);
 	kernel_unlock();
@@ -946,140 +919,56 @@ static void test_parallel_ram(void)
 #endif
 #endif
 
-/* Retain originating user error across scheduler wait and resume */
-static void user_wait_entry(void *arg)
+/* Retain owned buffer error across scheduler wait */
+static void buffer_wait_entry(void *arg)
 {
-	struct user_wait_arg *waiter = arg;
+	struct buffer_wait_arg *waiter = arg;
 	struct buf *bp;
 
 	kernel_lock();
-	CHECK(current_user() == current_proc()->p_addr);
-	u.u_error = 0;
 	bp = bread(makedev(RAM_MAJOR, 0), RAM_NBLK);
 	CHECK(bp != NULL);
-	waiter->before = u.u_error;
-	brelse(bp);
-	CHECK(sched_sleep(waiter->chan, WAIT_READ) == 0);
-	CHECK(current_user() == current_proc()->p_addr);
-	waiter->after = u.u_error;
+	if (bp) {
+		waiter->before = bp->b_error;
+		CHECK(sched_sleep(waiter->chan, WAIT_READ) == 0);
+		waiter->after = bp->b_error;
+		brelse(bp);
+	}
 	kernel_unlock();
 }
 
-/* Successful peer operation must not clear sleeping user's error */
-static void user_peer_entry(void *arg)
+/* Successful peer I/O leaves sleeping caller's buffer error intact */
+static void buffer_peer_entry(void *arg)
 {
 	struct wait_chan *chan = arg;
 	struct buf *bp;
 
 	kernel_lock();
-	CHECK(u.u_error == 0);
 	bp = bread(makedev(RAM_MAJOR, 0), 0);
-	CHECK(bp != NULL && u.u_error == 0);
-	brelse(bp);
+	CHECK(bp != NULL && bp->b_error == 0);
+	if (bp)
+		brelse(bp);
 	sched_wakeup(chan);
 	kernel_unlock();
 }
 
-/* Host and worker users remain distinct through wait, join and reuse */
-static void test_user_isolation(void)
+/* Buffers retain independent errors through wait and resume */
+static void test_buffer_error_isolation(void)
 {
 	struct proc procs[2];
-	struct user users[2];
-	struct user *host;
 	struct wait_chan chan = { 0 };
-	struct user_wait_arg waiter = { &chan, 0, 0 };
+	struct buffer_wait_arg waiter = { &chan, 0, 0 };
 	int i;
 
 	raminit();
 	binit();
-	host = current_user();
-	host->u_error = SYS_EINVAL;
-	for (i = 0; i < 2; i++) {
-		users[i].u_error = SYS_EPIPE;
-		proc_init(&procs[i], &users[i]);
-		CHECK(procs[i].p_addr == &users[i]);
-		CHECK(users[i].u_error == 0);
-		CHECK(procs[i].p_addr != host);
-	}
-	CHECK(sched_prepare(&procs[0], user_wait_entry, &waiter) == 0);
-	CHECK(sched_prepare(&procs[1], user_peer_entry, &chan) == 0);
+	for (i = 0; i < 2; i++)
+		proc_init(&procs[i]);
+	CHECK(sched_prepare(&procs[0], buffer_wait_entry, &waiter) == 0);
+	CHECK(sched_prepare(&procs[1], buffer_peer_entry, &chan) == 0);
 	CHECK(run_scheduler(procs, 2) == 0);
 	CHECK(waiter.before == SYS_EIO && waiter.after == SYS_EIO);
-	CHECK(users[0].u_error == SYS_EIO && users[1].u_error == 0);
-	CHECK(current_user() == host && host->u_error == SYS_EINVAL);
 	for (i = 0; i < 2; i++)
 		sched_release(&procs[i]);
-	CHECK(users[0].u_error == SYS_EIO);
-	proc_init(&procs[0], &users[0]);
-	CHECK(users[0].u_error == 0);
-	host->u_error = 0;
 	check_resources();
 }
-
-#ifdef SCHED_THREAD
-/* Leave error live across host thread synchronization */
-static unsigned __stdcall native_user_entry(void *arg)
-{
-	struct native_user_arg *worker = arg;
-
-	kernel_lock();
-	if (current_proc() || u.u_error) {
-		kernel_unlock();
-		return 1;
-	}
-	u.u_error = worker->expected;
-	kernel_unlock();
-	SetEvent(worker->ready);
-	if (WaitForSingleObject(worker->resume, 20000) != WAIT_OBJECT_0)
-		return 1;
-	kernel_lock();
-	worker->actual = u.u_error;
-	kernel_unlock();
-	return 0;
-}
-
-/* Unbound native threads and host each retain dedicated base user */
-static void test_native_user_isolation(void)
-{
-	struct native_user_arg workers[2];
-	HANDLE threads[2];
-	HANDLE ready[2];
-	HANDLE resume;
-	DWORD result;
-	int i;
-
-	u.u_error = SYS_EINVAL;
-	resume = CreateEvent(NULL, TRUE, FALSE, NULL);
-	if (!resume)
-		exit(1);
-	for (i = 0; i < 2; i++) {
-		ready[i] = CreateEvent(NULL, TRUE, FALSE, NULL);
-		if (!ready[i])
-			exit(1);
-		workers[i].ready = ready[i];
-		workers[i].resume = resume;
-		workers[i].expected = i ? SYS_EPIPE : SYS_EIO;
-		workers[i].actual = 0;
-		threads[i] = (HANDLE)_beginthreadex(NULL, 0, native_user_entry,
-						 &workers[i], 0, NULL);
-		if (!threads[i])
-			exit(1);
-	}
-	result = WaitForMultipleObjects(2, ready, TRUE, 20000);
-	if (result != WAIT_OBJECT_0)
-		exit(1);
-	CHECK(u.u_error == SYS_EINVAL);
-	CHECK(SetEvent(resume));
-	result = WaitForMultipleObjects(2, threads, TRUE, 20000);
-	if (result != WAIT_OBJECT_0)
-		exit(1);
-	for (i = 0; i < 2; i++) {
-		CHECK(workers[i].actual == workers[i].expected);
-		CHECK(CloseHandle(threads[i]));
-		CHECK(CloseHandle(ready[i]));
-	}
-	CHECK(CloseHandle(resume));
-	CHECK(u.u_error == SYS_EINVAL);
-	u.u_error = 0;
-}
-#endif

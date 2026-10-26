@@ -27,13 +27,11 @@ enum wait_reason {
 };
 
 struct file;
-struct user;
 struct wait_chan;
 
 /* Portable execution state embedded in executor process */
 struct proc {
 	enum proc_state p_state;
-	struct user *p_addr;	/* Dedicated user area owned by caller */
 	struct file *p_ofile[NOFILE];
 	struct wait_chan *p_wait_chan;
 	struct proc *p_wait_next;
@@ -55,8 +53,8 @@ int kernel_is_locked(void);
 int sched_sleep(struct wait_chan *chan, enum wait_reason reason);
 void sched_wakeup(struct wait_chan *chan);
 struct proc *current_proc(void);
-/* User storage must outlive proc, including backend unwind and join */
-void proc_init(struct proc *proc, struct user *user);
+/* Initialize process before descriptors or backend setup */
+void proc_init(struct proc *proc);
 int proc_bind_backend(struct proc *proc, void *backend);
 int sched_prepare(struct proc *proc, void (*entry)(void *arg), void *arg);
 void sched_release(struct proc *proc);

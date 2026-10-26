@@ -264,13 +264,12 @@ static void exe_cleanup_pipeline(struct exe_proc *proc, int pipe_count,
 static int exe_connect_proc(struct exe_proc *writer, struct exe_proc *reader)
 {
 	struct proc owner;
-	struct user owner_user;
 	struct file *read_file;
 	struct file *write_file;
 	int fd[2];
 	int result;
 
-	proc_init(&owner, &owner_user);
+	proc_init(&owner);
 	kernel_lock();
 	result = pipe_for_proc(&owner, fd);
 	if (result < 0)
@@ -307,7 +306,7 @@ int exe_run_pipeline(struct exe_proc *proc, int count)
 			return -SYS_EINVAL;
 	}
 	for (i = 0; i < count; i++) {
-		proc_init(&proc[i].p_exec, &proc[i].p_user);
+		proc_init(&proc[i].p_exec);
 	}
 	pipe_count = 0;
 	prepared = 0;
@@ -370,7 +369,7 @@ static int exe_execute_commands(struct exe *exe)
 	if (exe->e_procs > 1)
 		return exe_run_pipeline(exe->e_proc, exe->e_procs);
 	proc = &exe->e_proc[0];
-	proc_init(&proc->p_exec, &proc->p_user);
+	proc_init(&proc->p_exec);
 	previous = current_proc();
 	sched_set_current_proc(&proc->p_exec);
 	result = proc->p_cmd->main(proc->p_argc, proc->p_argv);

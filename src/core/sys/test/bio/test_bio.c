@@ -8,7 +8,6 @@
 #include "conf.h"
 #include "ramdisk.h"
 #include "sys_error.h"
-#include "user.h"
 
 #define CHECK(condition) \
 	do { \
@@ -371,7 +370,7 @@ static void test_devices(void)
 
 static void begin_io_test(void)
 {
-	u.u_error = 0;
+
 	raminit();
 	binit();
 	saved_ram = bdevsw[RAM_MAJOR];
@@ -439,9 +438,9 @@ static void test_block_io(void)
 	binit();
 	for (unit = 0; unit < RAM_NDEV; unit++) {
 		for (block = 0; block < RAM_NBLK; block++) {
-			u.u_error = 0;
+
 			bp = bread(makedev(RAM_MAJOR, unit), block);
-			CHECK(bp != NULL && u.u_error == 0);
+			CHECK(bp != NULL && bp->b_error == 0);
 			CHECK(bp->b_flags & B_BUSY);
 			CHECK(!on_av_list(bp));
 			for (i = 0; i < BSIZE; i++)
@@ -462,23 +461,23 @@ static void test_read_cache(void)
 
 	begin_io_test();
 	bp = bread(makedev(RAM_MAJOR, 0), 0);
-	CHECK(bp != NULL && u.u_error == 0);
+	CHECK(bp != NULL && bp->b_error == 0);
 	CHECK(io_reads == 1);
 	cached = bp;
 	brelse(bp);
 	bp = bread(makedev(RAM_MAJOR, 0), 0);
-	CHECK(bp == cached && u.u_error == 0);
+	CHECK(bp == cached && bp->b_error == 0);
 	CHECK(io_reads == 1);
 	bp->b_addr[9] = 0x4c;
 	bwrite(bp);
 	CHECK(io_writes == 1);
 	bp = bread(makedev(RAM_MAJOR, 0), 0);
-	CHECK(bp != NULL && u.u_error == 0);
+	CHECK(bp != NULL && bp->b_error == 0);
 	CHECK(io_reads == 1);
 	brelse(bp);
 	binit();
 	bp = bread(makedev(RAM_MAJOR, 0), 0);
-	CHECK(bp != NULL && u.u_error == 0);
+	CHECK(bp != NULL && bp->b_error == 0);
 	CHECK(io_reads == 2);
 	for (i = 0; i < BSIZE; i++)
 		CHECK(bp->b_addr[i] == (i == 9 ? 0x4c : 0));
@@ -496,63 +495,55 @@ static void test_io_errors(void)
 	begin_io_test();
 	for (i = 0; i < NBUF * 2; i++) {
 		bp = bread(makedev(RAM_MAJOR, 2), 0);
-		CHECK(bp != NULL && u.u_error == SYS_ENODEV);
+		CHECK(bp != NULL && bp->b_error == SYS_ENODEV);
 		CHECK((bp->b_flags & (B_BUSY | B_ERROR | B_DONE)) ==
 		      (B_BUSY | B_ERROR | B_DONE));
 		CHECK(count_av_list() == NBUF - 1);
 		brelse(bp);
 		CHECK(!incore(makedev(RAM_MAJOR, 2), 0));
 		bp = bread(dev, RAM_NBLK);
-		CHECK(bp != NULL && u.u_error == SYS_EIO);
+		CHECK(bp != NULL && bp->b_error == SYS_EIO);
 		brelse(bp);
 		CHECK(count_av_list() == NBUF);
 	}
 	bp = bread(dev, ULONG_MAX);
-	CHECK(bp != NULL && u.u_error == SYS_EIO);
+	CHECK(bp != NULL && bp->b_error == SYS_EIO);
 	brelse(bp);
 	bp = getblk(dev, RAM_NBLK);
 	bwrite(bp);
-	CHECK(u.u_error == SYS_EIO);
+	CHECK(bp->b_error == SYS_EIO);
 	CHECK(!incore(dev, RAM_NBLK));
 	io_fail = 1;
 	io_error_code = SYS_EINVAL;
 	bp = bread(dev, 0);
-	CHECK(bp != NULL && u.u_error == SYS_EINVAL);
+	CHECK(bp != NULL && bp->b_error == SYS_EINVAL);
 	brelse(bp);
 	CHECK(!incore(dev, 0));
 	io_error_code = 0;
 	bp = bread(dev, 0);
-	CHECK(bp != NULL && u.u_error == SYS_EIO);
+	CHECK(bp != NULL && bp->b_error == SYS_EIO);
 	brelse(bp);
 	bp = getblk(dev, 0);
 	bwrite(bp);
-	CHECK(u.u_error == SYS_EIO);
+	CHECK(bp->b_error == SYS_EIO);
 	CHECK(!incore(dev, 0));
-	/* Async direct writes collect errors; delayed writes omit them */
-	u.u_error = 0;
+	/* Direct and delayed async writes retain buffer error */
+
 	bp = getblk(dev, 0);
 	bawrite(bp);
-	CHECK(u.u_error == SYS_EIO);
-	u.u_error = 0;
+	CHECK(bp->b_error == SYS_EIO);
+
 	bp = getblk(dev, 0);
 	bdwrite(bp);
 	bflush(dev);
-	CHECK(u.u_error == 0);
+	CHECK(bp->b_error == SYS_EIO);
 	io_fail = 0;
-	/* Successful completion leaves user error clear */
+	/* Successful completion clears buffer error */
 	bp = bread(dev, 0);
-	CHECK(bp != NULL && u.u_error == 0);
+	CHECK(bp != NULL && bp->b_error == 0);
 	CHECK(!(bp->b_flags & B_ERROR));
 	bwrite(bp);
-	CHECK(u.u_error == 0);
-	/* Successful I/O preserves previously recorded user error */
-	u.u_error = SYS_EINVAL;
-	binit();
-	bp = bread(dev, 0);
-	CHECK(bp != NULL && u.u_error == SYS_EINVAL);
-	bwrite(bp);
-	CHECK(u.u_error == SYS_EINVAL);
-	u.u_error = 0;
+	CHECK(bp->b_error == 0);
 	end_io_test();
 }
 
@@ -564,15 +555,13 @@ static void test_io_exhaustion(void)
 
 	begin_io_test();
 	held[0] = bread(makedev(RAM_MAJOR, 0), 0);
-	CHECK(held[0] != NULL && u.u_error == 0);
+	CHECK(held[0] != NULL && held[0]->b_error == 0);
 	CHECK(bread(makedev(RAM_MAJOR, 0), 0) == NULL);
-	CHECK(u.u_error == SYS_EAGAIN);
 	for (i = 1; i < NBUF; i++)
 		held[i] = getblk(makedev(RAM_MAJOR, 0), (unsigned long)i);
 	CHECK(bread(makedev(RAM_MAJOR, 0), NBUF) == NULL);
-	CHECK(u.u_error == SYS_EAGAIN);
 	CHECK(io_reads == 1);
-	u.u_error = 0;
+
 	for (i = 0; i < NBUF; i++)
 		brelse(held[i]);
 	binit();
@@ -584,7 +573,7 @@ static void test_io_exhaustion(void)
 		brelse(held[i]);
 	}
 	bp = bread(makedev(RAM_MAJOR, 0), NBUF);
-	CHECK(bp != NULL && u.u_error == 0);
+	CHECK(bp != NULL && bp->b_error == 0);
 	CHECK(io_writes == 1);
 	brelse(bp);
 	end_io_test();
@@ -605,7 +594,7 @@ static void test_delayed_write(void)
 	bdwrite(bp);
 	CHECK(io_writes == 0);
 	held = bread(dev, 0);
-	CHECK(held == bp && u.u_error == 0);
+	CHECK(held == bp && bp->b_error == 0);
 	CHECK(io_reads == 0 && held->b_addr[0] == 0x71);
 	bflush(dev);
 	bp = getblk(other, 0);
@@ -622,10 +611,10 @@ static void test_delayed_write(void)
 	bflush(PIPEDEV);
 	binit();
 	bp = bread(dev, 0);
-	CHECK(bp != NULL && u.u_error == 0 && bp->b_addr[0] == 0x71);
+	CHECK(bp != NULL && bp->b_error == 0 && bp->b_addr[0] == 0x71);
 	brelse(bp);
 	bp = bread(other, 0);
-	CHECK(bp != NULL && u.u_error == 0 && bp->b_addr[0] == 0x92);
+	CHECK(bp != NULL && bp->b_error == 0 && bp->b_addr[0] == 0x92);
 	brelse(bp);
 	end_io_test();
 }
@@ -680,7 +669,7 @@ static void test_dirty_reuse(void)
 	bflush(NODEV);
 	for (i = 0; i < NBUF; i++) {
 		bp = bread(dev, (unsigned long)i);
-		CHECK(bp != NULL && u.u_error == 0);
+		CHECK(bp != NULL && bp->b_error == 0);
 		bdwrite(bp);
 	}
 	bp = getblk(PIPEDEV, 90);
@@ -692,7 +681,7 @@ static void test_dirty_reuse(void)
 	binit();
 	for (i = 0; i < NBUF; i++) {
 		bp = bread(dev, (unsigned long)i);
-		CHECK(bp != NULL && u.u_error == 0);
+		CHECK(bp != NULL && bp->b_error == 0);
 		CHECK(bp->b_addr[0] == 0x50 + i);
 		brelse(bp);
 	}
@@ -714,23 +703,23 @@ static void test_strategy_busy(void)
 	queued = getblk(dev, 0);
 	CHECK(bdev_io_queue_enqueue(&ramqueue, queued) == 0);
 	bp = bread(dev, 1);
-	CHECK(bp != NULL && u.u_error == SYS_EAGAIN);
+	CHECK(bp != NULL && bp->b_error == SYS_EAGAIN);
 	CHECK((bp->b_flags & (B_DONE | B_ERROR | B_BUSY)) ==
 	      (B_DONE | B_ERROR | B_BUSY));
 	brelse(bp);
-	u.u_error = 0;
+
 	bp = getblk(dev, 2);
 	bawrite(bp);
-	CHECK(u.u_error == SYS_EAGAIN);
+	CHECK(bp->b_error == SYS_EAGAIN);
 	CHECK(!(bp->b_flags & (B_BUSY | B_ASYNC)));
 	CHECK(!incore(dev, 2));
 	CHECK(ramqueue.dq_head == queued && ramqueue.dq_tail == queued);
 	CHECK(bdev_io_queue_start(&ramqueue) == queued);
 	CHECK(bdev_io_queue_complete(&ramqueue) == queued);
 	brelse(queued);
-	u.u_error = 0;
+
 	bp = bread(dev, 1);
-	CHECK(bp != NULL && u.u_error == 0);
+	CHECK(bp != NULL && bp->b_error == 0);
 	brelse(bp);
 	end_io_test();
 }

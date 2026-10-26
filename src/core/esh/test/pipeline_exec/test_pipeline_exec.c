@@ -19,7 +19,6 @@
 #include "script.h"
 #include "stdio_adapt.h"
 #include "sys_error.h"
-#include "user.h"
 
 #define TEST_DATA_SIZE	(PIPSIZ * 8 + 41)
 
@@ -39,8 +38,8 @@ static size_t source_count = TEST_DATA_SIZE;
 static size_t busy_buffer_count(void);
 static void check_resources(void);
 static void test_startup_ram(void);
-static int user_probe_main(int argc, char **argv);
-static void test_single_user(void);
+static int context_probe_main(int argc, char **argv);
+static void test_single_context(void);
 static int producer_main(int argc, char **argv);
 static int filter_main(int argc, char **argv);
 static int consumer_main(int argc, char **argv);
@@ -70,7 +69,7 @@ extern int echo(int argc, char **argv);
 int main(void)
 {
 	test_startup_ram();
-	test_single_user();
+	test_single_context();
 	check_resources();
 	test_stdio_pipeline();
 	check_resources();
@@ -127,7 +126,7 @@ static void test_startup_ram(void)
 
 	eshinit();
 	kernel_lock();
-	u.u_error = 0;
+
 	for (unit = 0; unit < RAM_NDEV; unit++) {
 		bp = getblk(makedev(RAM_MAJOR, unit), RAM_NBLK - 1);
 		CHECK(bp != NULL);
@@ -141,7 +140,7 @@ static void test_startup_ram(void)
 	kernel_lock();
 	for (unit = 0; unit < RAM_NDEV; unit++) {
 		bp = bread(makedev(RAM_MAJOR, unit), RAM_NBLK - 1);
-		CHECK(bp != NULL && u.u_error == 0);
+		CHECK(bp != NULL && bp->b_error == 0);
 		for (i = 0; i < BSIZE; i++)
 			CHECK(bp->b_addr[i] == 0x51 + unit);
 		brelse(bp);
@@ -150,11 +149,11 @@ static void test_startup_ram(void)
 	/* Cold start resets storage and invalidates old cached contents */
 	eshinit();
 	kernel_lock();
-	u.u_error = 0;
+
 	for (unit = 0; unit < RAM_NDEV; unit++) {
 		for (block = 0; block < RAM_NBLK; block++) {
 			bp = bread(makedev(RAM_MAJOR, unit), block);
-			CHECK(bp != NULL && u.u_error == 0);
+			CHECK(bp != NULL && bp->b_error == 0);
 			for (i = 0; i < BSIZE; i++)
 				CHECK(bp->b_addr[i] == 0);
 			brelse(bp);
@@ -611,14 +610,13 @@ static void test_parser_bounds(void)
 static void test_pipe_exhaustion_cleanup(void)
 {
 	struct proc blockers[NINODE - 1];
-	struct user blockers_user[NINODE - 1];
 	struct exe_proc proc[3];
 	size_t j;
 	int fd[2];
 	int i;
 
 	for (i = 0; i < NINODE - 1; i++) {
-		proc_init(&blockers[i], &blockers_user[i]);
+		proc_init(&blockers[i]);
 		CHECK(pipe_for_proc(&blockers[i], fd) == 0);
 	}
 	init_command(&proc[0], &producer);
@@ -650,12 +648,11 @@ static void blocker_entry(void *arg)
 static void test_backend_exhaustion_cleanup(void)
 {
 	struct proc blockers[PIPELINE_MAX - 1];
-	struct user blockers_user[PIPELINE_MAX - 1];
 	struct exe_proc proc[2];
 	int i;
 
 	for (i = 0; i < PIPELINE_MAX - 1; i++) {
-		proc_init(&blockers[i], &blockers_user[i]);
+		proc_init(&blockers[i]);
 		CHECK(sched_prepare(&blockers[i], blocker_entry, NULL) == 0);
 	}
 	init_command(&proc[0], &producer);
@@ -708,29 +705,25 @@ static void test_pipeline_bytecode(void)
 	CHECK(pipe_in_use() == 0);
 }
 
-/* Direct command execution uses proc-owned user instead of host user */
-static int user_probe_main(int argc, char **argv)
+/* Direct command execution binds current proc */
+static int context_probe_main(int argc, char **argv)
 {
 	(void)argc;
 	(void)argv;
 	CHECK(current_proc() != NULL);
-	CHECK(current_user() == current_proc()->p_addr);
-	CHECK(u.u_error == 0);
-	u.u_error = SYS_EIO;
+
 	return 37;
 }
 
-/* Restore calling context and reinitialize dedicated user on next run */
-static void test_single_user(void)
+/* Restore calling context after repeated direct execution */
+static void test_single_context(void)
 {
-	struct applet probe = { "user_probe", user_probe_main };
+	struct applet probe = { "context_probe", context_probe_main };
 	struct code code;
 	struct exe executor;
 	struct proc *previous = current_proc();
-	struct user *host = current_user();
 	int repeat;
 
-	host->u_error = SYS_EINVAL;
 	for (repeat = 0; repeat < 2; repeat++) {
 		init_executor_instruction(&code, &executor, OP_CMD_EXE, 0);
 		code.c_codes = 1;
@@ -738,11 +731,6 @@ static void test_single_user(void)
 		executor.e_procs = 1;
 		CHECK(exe_run_codes(&code, &executor) == EXIT_SUCCESS);
 		CHECK(executor.e_status == 37);
-		CHECK(executor.e_proc[0].p_exec.p_addr ==
-		      &executor.e_proc[0].p_user);
-		CHECK(executor.e_proc[0].p_user.u_error == SYS_EIO);
-		CHECK(current_proc() == previous && current_user() == host);
-		CHECK(host->u_error == SYS_EINVAL);
+		CHECK(current_proc() == previous);
 	}
-	host->u_error = 0;
 }
