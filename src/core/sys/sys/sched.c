@@ -6,14 +6,14 @@
 #include <string.h>
 
 #include "sched.h"
-#include "sched_backend.h"
+#include "sched_adapt.h"
 #include "sys_error.h"
 
 #ifdef SCHED_TEST
 static int test_fail_yield;
 #endif
 
-static void wait_remove(struct wait_chan *chan, struct proc *proc);
+static void remove_wait_proc(struct proc_wait *chan, struct proc *proc);
 
 #ifdef SCHED_TEST
 void sched_test_fail_next_yield(void);
@@ -28,20 +28,20 @@ void sched_test_fail_next_yield(void)
 
 void kernel_lock(void)
 {
-	sched_backend_lock();
+	sched_adapt_lock();
 }
 
 void kernel_unlock(void)
 {
-	sched_backend_unlock();
+	sched_adapt_unlock();
 }
 
 int kernel_is_locked(void)
 {
-	return sched_backend_is_locked();
+	return sched_adapt_is_locked();
 }
 
-int sched_sleep(struct wait_chan *chan, enum wait_reason reason)
+int sched_sleep(struct proc_wait *chan, enum wait_reason reason)
 {
 	struct proc *proc;
 	int result;
@@ -63,24 +63,24 @@ int sched_sleep(struct wait_chan *chan, enum wait_reason reason)
 
 	proc->p_wchan = chan;
 	proc->p_link = NULL;
-	if (chan->wc_tail)
-		chan->wc_tail->p_link = proc;
+	if (chan->w_tail)
+		chan->w_tail->p_link = proc;
 	else
-		chan->wc_head = proc;
-	chan->wc_tail = proc;
+		chan->w_head = proc;
+	chan->w_tail = proc;
 
 #ifdef SCHED_TEST
 	if (test_fail_yield) {
 		test_fail_yield = 0;
 		result = -SYS_EINVAL;
 	} else {
-		result = sched_backend_yield(proc, reason);
+		result = sched_adapt_yield(proc, reason);
 	}
 #else
-	result = sched_backend_yield(proc, reason);
+	result = sched_adapt_yield(proc, reason);
 #endif
 	if (result != 0) {
-		wait_remove(chan, proc);
+		remove_wait_proc(chan, proc);
 		proc->p_state = PROC_ERROR;
 		return -SYS_EINVAL;
 	}
@@ -88,21 +88,21 @@ int sched_sleep(struct wait_chan *chan, enum wait_reason reason)
 	return 0;
 }
 
-void sched_wakeup(struct wait_chan *chan)
+void sched_wakeup(struct proc_wait *chan)
 {
 	struct proc *proc;
 	struct proc *next;
 
 	if (!chan)
 		return;
-	proc = chan->wc_head;
-	chan->wc_head = NULL;
-	chan->wc_tail = NULL;
+	proc = chan->w_head;
+	chan->w_head = NULL;
+	chan->w_tail = NULL;
 	while (proc) {
 		next = proc->p_link;
 		proc->p_wchan = NULL;
 		proc->p_link = NULL;
-		if (proc->p_ctx && sched_backend_wake(proc) == 0)
+		if (proc->p_ctx && sched_adapt_wake(proc) == 0)
 			proc->p_state = PROC_RUNNABLE;
 		else
 			proc->p_state = PROC_ERROR;
@@ -112,7 +112,7 @@ void sched_wakeup(struct wait_chan *chan)
 
 struct proc *current_proc(void)
 {
-	return sched_backend_current();
+	return sched_adapt_current();
 }
 
 /* Initialize process before descriptors or backend setup */
@@ -123,7 +123,7 @@ void pinit(struct proc *proc)
 	proc->p_state = PROC_NEW;
 }
 
-int proc_bind_backend(struct proc *proc, void *backend)
+int sched_bind_proc_to_coroutine(struct proc *proc, void *backend)
 {
 	if (!proc || !backend || proc->p_state != PROC_NEW)
 		return -SYS_EINVAL;
@@ -138,11 +138,11 @@ int sched_prepare(struct proc *proc, void (*entry)(void *arg), void *arg)
 
 	if (!proc || !entry || proc->p_state != PROC_NEW)
 		return -SYS_EINVAL;
-	backend = sched_backend_prepare(entry, arg);
+	backend = sched_adapt_prepare(entry, arg);
 	if (!backend)
 		return -SYS_ENOMEM;
-	if (proc_bind_backend(proc, backend) < 0) {
-		sched_backend_release(backend);
+	if (sched_bind_proc_to_coroutine(proc, backend) < 0) {
+		sched_adapt_release(backend);
 		return -SYS_EINVAL;
 	}
 	return 0;
@@ -156,11 +156,11 @@ void sched_release(struct proc *proc)
 		return;
 	kernel_lock();
 	if (proc->p_wchan)
-		wait_remove(proc->p_wchan, proc);
+		remove_wait_proc(proc->p_wchan, proc);
 	backend = proc->p_ctx;
 	proc->p_ctx = NULL;
 	kernel_unlock();
-	sched_backend_release(backend);
+	sched_adapt_release(backend);
 }
 
 int sched_resume(struct proc *proc)
@@ -177,7 +177,7 @@ int sched_resume(struct proc *proc)
 	sched_set_current_proc(proc);
 	proc->p_state = PROC_RUNNING;
 	kernel_unlock();
-	result = sched_backend_resume(proc);
+	result = sched_adapt_resume(proc);
 	sched_set_current_proc(NULL);
 	if (result == PROC_ERROR) {
 		kernel_lock();
@@ -196,16 +196,16 @@ int sched_resume(struct proc *proc)
 
 void sched_set_current_proc(struct proc *proc)
 {
-	sched_backend_set_current(proc);
+	sched_adapt_set_current(proc);
 }
 
-static void wait_remove(struct wait_chan *chan, struct proc *proc)
+static void remove_wait_proc(struct proc_wait *chan, struct proc *proc)
 {
 	struct proc *current;
 	struct proc *previous;
 
 	previous = NULL;
-	current = chan->wc_head;
+	current = chan->w_head;
 	while (current) {
 		if (current == proc)
 			break;
@@ -217,9 +217,9 @@ static void wait_remove(struct wait_chan *chan, struct proc *proc)
 	if (previous)
 		previous->p_link = current->p_link;
 	else
-		chan->wc_head = current->p_link;
-	if (chan->wc_tail == current)
-		chan->wc_tail = previous;
+		chan->w_head = current->p_link;
+	if (chan->w_tail == current)
+		chan->w_tail = previous;
 	current->p_wchan = NULL;
 	current->p_link = NULL;
 }

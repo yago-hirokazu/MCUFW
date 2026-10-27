@@ -4,7 +4,7 @@ TARGET = test_exe.exe
 
 # Commands
 CC = gcc
-include ../../../sys/dev/windows/sched_backend.mk
+include ../../../sys/dev/windows/sched_adapt.mk
 ifeq ($(MSYSTEM),MINGW64)
 DEL = rm -f
 COPY = cp

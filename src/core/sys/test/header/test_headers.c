@@ -3,7 +3,7 @@
 #if defined(TEST_REVERSE)
 #include "ramdisk.h"
 #include "conf.h"
-#include "sched_backend.h"
+#include "sched_adapt.h"
 #include "pipe.h"
 #include "inode.h"
 #include "file.h"
@@ -17,7 +17,7 @@
 #include "inode.h"
 #include "pipe.h"
 #include "sched.h"
-#include "sched_backend.h"
+#include "sched_adapt.h"
 #endif
 
 #include "ramdisk.h"

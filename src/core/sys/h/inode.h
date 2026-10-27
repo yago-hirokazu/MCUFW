@@ -22,9 +22,9 @@ struct inode {
 	unsigned char i_count;		/* File or construction references */
 	struct buf *i_buf;
 	size_t i_size;
-	struct wait_chan i_lock_chan;
-	struct wait_chan i_read_chan;
-	struct wait_chan i_write_chan;
+	struct proc_wait i_lock_chan;
+	struct proc_wait i_read_chan;
+	struct proc_wait i_write_chan;
 };
 
 extern struct inode inode[];

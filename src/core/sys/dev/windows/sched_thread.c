@@ -8,7 +8,7 @@
 #include <string.h>
 #include <windows.h>
 
-#include "sched_backend.h"
+#include "sched_adapt.h"
 #include "sys_error.h"
 
 struct sched_thread_slot {
@@ -32,34 +32,34 @@ static struct sched_thread_slot thread_slots[PIPELINE_MAX];
 static int sched_thread_wait(CONDITION_VARIABLE *cv);
 static unsigned __stdcall sched_thread_entry(void *arg);
 
-struct proc *sched_backend_current(void)
+struct proc *sched_adapt_current(void)
 {
 	return current;
 }
 
-void sched_backend_set_current(struct proc *proc)
+void sched_adapt_set_current(struct proc *proc)
 {
 	current = proc;
 }
 
-void sched_backend_lock(void)
+void sched_adapt_lock(void)
 {
 	AcquireSRWLockExclusive(&kernel_mutex);
 	kernel_lock_held = 1;
 }
 
-void sched_backend_unlock(void)
+void sched_adapt_unlock(void)
 {
 	kernel_lock_held = 0;
 	ReleaseSRWLockExclusive(&kernel_mutex);
 }
 
-int sched_backend_is_locked(void)
+int sched_adapt_is_locked(void)
 {
 	return kernel_lock_held;
 }
 
-void *sched_backend_prepare(void (*entry)(void *arg), void *arg)
+void *sched_adapt_prepare(void (*entry)(void *arg), void *arg)
 {
 	struct sched_thread_slot *slot;
 	uintptr_t thread;
@@ -93,7 +93,7 @@ void *sched_backend_prepare(void (*entry)(void *arg), void *arg)
 	return NULL;
 }
 
-void sched_backend_release(void *backend)
+void sched_adapt_release(void *backend)
 {
 	struct sched_thread_slot *slot;
 	int i;
@@ -116,7 +116,7 @@ void sched_backend_release(void *backend)
 	}
 }
 
-int sched_backend_yield(struct proc *proc, enum wait_reason reason)
+int sched_adapt_yield(struct proc *proc, enum wait_reason reason)
 {
 	struct sched_thread_slot *slot = proc->p_ctx;
 
@@ -133,7 +133,7 @@ int sched_backend_yield(struct proc *proc, enum wait_reason reason)
 	return slot->ts_stop ? -SYS_EINVAL : 0;
 }
 
-int sched_backend_wake(struct proc *proc)
+int sched_adapt_wake(struct proc *proc)
 {
 	struct sched_thread_slot *slot = proc->p_ctx;
 
@@ -144,7 +144,7 @@ int sched_backend_wake(struct proc *proc)
 	return 0;
 }
 
-enum proc_state sched_backend_resume(struct proc *proc)
+enum proc_state sched_adapt_resume(struct proc *proc)
 {
 	struct sched_thread_slot *slot = proc->p_ctx;
 	enum proc_state state;

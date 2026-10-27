@@ -5,7 +5,7 @@ TARGET = main.exe
 # Commands
 CXX = g++
 CC = gcc
-include ../../../core/sys/dev/windows/sched_backend.mk
+include ../../../core/sys/dev/windows/sched_adapt.mk
 DEL = del /q
 COPY = copy
 REN = ren
@@ -140,7 +140,7 @@ $(OUTDIR)/%.o: %.cpp
 $(OUTDIR)/%.o: %.S
 	$(CC) $(CFLAGS) -c -MMD -MP $< -o $@
 
-$(OBJS): Makefile ../../../core/sys/dev/windows/sched_backend.mk
+$(OBJS): Makefile ../../../core/sys/dev/windows/sched_adapt.mk
 
 .PHONY: clean
 clean:

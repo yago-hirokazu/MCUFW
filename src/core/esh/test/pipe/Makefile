@@ -2,7 +2,7 @@ TARGET = test_pipe.exe
 OUTDIR = _output
 CC = gcc
 OPT ?= -O0
-include ../../../sys/dev/windows/sched_backend.mk
+include ../../../sys/dev/windows/sched_adapt.mk
 
 CFLAGS = -mno-ms-bitfields -g $(OPT)
 CFLAGS += -Wall -Wextra -Werror -pedantic -std=c11

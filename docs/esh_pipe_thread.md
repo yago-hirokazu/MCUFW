@@ -5,7 +5,7 @@
 ## Backend選択
 
 schedulerを使うWindows Makefileは
-`src/core/sys/dev/windows/sched_backend.mk`をincludeする。defaultの
+`src/core/sys/dev/windows/sched_adapt.mk`をincludeする。defaultの
 `SCHED_BACKEND=cortn`はcoroutineを使い、`SCHED_BACKEND=thread`はnative
 Windows threadを使う。thread buildはcoroutine codeとcontext switch assemblyを
 linkしない。

@@ -150,7 +150,7 @@ src/core/sys/
 │       ├── cortn_context.c
 │       ├── cortn_context.h
 │       ├── cortn_switch.S
-│       ├── sched_backend.mk
+│       ├── sched_adapt.mk
 │       ├── sched_cortn.c
 │       └── sched_thread.c
 ├── h/
@@ -160,7 +160,7 @@ src/core/sys/
 │   ├── param.h
 │   ├── pipe.h
 │   ├── sched.h
-│   ├── sched_backend.h
+│   ├── sched_adapt.h
 │   └── sys_error.h
 └── sys/
     ├── alloc.c
@@ -335,7 +335,7 @@ offsetとsizeは非負で`PIPSIZ`以下に制限されるため、host依存の`
 | `struct esh_pipe_inode` | `struct inode` | sys内部型、`h/inode.h` |
 | `struct esh_proc` | `struct proc` | 公開型、`h/sched.h` |
 | executor `struct proc` | `struct exe_proc` | esh内部型、`esh/include/exe.h` |
-| `struct esh_wait_chan` | `struct wait_chan` | sys内部型、`h/sched.h` |
+| `struct esh_wait_chan` | `struct proc_wait` | sys内部型、`h/sched.h` |
 | `ESH_FD_STDIN/STDOUT/STDERR` | `FD_STDIN/STDOUT/STDERR` | `h/file.h` |
 | `ESH_OPEN_MAX` | `NOFILE` | `h/param.h`、値12 |
 | `ESH_FILE_MAX` | `NFILE` | `h/param.h`、値12 |
@@ -368,7 +368,7 @@ offsetとsizeは非負で`PIPSIZ`以下に制限されるため、host依存の`
 | `esh_current_proc` | `current_proc` | 公開、`sched.c` |
 | `esh_proc_*` | `proc_*` | 公開、`sched.c` |
 | `esh_sched_*` | `sched_*` | 公開、`sched.c` |
-| `esh_sched_backend_*` | `sched_backend_*` | private backend契約 |
+| `esh_sched_backend_*` | `sched_adapt_*` | private backend契約 |
 | `ESH_PROC_*` | `PROC_*` | `h/sched.h` |
 | `ESH_WAIT_*` | `WAIT_*` | `h/sched.h` |
 
@@ -387,7 +387,7 @@ includeしない。
 | `h/sched.h` | 公開 | `struct proc`、process state、scheduler API |
 | `h/inode.h` | sys private | pipe用最小`struct inode`、inode lifecycle |
 | `h/pipe.h` | sys private | `PIPSIZ`、`readp`、`writep`、lock契約 |
-| `h/sched_backend.h` | backend private | target backend契約 |
+| `h/sched_adapt.h` | backend private | target backend契約 |
 | `h/cortn.h` | backend private | coroutine engineと単体試験用契約 |
 
 「公開」はesh等のsys外callerが使用可能という意味であり、安定ABIは意味しない。
@@ -471,7 +471,7 @@ Step 7で必ず削除する。
 - `src/core/sys/h/inode.h`
 - `src/core/sys/h/pipe.h`
 - `src/core/sys/h/sched.h`
-- `src/core/sys/h/sched_backend.h`
+- `src/core/sys/h/sched_adapt.h`
 
 ### 実装内容
 
@@ -480,7 +480,7 @@ Step 7で必ず削除する。
 3. `inode.h`へpipeに必要な最小`struct inode`とflagを定義
 4. `pipe.h`へMCUFW固有の容量、I/O状態、internal prototypeを定義
 5. `sched.h`へprocess、wait channel、scheduler APIを定義
-6. `sched_backend.h`へtarget backend契約を定義
+6. `sched_adapt.h`へtarget backend契約を定義
 7. include依存を循環させず、forward declarationを優先
 8. header単体compile testを追加
 
@@ -527,7 +527,7 @@ Step 0で確定した次のheaderを追加した。
 - `src/core/sys/h/inode.h`
 - `src/core/sys/h/pipe.h`
 - `src/core/sys/h/sched.h`
-- `src/core/sys/h/sched_backend.h`
+- `src/core/sys/h/sched_adapt.h`
 
 旧esh headerとcallerは変更していない。新sys headerからesh header、host
 `errno.h`、Windows headerはincludeしていない。compatibility aliasもない。
@@ -539,7 +539,7 @@ Step 0で確定した次のheaderを追加した。
 | `struct file` | `f_flag`、`f_count`、`f_inode`、`f_offset` | `file[]`が所有、`f_count == 0`で未使用 |
 | `struct inode` | `i_flag`、`i_count`、`i_buf`、`i_size`、3 wait channel | `inode[]`が所有、`i_count == 0`で未使用 |
 | `struct proc` | `p_state`、`p_ofile[]`、wait link、backend、status | scheduler callerがstorageを所有 |
-| `struct wait_chan` | wait list head、tail | inodeまたはcallerがstorageを所有 |
+| `struct proc_wait` | wait list head、tail | inodeまたはcallerがstorageを所有 |
 | `struct pipe_io_status` | result、転送数、error | 一回分pipe I/Oの値object |
 
 `struct proc.p_ofile[NOFILE]`がprocessごとのfd tableである。fd entryは
@@ -573,7 +573,7 @@ owner、block address、timestampは意図的に追加していない。
 - `file.h`は`struct inode`と`struct proc`をforward declarationする
 - `inode.h`はwait channel実体を埋め込むため`sched.h`をincludeする
 - `pipe.h`は`PIPSIZ`とbuffer数検査のため`buf.h`、`param.h`をincludeする
-- `sched_backend.h`だけが`sched.h`へ依存する
+- `sched_adapt.h`だけが`sched.h`へ依存する
 
 V7名の`getf`、`ufalloc`、`falloc`、`closef`、`ialloc`、`iput`、`readp`、
 `writep`、`readi`、`writei`、`plock`、`prele`を宣言した。MCUFW補助として
@@ -1053,7 +1053,7 @@ scheduler本体と公開型をeshからsys層へ移し、file/pipeから利用�
 ### 対象
 
 - `src/core/esh/sched.c`から`src/core/sys/sys/sched.c`への移行
-- `sched.h`、`sched_backend.h`の確定
+- `sched.h`、`sched_adapt.h`の確定
 - `exe.h`、`exe.c`、旧file/pipeの必要な追従
 - scheduler test
 
@@ -1110,7 +1110,7 @@ scheduler本体、型、APIをsys層へ汎用化し、既存callerを必要範�
 ### Step 5実施結果（2026-10-13）
 
 `src/core/sys/sys/sched.c`へportable scheduler本体を追加し、Step 1で
-用意した`struct proc`、`struct wait_chan`、汎用APIへ移行した。wait listへの
+用意した`struct proc`、`struct proc_wait`、汎用APIへ移行した。wait listへの
 登録、backend yield、wakeup、releaseの順序は旧実装を維持した。
 
 Step 4から引き継いだinode lock待機のため、`WAIT_LOCK`を
@@ -1150,16 +1150,16 @@ pipeline試験が従来から出力するparser error診断とcompiler warning�
 
 確定したbackend APIは次のとおり。
 
-- `sched_backend_lock`、`sched_backend_unlock`、
-  `sched_backend_is_locked`
-- `sched_backend_current`、`sched_backend_set_current`
-- `sched_backend_prepare`、`sched_backend_release`
-- `sched_backend_yield`、`sched_backend_wake`、
-  `sched_backend_resume`
+- `sched_adapt_lock`、`sched_adapt_unlock`、
+  `sched_adapt_is_locked`
+- `sched_adapt_current`、`sched_adapt_set_current`
+- `sched_adapt_prepare`、`sched_adapt_release`
+- `sched_adapt_yield`、`sched_adapt_wake`、
+  `sched_adapt_resume`
 
-backendは非再帰kernel lockを提供する。`sched_backend_yield`はlock保持状態で
+backendは非再帰kernel lockを提供する。`sched_adapt_yield`はlock保持状態で
 呼ばれ、待機中だけlockを解放し、lockを再取得して戻る。
-`sched_backend_current`は実行中processを各実行contextで返す。wakeは待機中の
+`sched_adapt_current`は実行中processを各実行contextで返す。wakeは待機中の
 backendを再開可能にし、実際のrun token付与は`sched_resume`が行う。
 
 Step 6ではWindows backendを移動し、`SYS_SCHED`分岐と`esh_`/`ESH_`の一時
@@ -1183,7 +1183,7 @@ compatibility定義を削除して、汎用symbolを通常定義にする。旧e
 src/core/esh/target/windows/cortn_context.c
 src/core/esh/target/windows/cortn_context.h
 src/core/esh/target/windows/cortn_switch.S
-src/core/esh/target/windows/sched_backend.mk
+src/core/esh/target/windows/sched_adapt.mk
 src/core/esh/target/windows/sched_cortn.c
 src/core/esh/target/windows/sched_thread.c
 ```
@@ -1241,12 +1241,12 @@ build pathとbackend symbolを更新してください。Step 7のfile/pipe切�
 - `cortn_context.c`
 - `cortn_context.h`
 - `cortn_switch.S`
-- `sched_backend.mk`
+- `sched_adapt.mk`
 - `sched_cortn.c`
 - `sched_thread.c`
 
 移動後のscheduler backendは`struct proc`、`PROC_*`、`WAIT_*`、
-`sched_backend_*`、`SYS_EINVAL`を直接使用する。Step 5で設けた
+`sched_adapt_*`、`SYS_EINVAL`を直接使用する。Step 5で設けた
 `SYS_SCHED`分岐とbackend内の`esh_`/`ESH_` compatibility定義は削除した。
 `src/core/sys`内の`esh_`、`ESH_`検索結果は0件である。
 

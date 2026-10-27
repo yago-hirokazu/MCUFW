@@ -34,11 +34,11 @@ static ptrdiff_t call_write(struct proc *proc, int fd, const void *buf,
 			    size_t count);
 static int call_close(struct proc *proc, int fd);
 static void call_close_all(struct proc *proc);
-static void supply_read_hook(struct wait_chan *chan,
+static void supply_read_hook(struct proc_wait *chan,
 			     enum wait_reason reason);
-static void drain_write_hook(struct wait_chan *chan,
+static void drain_write_hook(struct proc_wait *chan,
 			     enum wait_reason reason);
-static void unlock_hook(struct wait_chan *chan, enum wait_reason reason);
+static void unlock_hook(struct proc_wait *chan, enum wait_reason reason);
 static void test_zero_length_and_validation(void);
 static void test_create_and_data_path(void);
 static void test_full_and_offset_reset(void);
@@ -111,7 +111,7 @@ static void call_close_all(struct proc *proc)
 	kernel_unlock();
 }
 
-static void supply_read_hook(struct wait_chan *chan,
+static void supply_read_hook(struct proc_wait *chan,
 			     enum wait_reason reason)
 {
 	static const char data = 'Q';
@@ -123,7 +123,7 @@ static void supply_read_hook(struct wait_chan *chan,
 	hook_result = writei(hook_inode, &offset, &data, 1);
 }
 
-static void drain_write_hook(struct wait_chan *chan,
+static void drain_write_hook(struct proc_wait *chan,
 			     enum wait_reason reason)
 {
 	unsigned char data[PIPSIZ];
@@ -133,7 +133,7 @@ static void drain_write_hook(struct wait_chan *chan,
 	hook_result = readp(hook_proc, hook_file, data, sizeof(data));
 }
 
-static void unlock_hook(struct wait_chan *chan, enum wait_reason reason)
+static void unlock_hook(struct proc_wait *chan, enum wait_reason reason)
 {
 	(void)chan;
 	(void)reason;

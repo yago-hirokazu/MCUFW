@@ -3,7 +3,7 @@
 #include <string.h>
 
 #include "cortn.h"
-#include "sched_backend.h"
+#include "sched_adapt.h"
 #include "sys_error.h"
 
 struct sched_cortn_slot {
@@ -21,33 +21,33 @@ static struct sched_cortn_slot cortn_slots[PIPELINE_MAX];
 
 static void sched_cortn_entry(struct cortn *cortn, void *arg);
 
-struct proc *sched_backend_current(void)
+struct proc *sched_adapt_current(void)
 {
 	return current;
 }
 
-void sched_backend_set_current(struct proc *proc)
+void sched_adapt_set_current(struct proc *proc)
 {
 	current = proc;
 }
 
-void sched_backend_lock(void)
+void sched_adapt_lock(void)
 {
 	/* Coroutine cannot be preempted while scheduler is not running */
 	kernel_lock_held = 1;
 }
 
-void sched_backend_unlock(void)
+void sched_adapt_unlock(void)
 {
 	kernel_lock_held = 0;
 }
 
-int sched_backend_is_locked(void)
+int sched_adapt_is_locked(void)
 {
 	return kernel_lock_held != 0;
 }
 
-void *sched_backend_prepare(void (*entry)(void *arg), void *arg)
+void *sched_adapt_prepare(void (*entry)(void *arg), void *arg)
 {
 	struct sched_cortn_slot *slot;
 	int i;
@@ -73,7 +73,7 @@ void *sched_backend_prepare(void (*entry)(void *arg), void *arg)
 	return NULL;
 }
 
-void sched_backend_release(void *backend)
+void sched_adapt_release(void *backend)
 {
 	struct sched_cortn_slot *slot;
 	int i;
@@ -89,7 +89,7 @@ void sched_backend_release(void *backend)
 	}
 }
 
-int sched_backend_yield(struct proc *proc, enum wait_reason reason)
+int sched_adapt_yield(struct proc *proc, enum wait_reason reason)
 {
 	struct cortn *cortn;
 	enum cortn_yield_reason yield_reason;
@@ -112,7 +112,7 @@ int sched_backend_yield(struct proc *proc, enum wait_reason reason)
 	return 0;
 }
 
-int sched_backend_wake(struct proc *proc)
+int sched_adapt_wake(struct proc *proc)
 {
 	struct cortn *cortn;
 
@@ -122,7 +122,7 @@ int sched_backend_wake(struct proc *proc)
 	return 0;
 }
 
-enum proc_state sched_backend_resume(struct proc *proc)
+enum proc_state sched_adapt_resume(struct proc *proc)
 {
 	struct cortn *cortn;
 

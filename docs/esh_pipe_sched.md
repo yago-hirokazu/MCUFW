@@ -8,7 +8,7 @@ portableな`src/core/sys/sys/sched.c`はwait listと`struct proc`状態を管理
 context切替とlock実装をscheduler backendへ委譲する。Windows backendは
 `src/core/sys/dev/windows/sched_cortn.c`と`sched_thread.c`にある。
 
-`src/core/sys/dev/windows/sched_backend.mk`の`SCHED_BACKEND`でbackendを選ぶ。
+`src/core/sys/dev/windows/sched_adapt.mk`の`SCHED_BACKEND`でbackendを選ぶ。
 defaultは`cortn`で、`thread`指定時はnative Windows threadを使用する。
 
 ## Kernel lock

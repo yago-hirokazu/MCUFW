@@ -33,7 +33,7 @@ coroutineは再開できない。scheduler backendがcoroutine状態を`PROC_*`�
 
 ## Scheduler backend選択
 
-`src/core/sys/dev/windows/sched_backend.mk`がWindows scheduler backendを選ぶ。
+`src/core/sys/dev/windows/sched_adapt.mk`がWindows scheduler backendを選ぶ。
 defaultの`SCHED_BACKEND=cortn`は次をbuildする。
 
 - `cortn.c`

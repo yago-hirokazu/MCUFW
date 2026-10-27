@@ -65,7 +65,7 @@ Milestone 9 は 18 ファイル、788 行追加・105 行削除。
 | Coroutine | `cortn.c`, Windows `cortn_context.c`, `cortn_switch.S`, `sched_cortn.c` | Context、stack、backend |
 | Thread | sys Windows `sched_thread.c` | TLS、SRW lock、CV、thread handle |
 | Stdio | Windows `stdio_adapt.c`, `include/bltn.h`, `echo.c`, `cat.c` | 既存 applet の入出力経路 |
-| Build | sys Windows `sched_backend.mk`、各 Makefile | Backend 選択と条件付き接続 |
+| Build | sys Windows `sched_adapt.mk`、各 Makefile | Backend 選択と条件付き接続 |
 
 Scheduler Windows固有ファイルは`src/core/sys/dev/windows/`にある。
 esh adapterは`src/core/esh/target/windows/`に残る。

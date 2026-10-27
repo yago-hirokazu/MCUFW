@@ -27,22 +27,22 @@ enum wait_reason {
 };
 
 struct file;
-struct wait_chan;
+struct proc_wait;
 
 /* Portable execution state embedded in executor process */
 struct proc {
 	enum proc_state p_state;
 	struct file *p_ofile[NOFILE];
-	struct wait_chan *p_wchan;
+	struct proc_wait *p_wchan;
 	struct proc *p_link;
 	void *p_ctx;
 	int p_ret;
 };
 
 /* Channel storage belongs to waiting object; scheduler manages list */
-struct wait_chan {
-	struct proc *wc_head;
-	struct proc *wc_tail;
+struct proc_wait {
+	struct proc *w_head;
+	struct proc *w_tail;
 };
 
 /* Non-recursive kernel lock protects pipes, cache, queues and wait lists */
@@ -50,12 +50,12 @@ struct wait_chan {
 void kernel_lock(void);
 void kernel_unlock(void);
 int kernel_is_locked(void);
-int sched_sleep(struct wait_chan *chan, enum wait_reason reason);
-void sched_wakeup(struct wait_chan *chan);
+int sched_sleep(struct proc_wait *chan, enum wait_reason reason);
+void sched_wakeup(struct proc_wait *chan);
 struct proc *current_proc(void);
 /* Initialize process before descriptors or backend setup */
 void pinit(struct proc *proc);
-int proc_bind_backend(struct proc *proc, void *backend);
+int sched_bind_proc_to_coroutine(struct proc *proc, void *backend);
 int sched_prepare(struct proc *proc, void (*entry)(void *arg), void *arg);
 void sched_release(struct proc *proc);
 int sched_resume(struct proc *proc);

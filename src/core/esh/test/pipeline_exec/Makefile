@@ -2,7 +2,7 @@ TARGET = test_pipeline_exec.exe
 OUTDIR = _output
 CC = gcc
 CXX = g++
-include ../../../sys/dev/windows/sched_backend.mk
+include ../../../sys/dev/windows/sched_adapt.mk
 
 CFLAGS = -mno-ms-bitfields -g
 CFLAGS += -Wall -Wextra

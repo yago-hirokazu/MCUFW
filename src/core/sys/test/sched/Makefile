@@ -2,7 +2,7 @@ TARGET ?= test_sched.exe
 OUTDIR ?= _output
 CC = gcc
 OPT ?= -O0
-include ../../dev/windows/sched_backend.mk
+include ../../dev/windows/sched_adapt.mk
 
 CFLAGS = -mno-ms-bitfields -g $(OPT)
 CFLAGS += -Wall -Wextra -Werror -pedantic -std=c11

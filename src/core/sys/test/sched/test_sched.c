@@ -50,7 +50,7 @@ struct reader_arg {
 };
 
 struct wait_arg {
-	struct wait_chan *chan;
+	struct proc_wait *chan;
 	enum wait_reason reason;
 	int result;
 	int lock_held;
@@ -76,7 +76,7 @@ struct native_arg {
 
 
 struct buffer_wait_arg {
-	struct wait_chan *chan;
+	struct proc_wait *chan;
 	int before;
 	int after;
 };
@@ -391,7 +391,7 @@ static void test_wait_lock(void)
 static void test_multiple_waiters(void)
 {
 	struct wait_arg wait[2];
-	struct wait_chan chan;
+	struct proc_wait chan;
 	struct proc procs[2];
 	int i;
 
@@ -409,8 +409,8 @@ static void test_multiple_waiters(void)
 	kernel_lock();
 	sched_wakeup(&chan);
 	kernel_unlock();
-	CHECK(chan.wc_head == NULL);
-	CHECK(chan.wc_tail == NULL);
+	CHECK(chan.w_head == NULL);
+	CHECK(chan.w_tail == NULL);
 	CHECK(run_scheduler(procs, 2) == 0);
 	for (i = 0; i < 2; i++) {
 		CHECK(wait[i].result == 0);
@@ -422,7 +422,7 @@ static void test_multiple_waiters(void)
 static void test_release_waiter(void)
 {
 	struct wait_arg wait;
-	struct wait_chan chan;
+	struct proc_wait chan;
 	struct proc proc;
 
 	memset(&chan, 0, sizeof(chan));
@@ -434,14 +434,14 @@ static void test_release_waiter(void)
 	CHECK(proc.p_state == PROC_WAIT_WRITE);
 	sched_release(&proc);
 	CHECK(proc.p_ctx == NULL);
-	CHECK(chan.wc_head == NULL);
-	CHECK(chan.wc_tail == NULL);
+	CHECK(chan.w_head == NULL);
+	CHECK(chan.w_tail == NULL);
 }
 
 static void test_wake_then_release(void)
 {
 	struct wait_arg wait;
-	struct wait_chan chan;
+	struct proc_wait chan;
 	struct proc proc;
 
 	memset(&chan, 0, sizeof(chan));
@@ -456,13 +456,13 @@ static void test_wake_then_release(void)
 	CHECK(proc.p_state == PROC_RUNNABLE);
 	sched_release(&proc);
 	CHECK(proc.p_ctx == NULL);
-	CHECK(chan.wc_head == NULL);
+	CHECK(chan.w_head == NULL);
 }
 
 static void test_yield_failure_cleanup(void)
 {
 	struct wait_arg wait;
-	struct wait_chan chan;
+	struct proc_wait chan;
 	struct proc proc;
 
 	memset(&chan, 0, sizeof(chan));
@@ -479,8 +479,8 @@ static void test_yield_failure_cleanup(void)
 	CHECK(proc.p_state == PROC_FINISHED);
 	CHECK(proc.p_wchan == NULL);
 	CHECK(proc.p_link == NULL);
-	CHECK(chan.wc_head == NULL);
-	CHECK(chan.wc_tail == NULL);
+	CHECK(chan.w_head == NULL);
+	CHECK(chan.w_tail == NULL);
 	sched_release(&proc);
 }
 
@@ -940,7 +940,7 @@ static void buffer_wait_entry(void *arg)
 /* Successful peer I/O leaves sleeping caller's buffer error intact */
 static void buffer_peer_entry(void *arg)
 {
-	struct wait_chan *chan = arg;
+	struct proc_wait *chan = arg;
 	struct buf *bp;
 
 	kernel_lock();
@@ -956,7 +956,7 @@ static void buffer_peer_entry(void *arg)
 static void test_buffer_error_isolation(void)
 {
 	struct proc procs[2];
-	struct wait_chan chan = { 0 };
+	struct proc_wait chan = { 0 };
 	struct buffer_wait_arg waiter = { &chan, 0, 0 };
 	int i;
 

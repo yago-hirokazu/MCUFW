@@ -110,7 +110,7 @@ src/core/sys/dev/windows/
   cortn_switch.S
   sched_cortn.c
   sched_thread.c
-  sched_backend.mk
+  sched_adapt.mk
 ```
 
 ファイル内容、公開関数名、構造体、stack size、guard処理、context switchの
@@ -174,7 +174,7 @@ bundled UNIX V7の`usr/sys/sys/main.c`では、`binit()`は起動処理から独
 次は`SCHED_CSOURCES = cortn.c ...`と`vpath`を使用している。物理移動後も新しい
 `sys/dev/windows`から解決されることを確認する。
 
-- `src/core/sys/dev/windows/sched_backend.mk`
+- `src/core/sys/dev/windows/sched_adapt.mk`
 - `src/core/esh/test/exe/Makefile`
 - `src/core/esh/test/pipeline_exec/Makefile`
 - `src/target/windows/Makefile`
@@ -397,7 +397,7 @@ src/core/esh/include/cortn.h
 3. `src/core/sys/test/sched/Makefile`の
    `-I../../../esh/include`がcoroutine headerのためだけなら削除
 4. esh試験で必要な`esh/include`は削除しない
-5. `sched_backend.mk`のbare filenameは維持
+5. `sched_adapt.mk`のbare filenameは維持
 6. `vpath`使用buildが`sys/dev/windows/cortn.c`を選ぶことを依存fileまたは
    build出力で確認
 7. 古い`.d`を使わないよう対象試験をclean build
@@ -432,7 +432,7 @@ coroutine/thread両backendを持つsuiteは両方、`-O0`と`-O2`の両方を確
   - `src/core/sys/test/sched/Makefile`
 - `src/core/sys/test/sched/Makefile`から不要な
   `-I../../../esh/include`を削除
-- `sched_backend.mk`のbare filename定義は変更なし
+- `sched_adapt.mk`のbare filename定義は変更なし
 - `pipeline_exec/run_test.sh`へ構成別cleanを追加
   - `-B`でも古い`.d`内の消滅済みpathが解決されるため、build前cleanが必要
   - clean対象は各構成の`OUTDIR`と`TARGET`だけに限定
@@ -682,7 +682,7 @@ MSYS2 MINGW64 shellで次を実行する。
 - 開始時HEAD: `1854fbd Update file initialization callers`
 - `docs/cortn_windows.md`を次の現行実装へ更新
   - coroutine engineとheaderの配置を`src/core/sys/dev/windows`へ変更
-  - `sched_backend.mk`によるbackend選択を追加
+  - `sched_adapt.mk`によるbackend選択を追加
   - cortn backendのC sourceとassembly sourceを記録
   - thread backendが`sched_thread.c`だけを使用することを記録
   - 更新日を2026-10-15へ変更
@@ -693,7 +693,7 @@ MSYS2 MINGW64 shellで次を実行する。
   - `finit()`は`binit()`を内部で呼ばない
   - 更新日を2026-10-15へ変更
 - 対象2文書に旧coroutine pathと`file_system_init()`がないことを確認
-- sourceと`sched_backend.mk`を現行文書の記述と照合
+- sourceと`sched_adapt.mk`を現行文書の記述と照合
 - review結果、計画、過去handoff内の旧記述は歴史的記録として変更なし
 - 文書だけの変更なのでbuildと実行試験は未実施
 
@@ -764,7 +764,7 @@ MSYS2 MINGW64 shellで次を実行する。
   - `cortn_context.c`
   - `sched_cortn.c`
 - coroutine単体試験の`test_cortn.c`も意図どおり`cortn.h`をinclude
-- `sched_backend.mk`を使用する全6個のbuildについて、Make展開結果を確認
+- `sched_adapt.mk`を使用する全6個のbuildについて、Make展開結果を確認
   - `SCHED_BACKEND=thread`では`SCHED_CSOURCES=sched_thread.c`
   - `SCHED_ASOURCES`は空
   - coroutine objectはthread構成へ混入しない
