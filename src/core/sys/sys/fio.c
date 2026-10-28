@@ -80,8 +80,8 @@ void closef(struct file *fp)
 	flag = fp->f_flag;
 	memset(fp, 0, sizeof(*fp));
 	if (ip && (flag & FPIPE)) {
-		sched_wakeup(&ip->i_read_chan);
-		sched_wakeup(&ip->i_write_chan);
+		sched_wakeup(&ip->i_rchan);
+		sched_wakeup(&ip->i_wchan);
 	}
 	if (ip)
 		iput(ip);

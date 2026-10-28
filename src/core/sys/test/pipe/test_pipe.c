@@ -207,8 +207,8 @@ static void test_create_and_data_path(void)
 	CHECK(memcmp(data, "cd", 2) == 0);
 	CHECK(rf->f_offset == 0);
 	CHECK(ip->i_size == 0);
-	CHECK(sched_stub_wakeup_count(&ip->i_read_chan) >= 2);
-	CHECK(sched_stub_wakeup_count(&ip->i_write_chan) >= 1);
+	CHECK(sched_stub_wakeup_count(&ip->i_rchan) >= 2);
+	CHECK(sched_stub_wakeup_count(&ip->i_wchan) >= 1);
 	call_close_all(&proc);
 	CHECK(file_in_use() == 0);
 	CHECK(inode_in_use() == 0);
@@ -262,8 +262,8 @@ static void test_eof_epipe_and_close_wakeup(void)
 	CHECK(sys_pipe(fd) == 0);
 	ip = getf(&proc, fd[0])->f_inode;
 	CHECK(call_close(&proc, fd[1]) == 0);
-	CHECK(sched_stub_wakeup_count(&ip->i_read_chan) == 1);
-	CHECK(sched_stub_wakeup_count(&ip->i_write_chan) == 1);
+	CHECK(sched_stub_wakeup_count(&ip->i_rchan) == 1);
+	CHECK(sched_stub_wakeup_count(&ip->i_wchan) == 1);
 	CHECK(call_read(&proc, fd[0], &data, 1) == 0);
 	CHECK(call_close(&proc, fd[0]) == 0);
 	CHECK(pipe_in_use() == 0);

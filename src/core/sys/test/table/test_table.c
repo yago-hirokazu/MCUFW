@@ -51,12 +51,12 @@ static int file_is_unused(const struct file *fp)
 static int inode_is_unused(const struct inode *ip)
 {
 	return ip->i_flag == 0 && ip->i_count == 0 && ip->i_buf == NULL &&
-	       ip->i_size == 0 && ip->i_lock_chan.w_head == NULL &&
-	       ip->i_lock_chan.w_tail == NULL &&
-	       ip->i_read_chan.w_head == NULL &&
-	       ip->i_read_chan.w_tail == NULL &&
-	       ip->i_write_chan.w_head == NULL &&
-	       ip->i_write_chan.w_tail == NULL;
+	       ip->i_size == 0 && ip->i_lchan.w_head == NULL &&
+	       ip->i_lchan.w_tail == NULL &&
+	       ip->i_rchan.w_head == NULL &&
+	       ip->i_rchan.w_tail == NULL &&
+	       ip->i_wchan.w_head == NULL &&
+	       ip->i_wchan.w_tail == NULL;
 }
 
 static void reset_tables(void)
