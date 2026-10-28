@@ -13,7 +13,7 @@
 static int test_fail_yield;
 #endif
 
-static void remove_wait_proc(struct proc_wait *chan, struct proc *proc);
+static void remove_wait_proc(struct wait_channel *chan, struct proc *proc);
 
 #ifdef SCHED_TEST
 void sched_test_fail_next_yield(void);
@@ -41,7 +41,7 @@ int kernel_is_locked(void)
 	return sched_adapt_is_locked();
 }
 
-int sched_sleep(struct proc_wait *chan, enum wait_reason reason)
+int sched_sleep(struct wait_channel *chan, enum wait_reason reason)
 {
 	struct proc *proc;
 	int result;
@@ -88,7 +88,7 @@ int sched_sleep(struct proc_wait *chan, enum wait_reason reason)
 	return 0;
 }
 
-void sched_wakeup(struct proc_wait *chan)
+void sched_wakeup(struct wait_channel *chan)
 {
 	struct proc *proc;
 	struct proc *next;
@@ -199,7 +199,7 @@ void sched_set_current_proc(struct proc *proc)
 	sched_adapt_set_current(proc);
 }
 
-static void remove_wait_proc(struct proc_wait *chan, struct proc *proc)
+static void remove_wait_proc(struct wait_channel *chan, struct proc *proc)
 {
 	struct proc *current;
 	struct proc *previous;

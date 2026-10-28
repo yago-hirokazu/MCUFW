@@ -335,7 +335,7 @@ offsetとsizeは非負で`PIPSIZ`以下に制限されるため、host依存の`
 | `struct esh_pipe_inode` | `struct inode` | sys内部型、`h/inode.h` |
 | `struct esh_proc` | `struct proc` | 公開型、`h/sched.h` |
 | executor `struct proc` | `struct exe_proc` | esh内部型、`esh/include/exe.h` |
-| `struct esh_wait_chan` | `struct proc_wait` | sys内部型、`h/sched.h` |
+| `struct esh_wait_chan` | `struct wait_channel` | sys内部型、`h/sched.h` |
 | `ESH_FD_STDIN/STDOUT/STDERR` | `FD_STDIN/STDOUT/STDERR` | `h/file.h` |
 | `ESH_OPEN_MAX` | `NOFILE` | `h/param.h`、値12 |
 | `ESH_FILE_MAX` | `NFILE` | `h/param.h`、値12 |
@@ -539,7 +539,7 @@ Step 0で確定した次のheaderを追加した。
 | `struct file` | `f_flag`、`f_count`、`f_inode`、`f_offset` | `file[]`が所有、`f_count == 0`で未使用 |
 | `struct inode` | `i_flag`、`i_count`、`i_buf`、`i_size`、3 wait channel | `inode[]`が所有、`i_count == 0`で未使用 |
 | `struct proc` | `p_state`、`p_ofile[]`、wait link、backend、status | scheduler callerがstorageを所有 |
-| `struct proc_wait` | wait list head、tail | inodeまたはcallerがstorageを所有 |
+| `struct wait_channel` | wait list head、tail | inodeまたはcallerがstorageを所有 |
 | `struct pipe_io_status` | result、転送数、error | 一回分pipe I/Oの値object |
 
 `struct proc.p_ofile[NOFILE]`がprocessごとのfd tableである。fd entryは
@@ -1110,7 +1110,7 @@ scheduler本体、型、APIをsys層へ汎用化し、既存callerを必要範�
 ### Step 5実施結果（2026-10-13）
 
 `src/core/sys/sys/sched.c`へportable scheduler本体を追加し、Step 1で
-用意した`struct proc`、`struct proc_wait`、汎用APIへ移行した。wait listへの
+用意した`struct proc`、`struct wait_channel`、汎用APIへ移行した。wait listへの
 登録、backend yield、wakeup、releaseの順序は旧実装を維持した。
 
 Step 4から引き継いだinode lock待機のため、`WAIT_LOCK`を

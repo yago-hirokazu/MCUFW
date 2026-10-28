@@ -50,7 +50,7 @@ struct reader_arg {
 };
 
 struct wait_arg {
-	struct proc_wait *chan;
+	struct wait_channel *chan;
 	enum wait_reason reason;
 	int result;
 	int lock_held;
@@ -76,7 +76,7 @@ struct native_arg {
 
 
 struct buffer_wait_arg {
-	struct proc_wait *chan;
+	struct wait_channel *chan;
 	int before;
 	int after;
 };
@@ -391,7 +391,7 @@ static void test_wait_lock(void)
 static void test_multiple_waiters(void)
 {
 	struct wait_arg wait[2];
-	struct proc_wait chan;
+	struct wait_channel chan;
 	struct proc procs[2];
 	int i;
 
@@ -422,7 +422,7 @@ static void test_multiple_waiters(void)
 static void test_release_waiter(void)
 {
 	struct wait_arg wait;
-	struct proc_wait chan;
+	struct wait_channel chan;
 	struct proc proc;
 
 	memset(&chan, 0, sizeof(chan));
@@ -441,7 +441,7 @@ static void test_release_waiter(void)
 static void test_wake_then_release(void)
 {
 	struct wait_arg wait;
-	struct proc_wait chan;
+	struct wait_channel chan;
 	struct proc proc;
 
 	memset(&chan, 0, sizeof(chan));
@@ -462,7 +462,7 @@ static void test_wake_then_release(void)
 static void test_yield_failure_cleanup(void)
 {
 	struct wait_arg wait;
-	struct proc_wait chan;
+	struct wait_channel chan;
 	struct proc proc;
 
 	memset(&chan, 0, sizeof(chan));
@@ -940,7 +940,7 @@ static void buffer_wait_entry(void *arg)
 /* Successful peer I/O leaves sleeping caller's buffer error intact */
 static void buffer_peer_entry(void *arg)
 {
-	struct proc_wait *chan = arg;
+	struct wait_channel *chan = arg;
 	struct buf *bp;
 
 	kernel_lock();
@@ -956,7 +956,7 @@ static void buffer_peer_entry(void *arg)
 static void test_buffer_error_isolation(void)
 {
 	struct proc procs[2];
-	struct proc_wait chan = { 0 };
+	struct wait_channel chan = { 0 };
 	struct buffer_wait_arg waiter = { &chan, 0, 0 };
 	int i;
 
