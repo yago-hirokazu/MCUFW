@@ -1,6 +1,6 @@
 # sys pipe sleep・wakeup
 
-更新日: 2026-10-13
+更新日: 2026-10-30
 
 ## 役割
 
@@ -23,7 +23,7 @@ pipe状態、inode lock、file/inode参照、wait listを単一の非再帰kerne
 
 ```text
 pipeまたはinode lock条件を検査
-  -> processをwait channel末尾へ登録
+  -> channelアドレスをhashし、slpque[]の該当list先頭へ登録
   -> PROC_WAIT_LOCK/READ/WRITEへ変更
   -> backendがlock解放と待機を不可分に実行
   -> wake後にlock保持状態で復帰
@@ -34,11 +34,25 @@ wait登録前に実行権を返さないため、条件検査直後のwakeupを�
 
 ## Wakeup
 
-`sched_wakeup()`はchannel上の全processをwait listから外し、backendをwakeして
+`sched_wakeup()`はkernel lock保持中に呼び出す。channel上の全processを
+wait listから外し、backendをwakeして
 `PROC_RUNNABLE`へ変更する。wake後にI/O可能とは限らない。各processは条件を
 再検査し、満たされていなければ再びsleepする。
 
-使用するchannelは次のとおり。
+channelは格納領域を持つ構造体ではなく、出来事を識別する`char *`である。
+pipeではV7と同じく、inode先頭アドレスをlock、先頭+1 byteをwrite、
+先頭+2 byteをreadに使う。指す値は読み書きしない。
+
+portable schedulerは64 bucketの`slpque[]`を所有し、`p_link`でwaiterをつなぐ。
+hashは`((uintptr_t)chan >> 5) & 63`とし、Windowsでもpointer幅を保つ。
+同じbucketに異なるchannelが混在するため、wakeupは`p_wchan == chan`の
+processだけを取り外す。channelの対象は待機終了まで有効でなければならない。
+inode解放・再利用までに関係する待機登録を除去する。
+
+起床後は`p_wchan`と`p_link`をNULLにする。runqは導入せず、executorによる
+runnable processの選択を維持する。`pinit()`で共通wait hashを初期化しない。
+
+各channelの起床契機は次のとおり。
 
 - write後にread channelをwake
 - 全dataをreadしてbufferを空にした後にwrite channelをwake

@@ -6,6 +6,7 @@
 #include "conf.h"
 #include "file.h"
 #include "inode.h"
+#include "param.h"
 #include "ramdisk.h"
 
 struct buf buf[NBUF];

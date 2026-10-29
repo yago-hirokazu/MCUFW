@@ -1,4 +1,7 @@
-/* pipe.c */
+/*
+ * Pipe events => inode address + 0 (lock), + 1 (write), + 2 (read)
+ *   => sched_sleep() / sched_wakeup() => scheduler wait hash
+ */
 
 #include "file.h"
 #include "inode.h"
@@ -90,7 +93,7 @@ ptrdiff_t readp(struct proc *proc, struct file *fp, void *buf, size_t count)
 		case PIPE_IO_WAIT_READ:
 			if (!proc || !proc->p_ctx)
 				return -SYS_EAGAIN;
-			result = sched_sleep(&fp->f_inode->i_rchan,
+			result = sched_sleep((char *)fp->f_inode + 2,
 					     WAIT_READ);
 			if (result < 0)
 				return result;
@@ -134,7 +137,7 @@ ptrdiff_t writep(struct proc *proc, struct file *fp, const void *buf,
 					return (ptrdiff_t)transferred;
 				return -SYS_EAGAIN;
 			}
-			result = sched_sleep(&fp->f_inode->i_wchan,
+			result = sched_sleep((char *)fp->f_inode + 1,
 					     WAIT_WRITE);
 			if (result < 0)
 				return result;
@@ -157,7 +160,7 @@ int plock(struct inode *ip)
 		proc = current_proc();
 		if (!proc || !proc->p_ctx)
 			return -SYS_EAGAIN;
-		result = sched_sleep(&ip->i_lchan, WAIT_LOCK);
+		result = sched_sleep((char *)ip, WAIT_LOCK);
 		if (result < 0)
 			return result;
 	}
@@ -172,7 +175,7 @@ void prele(struct inode *ip)
 	ip->i_flag &= ~ILOCK;
 	if (ip->i_flag & IWANT) {
 		ip->i_flag &= ~IWANT;
-		sched_wakeup(&ip->i_lchan);
+		sched_wakeup((char *)ip);
 	}
 }
 
@@ -222,7 +225,7 @@ static struct pipe_io_status pipe_read_once(struct file *fp, void *buf,
 	if (fp->f_offset == ip->i_size) {
 		fp->f_offset = 0;
 		ip->i_size = 0;
-		sched_wakeup(&ip->i_wchan);
+		sched_wakeup((char *)ip + 1);
 	}
 	return pipe_status(PIPE_IO_PROGRESS, transferred, 0);
 }
@@ -249,6 +252,6 @@ static struct pipe_io_status pipe_write_once(struct file *fp,
 	transferred = writei(ip, &offset, buf, count);
 	if (transferred < 0)
 		return pipe_status(PIPE_IO_ERROR, 0, (int)transferred);
-	sched_wakeup(&ip->i_rchan);
+	sched_wakeup((char *)ip + 2);
 	return pipe_status(PIPE_IO_PROGRESS, transferred, 0);
 }

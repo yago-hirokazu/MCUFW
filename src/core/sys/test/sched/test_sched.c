@@ -50,7 +50,7 @@ struct reader_arg {
 };
 
 struct wait_arg {
-	struct wait_channel *chan;
+	char *chan;
 	enum wait_reason reason;
 	int result;
 	int lock_held;
@@ -76,7 +76,7 @@ struct native_arg {
 
 
 struct buffer_wait_arg {
-	struct wait_channel *chan;
+	char *chan;
 	int before;
 	int after;
 };
@@ -99,6 +99,9 @@ static void unused_entry(void *arg);
 static void test_blocking_transfer(void);
 static void test_wait_lock(void);
 static void test_multiple_waiters(void);
+static void test_inode_channels(void);
+static void test_hash_collision(void);
+static void test_release_collision(void);
 static void test_release_waiter(void);
 static void test_wake_then_release(void);
 static void test_yield_failure_cleanup(void);
@@ -134,6 +137,9 @@ int main(void)
 	test_wait_lock();
 	check_resources();
 	test_multiple_waiters();
+	test_inode_channels();
+	test_hash_collision();
+	test_release_collision();
 	test_release_waiter();
 	test_wake_then_release();
 	test_yield_failure_cleanup();
@@ -391,11 +397,10 @@ static void test_wait_lock(void)
 static void test_multiple_waiters(void)
 {
 	struct wait_arg wait[2];
-	struct wait_channel chan;
+	char chan = 0;
 	struct proc procs[2];
 	int i;
 
-	memset(&chan, 0, sizeof(chan));
 	for (i = 0; i < 2; i++) {
 		pinit(&procs[i]);
 		wait[i].chan = &chan;
@@ -409,23 +414,137 @@ static void test_multiple_waiters(void)
 	kernel_lock();
 	sched_wakeup(&chan);
 	kernel_unlock();
-	CHECK(chan.w_head == NULL);
-	CHECK(chan.w_tail == NULL);
 	CHECK(run_scheduler(procs, 2) == 0);
 	for (i = 0; i < 2; i++) {
+		CHECK(procs[i].p_wchan == NULL);
+		CHECK(procs[i].p_link == NULL);
 		CHECK(wait[i].result == 0);
 		CHECK(wait[i].lock_held);
 		sched_release(&procs[i]);
 	}
 }
 
+/* Distinguish V7 inode events and reuse same inode after all wakeups */
+static void test_inode_channels(void)
+{
+	struct inode node = { 0 };
+	struct wait_arg wait[3];
+	struct proc procs[3];
+	enum wait_reason reasons[3] = { WAIT_LOCK, WAIT_WRITE, WAIT_READ };
+	enum proc_state states[3] = {
+		PROC_WAIT_LOCK, PROC_WAIT_WRITE, PROC_WAIT_READ
+	};
+	int cycle;
+	int i;
+	int j;
+
+	for (cycle = 0; cycle < 2; cycle++) {
+		for (i = 0; i < 3; i++) {
+			pinit(&procs[i]);
+			wait[i].chan = (char *)&node + i;
+			wait[i].reason = reasons[i];
+			CHECK(sched_prepare(&procs[i], wait_entry,
+					    &wait[i]) == 0);
+			CHECK(sched_resume(&procs[i]) == 0);
+			CHECK(procs[i].p_state == states[i]);
+			CHECK(procs[i].p_wchan == (char *)&node + i);
+		}
+		for (i = 0; i < 3; i++) {
+			kernel_lock();
+			sched_wakeup((char *)&node + i);
+			kernel_unlock();
+			CHECK(procs[i].p_state == PROC_RUNNABLE);
+			CHECK(procs[i].p_wchan == NULL);
+			CHECK(procs[i].p_link == NULL);
+			for (j = i + 1; j < 3; j++)
+				CHECK(procs[j].p_state == states[j]);
+		}
+		CHECK(run_scheduler(procs, 3) == 0);
+		for (i = 0; i < 3; i++) {
+			CHECK(wait[i].result == 0 && wait[i].lock_held);
+			sched_release(&procs[i]);
+		}
+	}
+}
+
+/* Wake matching head and tail while preserving colliding middle waiter */
+static void test_hash_collision(void)
+{
+	_Alignas(32) char channels[32] = { 0 };
+	struct wait_arg wait[3];
+	struct proc procs[3];
+	int i;
+
+	/* Aligned first bytes share V7 hash after five-bit shift */
+	for (i = 0; i < 3; i++) {
+		pinit(&procs[i]);
+		wait[i].chan = channels + (i == 1);
+		wait[i].reason = WAIT_READ;
+		CHECK(sched_prepare(&procs[i], wait_entry, &wait[i]) == 0);
+		CHECK(sched_resume(&procs[i]) == 0);
+	}
+	kernel_lock();
+	sched_wakeup(channels);
+	kernel_unlock();
+	CHECK(procs[0].p_state == PROC_RUNNABLE);
+	CHECK(procs[2].p_state == PROC_RUNNABLE);
+	CHECK(procs[1].p_state == PROC_WAIT_READ);
+	CHECK(procs[1].p_wchan == channels + 1);
+	CHECK(procs[1].p_link == NULL);
+	kernel_lock();
+	sched_wakeup(channels + 1);
+	kernel_unlock();
+	CHECK(run_scheduler(procs, 3) == 0);
+	for (i = 0; i < 3; i++) {
+		CHECK(wait[i].result == 0 && wait[i].lock_held);
+		CHECK(procs[i].p_wchan == NULL && procs[i].p_link == NULL);
+		sched_release(&procs[i]);
+	}
+}
+
+/* Release each bucket position without losing other colliding waiters */
+static void test_release_collision(void)
+{
+	_Alignas(32) char channels[32] = { 0 };
+	struct wait_arg wait[3];
+	struct proc procs[3];
+	int removed;
+	int i;
+
+	for (removed = 0; removed < 3; removed++) {
+		for (i = 0; i < 3; i++) {
+			pinit(&procs[i]);
+			wait[i].chan = channels + i;
+			wait[i].reason = WAIT_READ;
+			CHECK(sched_prepare(&procs[i], wait_entry,
+					    &wait[i]) == 0);
+			CHECK(sched_resume(&procs[i]) == 0);
+		}
+		sched_release(&procs[removed]);
+		CHECK(procs[removed].p_wchan == NULL);
+		CHECK(procs[removed].p_link == NULL);
+		for (i = 0; i < 3; i++) {
+			kernel_lock();
+			sched_wakeup(channels + i);
+			kernel_unlock();
+			if (i == removed)
+				continue;
+			CHECK(procs[i].p_state == PROC_RUNNABLE);
+			CHECK(sched_resume(&procs[i]) == 0);
+			CHECK(wait[i].result == 0 && wait[i].lock_held);
+			CHECK(procs[i].p_wchan == NULL);
+			CHECK(procs[i].p_link == NULL);
+			sched_release(&procs[i]);
+		}
+	}
+}
+
 static void test_release_waiter(void)
 {
 	struct wait_arg wait;
-	struct wait_channel chan;
+	char chan = 0;
 	struct proc proc;
 
-	memset(&chan, 0, sizeof(chan));
 	pinit(&proc);
 	wait.chan = &chan;
 	wait.reason = WAIT_WRITE;
@@ -434,17 +553,16 @@ static void test_release_waiter(void)
 	CHECK(proc.p_state == PROC_WAIT_WRITE);
 	sched_release(&proc);
 	CHECK(proc.p_ctx == NULL);
-	CHECK(chan.w_head == NULL);
-	CHECK(chan.w_tail == NULL);
+	CHECK(proc.p_wchan == NULL);
+	CHECK(proc.p_link == NULL);
 }
 
 static void test_wake_then_release(void)
 {
 	struct wait_arg wait;
-	struct wait_channel chan;
+	char chan = 0;
 	struct proc proc;
 
-	memset(&chan, 0, sizeof(chan));
 	pinit(&proc);
 	wait.chan = &chan;
 	wait.reason = WAIT_READ;
@@ -456,16 +574,16 @@ static void test_wake_then_release(void)
 	CHECK(proc.p_state == PROC_RUNNABLE);
 	sched_release(&proc);
 	CHECK(proc.p_ctx == NULL);
-	CHECK(chan.w_head == NULL);
+	CHECK(proc.p_wchan == NULL);
+	CHECK(proc.p_link == NULL);
 }
 
 static void test_yield_failure_cleanup(void)
 {
 	struct wait_arg wait;
-	struct wait_channel chan;
+	char chan = 0;
 	struct proc proc;
 
-	memset(&chan, 0, sizeof(chan));
 	pinit(&proc);
 	wait.chan = &chan;
 	wait.reason = WAIT_READ;
@@ -479,8 +597,6 @@ static void test_yield_failure_cleanup(void)
 	CHECK(proc.p_state == PROC_FINISHED);
 	CHECK(proc.p_wchan == NULL);
 	CHECK(proc.p_link == NULL);
-	CHECK(chan.w_head == NULL);
-	CHECK(chan.w_tail == NULL);
 	sched_release(&proc);
 }
 
@@ -940,7 +1056,7 @@ static void buffer_wait_entry(void *arg)
 /* Successful peer I/O leaves sleeping caller's buffer error intact */
 static void buffer_peer_entry(void *arg)
 {
-	struct wait_channel *chan = arg;
+	char *chan = arg;
 	struct buf *bp;
 
 	kernel_lock();
@@ -956,7 +1072,7 @@ static void buffer_peer_entry(void *arg)
 static void test_buffer_error_isolation(void)
 {
 	struct proc procs[2];
-	struct wait_channel chan = { 0 };
+	char chan = 0;
 	struct buffer_wait_arg waiter = { &chan, 0, 0 };
 	int i;
 

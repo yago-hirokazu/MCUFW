@@ -9,8 +9,6 @@ extern "C" {
 
 #include <stddef.h>
 
-#include "sched.h"
-
 #define ILOCK	0x01U
 #define IWANT	0x10U
 
@@ -22,9 +20,6 @@ struct inode {
 	unsigned char i_count;		/* File or construction references */
 	struct buf *i_buf;
 	size_t i_size;
-	struct wait_channel i_lchan;
-	struct wait_channel i_rchan;
-	struct wait_channel i_wchan;
 };
 
 extern struct inode inode[];

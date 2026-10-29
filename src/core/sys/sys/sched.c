@@ -1,19 +1,27 @@
 /*
+ * Event address => wait_hash() => slpque[] => proc.p_link
+ *   => matching proc.p_wchan => backend wake
  * current_proc() => scheduler backend => active process
  */
 
 #include <assert.h>
+#include <stdint.h>
 #include <string.h>
 
 #include "sched.h"
 #include "sched_adapt.h"
 #include "sys_error.h"
 
+#define SQSIZE	64
+
+static struct proc *slpque[SQSIZE];
+
 #ifdef SCHED_TEST
 static int test_fail_yield;
 #endif
 
-static void remove_wait_proc(struct wait_channel *chan, struct proc *proc);
+static unsigned int wait_hash(char *chan);
+static void remove_wait_proc(char *chan, struct proc *proc);
 
 #ifdef SCHED_TEST
 void sched_test_fail_next_yield(void);
@@ -41,10 +49,12 @@ int kernel_is_locked(void)
 	return sched_adapt_is_locked();
 }
 
-int sched_sleep(struct wait_channel *chan, enum wait_reason reason)
+/* Register wait event before yielding with kernel lock held */
+int sched_sleep(char *chan, enum wait_reason reason)
 {
 	struct proc *proc;
 	int result;
+	unsigned int h;
 
 	proc = current_proc();
 	if (!chan || !proc || !proc->p_ctx || !kernel_is_locked())
@@ -61,13 +71,11 @@ int sched_sleep(struct wait_channel *chan, enum wait_reason reason)
 	else
 		return -SYS_EINVAL;
 
+	/* Insert at bucket head, following V7 sleep */
+	h = wait_hash(chan);
 	proc->p_wchan = chan;
-	proc->p_link = NULL;
-	if (chan->w_tail)
-		chan->w_tail->p_link = proc;
-	else
-		chan->w_head = proc;
-	chan->w_tail = proc;
+	proc->p_link = slpque[h];
+	slpque[h] = proc;
 
 #ifdef SCHED_TEST
 	if (test_fail_yield) {
@@ -88,18 +96,32 @@ int sched_sleep(struct wait_channel *chan, enum wait_reason reason)
 	return 0;
 }
 
-void sched_wakeup(struct wait_channel *chan)
+/* Wake all processes awaiting matching event address */
+void sched_wakeup(char *chan)
 {
 	struct proc *proc;
+	struct proc *previous;
 	struct proc *next;
+	unsigned int h;
 
 	if (!chan)
 		return;
-	proc = chan->w_head;
-	chan->w_head = NULL;
-	chan->w_tail = NULL;
+	assert(kernel_is_locked());
+	h = wait_hash(chan);
+	previous = NULL;
+	proc = slpque[h];
 	while (proc) {
 		next = proc->p_link;
+		/* Hash collisions do not identify same event */
+		if (proc->p_wchan != chan) {
+			previous = proc;
+			proc = next;
+			continue;
+		}
+		if (previous)
+			previous->p_link = next;
+		else
+			slpque[h] = next;
 		proc->p_wchan = NULL;
 		proc->p_link = NULL;
 		if (proc->p_ctx && sched_adapt_wake(proc) == 0)
@@ -199,13 +221,23 @@ void sched_set_current_proc(struct proc *proc)
 	sched_adapt_set_current(proc);
 }
 
-static void remove_wait_proc(struct wait_channel *chan, struct proc *proc)
+/* Preserve full pointer width in V7 wait-channel hash */
+static unsigned int wait_hash(char *chan)
+{
+	return (unsigned int)(((uintptr_t)chan >> 5) & (SQSIZE - 1));
+}
+
+/* Unlink specified process without disturbing colliding waiters */
+static void remove_wait_proc(char *chan, struct proc *proc)
 {
 	struct proc *current;
 	struct proc *previous;
+	unsigned int h;
 
+	assert(kernel_is_locked());
+	h = wait_hash(chan);
 	previous = NULL;
-	current = chan->w_head;
+	current = slpque[h];
 	while (current) {
 		if (current == proc)
 			break;
@@ -217,9 +249,7 @@ static void remove_wait_proc(struct wait_channel *chan, struct proc *proc)
 	if (previous)
 		previous->p_link = current->p_link;
 	else
-		chan->w_head = current->p_link;
-	if (chan->w_tail == current)
-		chan->w_tail = previous;
+		slpque[h] = current->p_link;
 	current->p_wchan = NULL;
 	current->p_link = NULL;
 }

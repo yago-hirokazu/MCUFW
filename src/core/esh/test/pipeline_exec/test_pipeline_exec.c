@@ -615,18 +615,23 @@ static void test_pipe_exhaustion_cleanup(void)
 	int fd[2];
 	int i;
 
+	/* Fixture setup and close follow shared kernel lock contract */
+	kernel_lock();
 	for (i = 0; i < NINODE - 1; i++) {
 		pinit(&blockers[i]);
 		CHECK(pipe_for_proc(&blockers[i], fd) == 0);
 	}
+	kernel_unlock();
 	init_command(&proc[0], &producer);
 	init_command(&proc[1], &filter);
 	init_command(&proc[2], &consumer);
 	CHECK(exe_run_pipeline(proc, 3) == -SYS_ENFILE);
 	CHECK(pipe_in_use() == NINODE - 1);
 	CHECK(file_in_use() == (NINODE - 1) * 2);
+	kernel_lock();
 	for (i = 0; i < NINODE - 1; i++)
 		close_all(&blockers[i]);
+	kernel_unlock();
 	CHECK(pipe_in_use() == 0);
 	CHECK(file_in_use() == 0);
 

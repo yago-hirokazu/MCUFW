@@ -87,7 +87,9 @@ esh executor用processはこれを`p_exec`として埋め込み、command引数�
 固有情報とportable scheduler状態を分離する。
 
 wait listはportable schedulerが管理し、backendはcontext切替とkernel lockを
-実装する。pipe inodeはlock、read、write用channelを別々に所有する。状態検査、
+実装する。channelはアドレスで識別し、pipeは`(char *)ip`でlock、
+`(char *)ip + 1`でwrite、`(char *)ip + 2`でreadを区別する。inode内に
+wait list格納領域は持たず、schedulerの`slpque[]`で管理する。状態検査、
 wait登録、backend待機をkernel lockの下で行い、再開後は条件を再検査する。
 
 pipeline全体の終了statusは最後のcommandのstatusとする。途中commandのerrorは

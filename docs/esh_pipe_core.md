@@ -46,7 +46,9 @@ processがある状態では完全初期化しない。
 `fd_install()`と`fd_install_at()`は既存file参照を1個追加する。`fd_close()`はfdを
 外して`closef()`へ1参照を渡す。
 
-file参照が0になると、pipe wait channelを起床してinode参照を解放する。最後の
+file参照が0になると、pipe wait channelを起床してinode参照を解放する。channelは
+inode先頭からのbyte offsetで識別し、lockは0、writeは1、readは2とする。
+wait listはinode外のscheduler hashが所有する。最後の
 readまたはwrite endpointが閉じた状態は`i_count < 2`で判定する。両endpointが
 閉じると`iput()`がbufferを返し、inodeを空き状態へ戻す。
 

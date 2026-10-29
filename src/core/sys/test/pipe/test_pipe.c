@@ -34,11 +34,9 @@ static ptrdiff_t call_write(struct proc *proc, int fd, const void *buf,
 			    size_t count);
 static int call_close(struct proc *proc, int fd);
 static void call_close_all(struct proc *proc);
-static void supply_read_hook(struct wait_channel *chan,
-			     enum wait_reason reason);
-static void drain_write_hook(struct wait_channel *chan,
-			     enum wait_reason reason);
-static void unlock_hook(struct wait_channel *chan, enum wait_reason reason);
+static void supply_read_hook(char *chan, enum wait_reason reason);
+static void drain_write_hook(char *chan, enum wait_reason reason);
+static void unlock_hook(char *chan, enum wait_reason reason);
 static void test_zero_length_and_validation(void);
 static void test_create_and_data_path(void);
 static void test_full_and_offset_reset(void);
@@ -111,32 +109,30 @@ static void call_close_all(struct proc *proc)
 	kernel_unlock();
 }
 
-static void supply_read_hook(struct wait_channel *chan,
-			     enum wait_reason reason)
+static void supply_read_hook(char *chan, enum wait_reason reason)
 {
 	static const char data = 'Q';
 	size_t offset;
 
-	(void)chan;
-	(void)reason;
+	CHECK(chan == (char *)hook_inode + 2);
+	CHECK(reason == WAIT_READ);
 	offset = hook_inode->i_size;
 	hook_result = writei(hook_inode, &offset, &data, 1);
 }
 
-static void drain_write_hook(struct wait_channel *chan,
-			     enum wait_reason reason)
+static void drain_write_hook(char *chan, enum wait_reason reason)
 {
 	unsigned char data[PIPSIZ];
 
-	(void)chan;
-	(void)reason;
+	CHECK(chan == (char *)hook_inode + 1);
+	CHECK(reason == WAIT_WRITE);
 	hook_result = readp(hook_proc, hook_file, data, sizeof(data));
 }
 
-static void unlock_hook(struct wait_channel *chan, enum wait_reason reason)
+static void unlock_hook(char *chan, enum wait_reason reason)
 {
-	(void)chan;
-	(void)reason;
+	CHECK(chan == (char *)hook_inode);
+	CHECK(reason == WAIT_LOCK);
 	prele(hook_inode);
 }
 
@@ -207,8 +203,8 @@ static void test_create_and_data_path(void)
 	CHECK(memcmp(data, "cd", 2) == 0);
 	CHECK(rf->f_offset == 0);
 	CHECK(ip->i_size == 0);
-	CHECK(sched_stub_wakeup_count(&ip->i_rchan) >= 2);
-	CHECK(sched_stub_wakeup_count(&ip->i_wchan) >= 1);
+	CHECK(sched_stub_wakeup_count((char *)ip + 2) >= 2);
+	CHECK(sched_stub_wakeup_count((char *)ip + 1) >= 1);
 	call_close_all(&proc);
 	CHECK(file_in_use() == 0);
 	CHECK(inode_in_use() == 0);
@@ -262,8 +258,8 @@ static void test_eof_epipe_and_close_wakeup(void)
 	CHECK(sys_pipe(fd) == 0);
 	ip = getf(&proc, fd[0])->f_inode;
 	CHECK(call_close(&proc, fd[1]) == 0);
-	CHECK(sched_stub_wakeup_count(&ip->i_rchan) == 1);
-	CHECK(sched_stub_wakeup_count(&ip->i_wchan) == 1);
+	CHECK(sched_stub_wakeup_count((char *)ip + 2) == 1);
+	CHECK(sched_stub_wakeup_count((char *)ip + 1) == 1);
 	CHECK(call_read(&proc, fd[0], &data, 1) == 0);
 	CHECK(call_close(&proc, fd[0]) == 0);
 	CHECK(pipe_in_use() == 0);
