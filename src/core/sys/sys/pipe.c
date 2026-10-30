@@ -74,6 +74,7 @@ int sys_pipe(int fd[2])
 ptrdiff_t readp(struct proc *proc, struct file *fp, void *buf, size_t count)
 {
 	struct pipe_io_status status;
+	struct inode *ip;
 	int result;
 
 	if (!count)
@@ -81,11 +82,12 @@ ptrdiff_t readp(struct proc *proc, struct file *fp, void *buf, size_t count)
 	if (!buf)
 		return -SYS_EINVAL;
 	for (;;) {
-		result = plock(fp ? fp->f_inode : NULL);
+		ip = fp ? fp->f_inode : NULL;
+		result = plock(ip);
 		if (result < 0)
 			return result;
 		status = pipe_read_once(fp, buf, count);
-		prele(fp->f_inode);
+		prele(ip);
 		switch (status.io_result) {
 		case PIPE_IO_PROGRESS:
 		case PIPE_IO_EOF:
@@ -93,8 +95,7 @@ ptrdiff_t readp(struct proc *proc, struct file *fp, void *buf, size_t count)
 		case PIPE_IO_WAIT_READ:
 			if (!proc || !proc->p_ctx)
 				return -SYS_EAGAIN;
-			result = sched_sleep((char *)fp->f_inode + 2,
-					     WAIT_READ);
+			result = sched_sleep((char *)ip + 2, WAIT_READ);
 			if (result < 0)
 				return result;
 			break;
@@ -109,6 +110,7 @@ ptrdiff_t writep(struct proc *proc, struct file *fp, const void *buf,
 {
 	const unsigned char *bytes;
 	struct pipe_io_status status;
+	struct inode *ip;
 	size_t transferred;
 	int result;
 
@@ -119,12 +121,13 @@ ptrdiff_t writep(struct proc *proc, struct file *fp, const void *buf,
 	bytes = buf;
 	transferred = 0;
 	for (;;) {
-		result = plock(fp ? fp->f_inode : NULL);
+		ip = fp ? fp->f_inode : NULL;
+		result = plock(ip);
 		if (result < 0)
 			return result;
 		status = pipe_write_once(fp, bytes + transferred,
 					 count - transferred);
-		prele(fp->f_inode);
+		prele(ip);
 		switch (status.io_result) {
 		case PIPE_IO_PROGRESS:
 			transferred += (size_t)status.io_count;
@@ -137,8 +140,7 @@ ptrdiff_t writep(struct proc *proc, struct file *fp, const void *buf,
 					return (ptrdiff_t)transferred;
 				return -SYS_EAGAIN;
 			}
-			result = sched_sleep((char *)fp->f_inode + 1,
-					     WAIT_WRITE);
+			result = sched_sleep((char *)ip + 1, WAIT_WRITE);
 			if (result < 0)
 				return result;
 			break;
