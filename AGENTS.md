@@ -58,7 +58,6 @@ target/						ハードウェア依存レイヤ
   - lex, par, exe は、ある程度できている。
   - lex, par, exe は、OSがない環境（ベアメタル）でも動けるようにステートマシンとコンテキスト構造体で実行コンテキストを保持する設計になっている。
   - 解釈可能な Bourne shell の文法を拡張しているところ。
-  - 引数あり break コマンドの追加のところで作業が中断している。（多忙のため）
 
 
 ### これからやりたいこと
@@ -70,8 +69,8 @@ target/						ハードウェア依存レイヤ
 1. パイプ処理をするときは、RTOS が使えない環境でも動かせるように、一時的に coroutine を用いて異なるコマンド処理を時分割で実行する。RTOS が使える環境では coroutine ではなくスレッドを使って UNIX パイプを使えるようにしたいので、移植レイヤを用意して開発を進める。
 
 2. UNIX V7 相当のファイルシステムを使えるようにして、UNIX V7 と同じような仕組みでパイプを使えるようにする。ただし、MMU (Memory Management Unit) がない環境でも動かしたいため、下記の制約を守った設計にする。
-   - 最下層はバッファキャッシュまでとする。物理ストレージへのアクセスはしない。
-   - ファイルシステムは UNIX V7 ファイルシステムを完全再現はせず、パイプを使えるだけの最小限の構成とする。
+   - 最下層はブロックデバイス。PC環境ではRAMディスク。STM32では内部フラッシュメモリ、外部フラッシュメモリ、SDカードメモリの使用を検討する。
+   - UNIX V7 ファイルシステムの完全再現を目指す
    - UNIX V6, V7 のように trap 命令を利用したシステムコールは使わない。
 
 
@@ -135,7 +134,7 @@ mingw64 シェルで `src/core/esh/test/exe` に移動し、下記を実行し�
 
 1. typedef を使うと型が一目でわからなくなり、プログラムが読みにくくなるため、使わないものとする。
 
-2. ソースファイルは下記の構成とする。`/MCUFW/src/core/esh/tty.c`がモデル。
+2. ソースファイルは下記の構成とする。`/MCUFW/src/core/esh/tty.c`をモデルとする。
 - standard include files
 - project-specific include files
 - (exported) global variable definitions
@@ -158,27 +157,14 @@ mingw64 シェルで `src/core/esh/test/exe` に移動し、下記を実行し�
 #endif
 ```
 
+4. 引数チェックはユーザーから指示があるまでいれないこと。
+
+
 ## UNIX V7 移植時のルール
 
 ### 絶対ルール
 - 可能な限りオリジナルの実装を踏襲すること。
 
-### 推奨ルール
-- code snippetを関数化して何をしている処理かを関数名で説明することを推奨する。
-例: `/c/usr/src/MCUFW/src/core/sys/dev/bio.c`の下記。
-
-``` c
-static void b_list_init(struct buf *head);
-static void b_list_remove(struct buf *bp);
-static void b_list_insert(struct buf *head, struct buf *bp);
-static void av_list_init(struct buf *head);
-static void av_list_remove(struct buf *bp);
-static void av_list_insert_head(struct buf *bp);
-static void av_list_insert_tail(struct buf *bp);
-static void reassociate(struct buf *bp, struct buf *head,
-			unsigned int dev, unsigned long blkno);
-
-```
 
 ## テスト
 
@@ -206,7 +192,7 @@ docs/coding_style_summary_linux_kernel.md
 
 src/target/NUCLEO-U575ZI-Q/
 
-#### 適用ルール
+#### 適用ルール1
 
 STM32CubeMX が生成した下記対象ディレクトリのプログラムコードには下記のルールを適用する。
 下記の対象ディレクトリ以外のプログラムコードは「コーディングルール1」を適用する。
@@ -217,7 +203,7 @@ src/target/NUCLEO-U575ZI-Q/Drivers
 src/target/NUCLEO-U575ZI-Q/Inc
 src/target/NUCLEO-U575ZI-Q/Src
 
-##### 適用ルール
+##### 適用ルール2
 
 docs/coding_style_summary_stm32cubefw.md
 
@@ -248,8 +234,8 @@ docs/coding_style_summary_stm32cubefw.md
 ```c
 struct lex {
 	enum lex_state l_state;	/* State of lexical analysis */
-	enum lex_state l_sprev; /* Previous state */
-	enum token_type l_tok;  /* Token type */
+	enum lex_state l_sprev;	/* Previous state */
+	enum token_type l_tok;	/* Token type */
 	char l_bquote;		/* Back QUOTE */
 	char l_brack;		/* BRACKet */
 	char l_while;		/* While statement */
@@ -258,7 +244,7 @@ struct lex {
 ```
 
 #### 絶対ルールの思想
- ソースコードのコメントやコミットメッセージにおいて、冠詞（a, an, the）は基本的に省略します。
+ソースコードのコメントやコミットメッセージにおいて、冠詞（a, an, the）は基本的に省略します。
 理由は、限られたスペースでコードの意図を短く、素早く伝えるためです。
 
 #### コメントの記述例
