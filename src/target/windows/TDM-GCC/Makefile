@@ -19,9 +19,9 @@ OUTDIR = _output
 vpath %.c ../Src
 vpath %.c ../Adapt
 vpath %.c ../../../core/usr/cmd
-vpath %.c ../../../core/elib
-vpath %.c ../../../core/esh
-vpath %.c ../../../core/esh/target/windows
+vpath %.c ../../../core/lib
+vpath %.c ../../../core/shell
+vpath %.c ../../../core/shell/target/windows
 vpath %.c ../../../core/sys/dev
 vpath %.c ../../../core/sys/dev/windows
 vpath %.c ../../../core/sys/conf
@@ -42,12 +42,12 @@ CSOURCES += tick_adapt.c
 ## ../../../core/usr/cmd
 CSOURCES += cmd_sample.c
 
-## ../../../core/elib
+## ../../../core/lib
 CSOURCES += getopt.c
 CSOURCES += qbyte.c
 CSOURCES += symchar.c
 
-## ../../../core/esh
+## ../../../core/shell
 CSOURCES += break.c cat.c code.c esh_debug.c exe.c lex.c par.c script.c tok.c
 CSOURCES += echo.c
 CSOURCES += esh.c
@@ -92,9 +92,9 @@ INCLUDES := -I../Inc
 INCLUDES += -I../Adapt
 INCLUDES += -I../Drivers/adafruit_ft232h/include
 INCLUDES += -I../Drivers/adafruit_ft232h/include/windows
-INCLUDES += -I../../../core/elib
-INCLUDES += -I../../../core/esh/include
-INCLUDES += -I../../../core/esh/target/windows
+INCLUDES += -I../../../core/lib
+INCLUDES += -I../../../core/shell/include
+INCLUDES += -I../../../core/shell/target/windows
 INCLUDES += -I../../../core/sys/h
 INCLUDES += -I../../../core/sys/dev/windows
 

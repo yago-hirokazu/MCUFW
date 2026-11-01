@@ -23,7 +23,7 @@ OUTDIR = _output
 # Search path
 vpath %.c .
 vpath %.c ..
-vpath %.c ../../../esh/target/windows/
+vpath %.c ../../../shell/target/windows/
 vpath %.o _output
 
 # C sources
@@ -49,8 +49,8 @@ CFLAGS = -mno-ms-bitfields
 CFLAGS += -g -O0
 
 INCLUDES := -I.
-INCLUDES += -I../../../elib
-INCLUDES += -I../../../esh/target/windows
+INCLUDES += -I../../../lib
+INCLUDES += -I../../../shell/target/windows
 
 CFLAGS += $(INCLUDES)
 

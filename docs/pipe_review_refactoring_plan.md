@@ -114,34 +114,34 @@ assemblyを、現行`AGENTS.md`と
 
 Production code:
 
-- `src/core/esh/cat.c`
-- `src/core/esh/script.c`
-- `src/core/esh/include/script.h`
-- `src/core/esh/target/windows/sched_thread.c`
-- `src/core/esh/include/esh_sched_backend.h`
-- `src/core/esh/target/windows/sched_cortn.c`
-- `src/core/esh/cortn.c`
-- `src/core/esh/target/windows/cortn_context.c`
-- `src/core/esh/target/windows/cortn_context.h`
-- `src/core/esh/target/windows/cortn_switch.S`
-- `src/core/esh/file.c`
-- `src/core/esh/include/cortn.h`
-- `src/core/esh/include/esh_errno.h`
-- `src/core/esh/include/esh_file.h`
-- `src/core/esh/include/pipe.h`
-- `src/core/esh/include/esh_sched.h`
-- `src/core/esh/pipe.c`
-- `src/core/esh/sched.c`
+- `src/core/shell/cat.c`
+- `src/core/shell/script.c`
+- `src/core/shell/include/script.h`
+- `src/core/shell/target/windows/sched_thread.c`
+- `src/core/shell/include/esh_sched_backend.h`
+- `src/core/shell/target/windows/sched_cortn.c`
+- `src/core/shell/cortn.c`
+- `src/core/shell/target/windows/cortn_context.c`
+- `src/core/shell/target/windows/cortn_context.h`
+- `src/core/shell/target/windows/cortn_switch.S`
+- `src/core/shell/file.c`
+- `src/core/shell/include/cortn.h`
+- `src/core/shell/include/esh_errno.h`
+- `src/core/shell/include/esh_file.h`
+- `src/core/shell/include/pipe.h`
+- `src/core/shell/include/esh_sched.h`
+- `src/core/shell/pipe.c`
+- `src/core/shell/sched.c`
 
 Test code:
 
-- `src/core/esh/test/pipeline_exec/test_pipeline_exec.c`
-- `src/core/esh/test/pipeline_exec/tty_config.h`
-- `src/core/esh/test/pipeline/test_pipeline.c`
-- `src/core/esh/test/pipeline/tty_config.h`
-- `src/core/esh/test/sched/test_sched.c`
-- `src/core/esh/test/pipe/test_pipe.c`
-- `src/core/esh/test/cortn/test_cortn.c`
+- `src/core/shell/test/pipeline_exec/test_pipeline_exec.c`
+- `src/core/shell/test/pipeline_exec/tty_config.h`
+- `src/core/shell/test/pipeline/test_pipeline.c`
+- `src/core/shell/test/pipeline/tty_config.h`
+- `src/core/shell/test/sched/test_sched.c`
+- `src/core/shell/test/pipe/test_pipe.c`
+- `src/core/shell/test/cortn/test_cortn.c`
 
 #### 作業
 
@@ -224,7 +224,7 @@ Test code:
 
 #### 対象
 
-- `src/core/esh/run.c`
+- `src/core/shell/run.c`
 - debug buildに必要なMakefileまたは試験入口
 
 #### 作業
@@ -307,7 +307,7 @@ Pipeline準備失敗後のrollbackと次回実行を試験で固定する。
 
 #### 対象
 
-- `src/core/esh/test/pipeline_exec/`
+- `src/core/shell/test/pipeline_exec/`
 - 必要な場合だけtest hook
 
 #### 試験項目
@@ -353,7 +353,7 @@ Pipelineの成功・失敗経路を、所有段階が読み取れる終了処理
 
 #### 対象
 
-- `src/core/esh/exe.c`
+- `src/core/shell/exe.c`
 - 必要な内部header
 
 #### 作業
@@ -400,8 +400,8 @@ EOF、EPIPE、部分転送、close wakeupの現行動作を明示する。
 
 #### 対象
 
-- `src/core/esh/test/pipe/`
-- `src/core/esh/pipe.c`は不具合確認時だけ変更
+- `src/core/shell/test/pipe/`
+- `src/core/shell/pipe.c`は不具合確認時だけ変更
 
 #### 試験項目
 
@@ -455,8 +455,8 @@ wait list、wake、release、thread joinの境界を試験で固定する。
 
 #### 対象
 
-- `src/core/esh/test/sched/`
-- `src/core/esh/sched.c`
+- `src/core/shell/test/sched/`
+- `src/core/shell/sched.c`
 - Windows scheduler backendは不具合確認時だけ変更
 
 #### 試験項目
@@ -506,8 +506,8 @@ Executorが不正bytecodeを範囲外参照なしで拒否し、再利用でき�
 
 #### 対象
 
-- `src/core/esh/test/exe/`または専用executor試験
-- `src/core/esh/exe.c`は試験追加後に必要最小限だけ修正
+- `src/core/shell/test/exe/`または専用executor試験
+- `src/core/shell/exe.c`は試験追加後に必要最小限だけ修正
 
 #### 試験項目
 
@@ -558,7 +558,7 @@ Executorが不正bytecodeを範囲外参照なしで拒否し、再利用でき�
 
 #### 対象
 
-- `src/core/esh/exe.c`
+- `src/core/shell/exe.c`
 - 必要な場合だけprivate helper宣言
 
 #### 作業
@@ -609,8 +609,8 @@ Executorが不正bytecodeを範囲外参照なしで拒否し、再利用でき�
 
 #### 対象
 
-- `src/core/esh/script.c`
-- `src/core/esh/par.c`の局所helper
+- `src/core/shell/script.c`
+- `src/core/shell/par.c`の局所helper
 
 #### 作業
 

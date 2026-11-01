@@ -26,7 +26,7 @@
 `struct bdev_queue`で明示する。
 
 UNIX V7から採用するportableなsourceとheaderは`src/core/sys/`へ配置する。
-既存`src/core/esh/`にはshell、scheduler、既存pipeとの接続処理だけを残す。
+既存`src/core/shell/`にはshell、scheduler、既存pipeとの接続処理だけを残す。
 
 最初の実装範囲には、USB memory、Flash、通常ファイル、directory、mount、
 free-block管理、実I/Oを含めない。Windows上でbuffer cache単体と既存pipeを
@@ -38,15 +38,15 @@ free-block管理、実I/Oを含めない。Windows上でbuffer cache単体と既
 
 | ファイル | 現在の役割 |
 |---|---|
-| `src/core/esh/include/pipe.h` | pipe inode、ring、I/O結果 |
-| `src/core/esh/pipe.c` | pipe生成、read/write、EOF/EPIPE、待機 |
-| `src/core/esh/include/esh_file.h` | fd table、file object |
-| `src/core/esh/file.c` | file pool、参照数、close |
-| `src/core/esh/include/esh_sched.h` | process、wait channel |
-| `src/core/esh/sched.c` | sleep/wakeupのportable契約 |
-| `src/core/esh/test/pipe/` | pipe単体・資源枯渇試験 |
-| `src/core/esh/test/sched/` | 待機・wakeup・競合試験 |
-| `src/core/esh/test/pipeline_exec/` | pipeline結合試験 |
+| `src/core/shell/include/pipe.h` | pipe inode、ring、I/O結果 |
+| `src/core/shell/pipe.c` | pipe生成、read/write、EOF/EPIPE、待機 |
+| `src/core/shell/include/esh_file.h` | fd table、file object |
+| `src/core/shell/file.c` | file pool、参照数、close |
+| `src/core/shell/include/esh_sched.h` | process、wait channel |
+| `src/core/shell/sched.c` | sleep/wakeupのportable契約 |
+| `src/core/shell/test/pipe/` | pipe単体・資源枯渇試験 |
+| `src/core/shell/test/sched/` | 待機・wakeup・競合試験 |
+| `src/core/shell/test/pipeline_exec/` | pipeline結合試験 |
 
 現在の所有関係:
 
@@ -256,7 +256,7 @@ src/core/sys/sys/     V7 usr/sys/sys相当のgeneric kernel処理
 src/core/sys/conf/    fixed tableとdevice configuration
 ```
 
-既存の`src/core/esh/pipe.c`と`src/core/esh/include/pipe.h`は最初の移行では
+既存の`src/core/shell/pipe.c`と`src/core/shell/include/pipe.h`は最初の移行では
 移動しない。これらは`buf.h`を利用するconsumerとして変更する。source配置は
 V7を踏襲するが、historical sourceを無変更でcopyせず、PDP-11依存部を除いた
 modern Cとして実装する。
@@ -511,7 +511,7 @@ live process/file/pipeがある状態でpool全体を再初期化してはなら
 変更前に少なくとも次をMSYS2 MINGW64 shell経由で実行する。
 
 ```sh
-cd /c/usr/src/MCUFW/src/core/esh/test/pipe
+cd /c/usr/src/MCUFW/src/core/shell/test/pipe
 bash ./run_test.sh
 cd ../sched
 bash ./run_test.sh
@@ -533,7 +533,7 @@ MinGW gccを直接起動しない。
    `brelse()`、`incore()`、`clrbuf()`を実装
 5. `src/core/sys/test/bio/`でlist invariantとLRU順を検査
 
-最初から`src/core/esh/pipe.c`へ埋め込まず、`src/core/sys`だけでlist操作を
+最初から`src/core/shell/pipe.c`へ埋め込まず、`src/core/sys`だけでlist操作を
 単体試験できるようにする。
 
 ### Step 2: pipe allocationへ接続
@@ -640,7 +640,7 @@ fixed pool、将来のstrategy/iodone境界は保つ。
 1. pipe payloadが`struct pipe_buffer.pb_data`ではなく`buffers[][]`に存在
 2. payloadを指すheaderが`buf[]`の`struct buf`
 3. V7由来source/headerが`src/core/sys/`に配置されている
-4. `src/core/esh/`にはsys実装を重複して置いていない
+4. `src/core/shell/`にはsys実装を重複して置いていない
 5. 各bufferがb-listへ常時所属
 6. 非busy bufferだけがav-listへ所属
 7. live pipe bufferが`B_BUSY`で保持され、最終closeでav-listへ戻る
@@ -678,10 +678,10 @@ retryした後に`B_ERROR`と`b_error`を設定して完了する。
 
 - `src/core/sys/test/bio/run_test.sh`: O0、O2
 - `src/core/sys/test/bdev/run_test.sh`: O0、O2
-- `src/core/esh/test/pipe/run_test.sh`: coroutine/thread、O0/O2
-- `src/core/esh/test/sched/run_test.sh`: coroutine/thread、O0/O2
-- `src/core/esh/test/pipeline_exec/run_test.sh`: coroutine/thread、O0/O2
-- `src/core/esh/test/exe/run_test.sh`
+- `src/core/shell/test/pipe/run_test.sh`: coroutine/thread、O0/O2
+- `src/core/shell/test/sched/run_test.sh`: coroutine/thread、O0/O2
+- `src/core/shell/test/pipeline_exec/run_test.sh`: coroutine/thread、O0/O2
+- `src/core/shell/test/exe/run_test.sh`
 - `src/target/windows`: `make -B -j4`
 
 既存suiteで0、1、256、257、2089 byte転送、EOF、EPIPE、早期consumer終了、

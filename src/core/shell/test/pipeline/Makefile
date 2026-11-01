@@ -5,7 +5,7 @@ CXX = g++
 
 CFLAGS = -mno-ms-bitfields -g
 CFLAGS += -Wall -Wextra
-CFLAGS += -I. -I../../include -I../../../elib
+CFLAGS += -I. -I../../include -I../../../lib
 CFLAGS += -I../../target/windows -I../../../../target/windows/Adapt
 CFLAGS += -DUSE_STACKMACH
 
@@ -18,7 +18,7 @@ CSOURCES += stdio_adapt.c tty_adapt.c cmd_sample.c qbyte.c symchar.c
 
 OBJS = $(addprefix $(OUTDIR)/,$(CSOURCES:.c=.o))
 
-vpath %.c . ../.. ../../../usr/cmd ../../../elib ../../target/windows
+vpath %.c . ../.. ../../../usr/cmd ../../../lib ../../target/windows
 
 .PHONY: all clean
 

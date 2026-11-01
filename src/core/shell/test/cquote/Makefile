@@ -1,6 +1,6 @@
 
 # Default target
-TARGET = test_par.exe
+TARGET = test_cquote.exe
 
 # Commands
 CC = gcc
@@ -29,7 +29,7 @@ OUTDIR = _output
 vpath %.c .
 vpath %.c ../..
 vpath %.c ../../../usr/cmd
-vpath %.c ../../../elib
+vpath %.c ../../../lib
 ifeq ($(OS),Windows_NT)
 vpath %.c ../../target/windows/
 else
@@ -40,32 +40,10 @@ vpath %.o _output
 # C sources
 
 ## .
-CSOURCES := test_par.c
+CSOURCES := test_cquote.c
 
 ## ../..
-CSOURCES += break.c
-CSOURCES += code.c
-CSOURCES += echo.c
-CSOURCES += esh_debug.c
-CSOURCES += expr.c
-CSOURCES += help.c
-CSOURCES += par.c
-CSOURCES += run.c
-CSOURCES += lex.c
-CSOURCES += test.c
-CSOURCES += tok.c
-CSOURCES += tty.c
-
-## ../../target/windows/
-CSOURCES += stdio_adapt.c
-CSOURCES += tty_adapt.c
-
-## ../../../usr/cmd
-CSOURCES += cmd_sample.c
-
-## ../../../reuse
-CSOURCES += qbyte.c
-CSOURCES += symchar.c
+CSOURCES += cquote.c
 
 # CPP sources
 ## reserved for future use
@@ -80,16 +58,16 @@ DEPS = $(OBJS:%.o=%.d)
 
 # CFLAGS
 CFLAGS = -mno-ms-bitfields
-CFLAGS += -g -O0
+OPT ?= -O0
+CFLAGS += -g $(OPT)
 
 INCLUDES := -I.
 INCLUDES += -I../../include
-INCLUDES += -I../../../elib
+INCLUDES += -I../../../lib
 INCLUDES += -I../../target/windows
 INCLUDES += -I../../../../target/windows/Adapt
 
 CFLAGS += $(INCLUDES)
-CFLAGS += -DUSE_STACKMACH
 
 # CXXFLAGS
 CXXFLAGS := $(CFLAGS)

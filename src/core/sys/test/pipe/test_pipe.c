@@ -1,6 +1,6 @@
 /*
  * Pipe unit tests => scheduler stub => peer-data and lock-release hooks
- * Prepared context integration => esh/test/pipe and sys/test/sched
+ * Prepared context integration => shell/test/pipe and sys/test/sched
  */
 
 #include <stdio.h>

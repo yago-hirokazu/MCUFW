@@ -68,7 +68,7 @@ Milestone 9 は 18 ファイル、788 行追加・105 行削除。
 | Build | sys Windows `sched_adapt.mk`、各 Makefile | Backend 選択と条件付き接続 |
 
 Scheduler Windows固有ファイルは`src/core/sys/dev/windows/`にある。
-esh adapterは`src/core/esh/target/windows/`に残る。
+esh adapterは`src/core/shell/target/windows/`に残る。
 `struct proc` は shell 引数を所有し、`struct esh_proc` を埋め込む。
 
 - 最大 4 段ネスト、pipe 3 本、256 byte/pipe、fd 12/process、file entry 12
@@ -169,13 +169,13 @@ PowerShell から MinGW gcc を直接呼ぶと、cc1.exe の DLL 探索で
 ```powershell
 $env:MSYSTEM = 'MINGW64'
 & 'C:\msys64\usr\bin\bash.exe' -lc `
-  'cd /c/usr/src/MCUFW/src/core/esh/test/pipeline_exec && bash ./run_test.sh'
+  'cd /c/usr/src/MCUFW/src/core/shell/test/pipeline_exec && bash ./run_test.sh'
 ```
 
 MSYS2 shell 内での基本 suite:
 
 ```sh
-cd /c/usr/src/MCUFW/src/core/esh/test/pipeline_exec
+cd /c/usr/src/MCUFW/src/core/shell/test/pipeline_exec
 bash ./run_test.sh
 cd ../pipe
 bash ./run_test.sh
@@ -219,7 +219,7 @@ MinGW64 GCC 16.1.0 で ASan/UBSan を試したが、link 時に
 既存の未追跡ファイル・ディレクトリには次がある:
 
 - `.agents/`、`cscope.files`、`cscope.out`、coding style 文書
-- `src/core/esh/test/exe/run_break_argument_test.sh`、`test11.sh`、`test12.sh`
+- `src/core/shell/test/exe/run_break_argument_test.sh`、`test11.sh`、`test12.sh`
 - `src/target/NUCLEO-U575ZI-Q/`、各 `.bak`
 - Cortn/cquote/pipe/sched と Windows の既存 build 出力、exe、DLL
 

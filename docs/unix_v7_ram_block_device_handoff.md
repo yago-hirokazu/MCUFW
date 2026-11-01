@@ -311,7 +311,7 @@ Step 3完了時点で基本経路を評価し、その結果でStep 4以降の�
 
 - typedefを追加しない
 - header guardは`__NAME_H__`形式とする
-- sourceの節構成は`src/core/esh/tty.c`に合わせる
+- sourceの節構成は`src/core/shell/tty.c`に合わせる
 - コメントとcommit messageは冠詞を可能な限り省く
 - 一文コメントは末尾periodなし、コメント記号とindent込み80 column以内
 - STM32、物理storage、filesystem全体への拡張を先取りしない
@@ -563,14 +563,14 @@ shellのsandbox内起動は出力なく失敗したため、承認されたsandb
 | src/core/sys/test/file | run_test.sh、O0/O2 | exit 0、all tests passed |
 | src/core/sys/test/pipe | run_test.sh、O0/O2 | exit 0、all tests passed |
 | src/core/sys/test/sched | run_test.sh、cortn/thread × O0/O2 | exit 0、all tests passed |
-| src/core/esh/test/pipe | run_test.sh、cortn/thread × O0/O2 | exit 0、all tests passed |
-| src/core/esh/test/sched | run_test.sh、cortn/thread × O0/O2 | exit 0、all tests passed |
-| src/core/esh/test/cortn | run_test.sh、O0/O2 | exit 0、all tests passed |
-| src/core/esh/test/pipeline | run_test.sh、O0/O2 | exit 0、all tests passed |
-| src/core/esh/test/pipeline_exec | run_test.sh、cortn/thread × O0/O2 | exit 0、all tests passed |
-| src/core/esh/test/exe | run_test.sh、既定build、test1〜10とgolden比較 | exit 0、all tests passed |
-| src/core/esh/test/par | run_test1.sh、既定buildとgolden比較 | exit 0、test pass |
-| src/core/esh/test/par | run_test2.sh、既定buildとgolden比較 | exit 0、test pass |
+| src/core/shell/test/pipe | run_test.sh、cortn/thread × O0/O2 | exit 0、all tests passed |
+| src/core/shell/test/sched | run_test.sh、cortn/thread × O0/O2 | exit 0、all tests passed |
+| src/core/shell/test/cortn | run_test.sh、O0/O2 | exit 0、all tests passed |
+| src/core/shell/test/pipeline | run_test.sh、O0/O2 | exit 0、all tests passed |
+| src/core/shell/test/pipeline_exec | run_test.sh、cortn/thread × O0/O2 | exit 0、all tests passed |
+| src/core/shell/test/exe | run_test.sh、既定build、test1〜10とgolden比較 | exit 0、all tests passed |
+| src/core/shell/test/par | run_test1.sh、既定buildとgolden比較 | exit 0、test pass |
+| src/core/shell/test/par | run_test2.sh、既定buildとgolden比較 | exit 0、test pass |
 
 全15項目が成功し、外側の一括実行もexit 0。
 script実装どおりの構成を実行しており、exe/parをO0/O2両構成実施とは数えない。
@@ -671,8 +671,8 @@ RAM driver、保存配列、raminit、bread/bwrite、NBUF変更は追加して�
 | sys/file | O0/O2 | exit 0 |
 | sys/pipe | O0/O2 | exit 0 |
 | sys/sched | cortn/thread × O0/O2 | exit 0 |
-| esh/pipe | cortn/thread × O0/O2 | exit 0 |
-| esh/pipeline_exec | cortn/thread × O0/O2 | exit 0 |
+| shell/pipe | cortn/thread × O0/O2 | exit 0 |
+| shell/pipeline_exec | cortn/thread × O0/O2 | exit 0 |
 
 全9 suiteでall tests passedを確認した。bdevはmajor 1とpending二重提出の
 追加試験後にもO0/O2で再実行して成功した。
@@ -789,10 +789,10 @@ sys/bdevのStep 1回帰では拒否時のbuffer/payload/list/queue不変も再�
 | sys/file | O0/O2 | ともにexit 0 |
 | sys/pipe | O0/O2 | ともにexit 0 |
 | sys/sched | cortn/thread × O0/O2 | ともにexit 0 |
-| esh/pipe | cortn/thread × O0/O2 | ともにexit 0 |
-| esh/sched | cortn/thread × O0/O2 | ともにexit 0 |
-| esh/pipeline_exec | cortn/thread × O0/O2 | ともにexit 0 |
-| esh/exe | 既定build、test1〜10とgolden比較 | ともにexit 0 |
+| shell/pipe | cortn/thread × O0/O2 | ともにexit 0 |
+| shell/sched | cortn/thread × O0/O2 | ともにexit 0 |
+| shell/pipeline_exec | cortn/thread × O0/O2 | ともにexit 0 |
+| shell/exe | 既定build、test1〜10とgolden比較 | ともにexit 0 |
 
 全12 suiteが成功した。各構成のmake cleanもすべてexit 0。
 生成対象のOUTDIR/TARGET計62 pathを確認し、残存0だった。
@@ -925,10 +925,10 @@ bioへ追加した観点:
 | sys/file | O0/O2 | ともにexit 0 |
 | sys/pipe | O0/O2 | ともにexit 0 |
 | sys/sched | cortn/thread × O0/O2 | ともにexit 0 |
-| esh/pipe | cortn/thread × O0/O2 | ともにexit 0 |
-| esh/sched | cortn/thread × O0/O2 | ともにexit 0 |
-| esh/pipeline_exec | cortn/thread × O0/O2 | ともにexit 0 |
-| esh/exe | 既定build、test1〜10とgolden比較 | ともにexit 0 |
+| shell/pipe | cortn/thread × O0/O2 | ともにexit 0 |
+| shell/sched | cortn/thread × O0/O2 | ともにexit 0 |
+| shell/pipeline_exec | cortn/thread × O0/O2 | ともにexit 0 |
+| shell/exe | 既定build、test1〜10とgolden比較 | ともにexit 0 |
 
 全12 suiteが成功した。bioは書込み前処理の最終調整後にもO0/O2で再実行して成功。
 実行はMSYS2 MINGW64 login shell経由とし、PowerShellからgccを直接起動していない。
@@ -980,7 +980,7 @@ cache取得からpayloadの参照・更新、提出、解放までcallerが同�
 
 確認したproductionの呼出し経路:
 
-- esh/exe.cのpipe接続・owner解放・各process close_allはkernel lock区間内
+- shell/exe.cのpipe接続・owner解放・各process close_allはkernel lock区間内
 - sys/pipe.cのsys_pipeはlockを取得してpipe_for_procへ接続
 - sys/sys2.cのsys_read/sys_write/sys_closeはlock区間内で低層file/pipe処理を呼ぶ
 - alloc.cのgetblk、iget.cのbrelseは上記callerのlockを継承する
@@ -1080,10 +1080,10 @@ coroutine/thread × O0/O2の計8構成を実行する。
 | sys/ramdisk | O0/O2 | ともにexit 0 |
 | sys/file | O0/O2 | ともにexit 0 |
 | sys/pipe | O0/O2 | ともにexit 0 |
-| esh/pipe | cortn/thread × O0/O2 | ともにexit 0 |
-| esh/sched | cortn/thread × O0/O2 | ともにexit 0 |
-| esh/pipeline_exec | cortn/thread × O0/O2 | ともにexit 0 |
-| esh/exe | 既定build、test1〜10とgolden比較 | ともにexit 0 |
+| shell/pipe | cortn/thread × O0/O2 | ともにexit 0 |
+| shell/sched | cortn/thread × O0/O2 | ともにexit 0 |
+| shell/pipeline_exec | cortn/thread × O0/O2 | ともにexit 0 |
+| shell/exe | 既定build、test1〜10とgolden比較 | ともにexit 0 |
 
 全12 suiteで成功し、sys/schedでは8回のall tests passedを確認した。
 全構成のmake cleanが成功し、生成対象のOUTDIR/TARGET計70 pathの残存は0。
@@ -1185,7 +1185,7 @@ Step 4の容量試験も遅延書込みで実行し、既定NBUF=5で3本のpipe
 | sys/header | C/C++、通常・逆順include、単独header、O0/O2 | pass |
 | sys/table、bio、bdev、ramdisk、file、pipe | 各O0/O2 | pass |
 | sys/sched | NBUF=5/3、cortn/thread、O0/O2の8構成 | pass |
-| esh/pipe、sched、pipeline_exec | 各cortn/thread、O0/O2 | pass |
+| shell/pipe、sched、pipeline_exec | 各cortn/thread、O0/O2 | pass |
 
 全11 suiteで成功。sys/schedはdirty共存を追加した最終版で8構成を再確認した。
 試験後は各Makefileのmake cleanを実行し、生成対象66 pathの残存0を確認した。
@@ -1244,7 +1244,7 @@ GCCはMSYS2 MINGW64 shell経由だけで実行する。PowerShell直起動は行
 
 ### 起動関数を含む結合試験
 
-esh/pipeline_execのMakefileに実際のWindows esh_adapt.cを追加した。
+shell/pipeline_execのMakefileに実際のWindows esh_adapt.cを追加した。
 test_startup_ramは実際のeshinitを呼び、両minorの最終blockへ異なるpatternを
 bdwriteし、flushする。binit単独の後は全byteが保持されることを確認する。
 全利用者の停止・全資源解放後にeshinitを再度呼び、両minorの全blockがzeroに
@@ -1331,10 +1331,10 @@ NINODE=3、NFILE=12、NOFILE=12、PIPELINE_MAX=4を維持する。
 | sys/header | C/C++、include順序と単独include、O0/O2 | pass |
 | sys/table、bio、bdev、ramdisk、file、pipe | 各O0/O2 | pass |
 | sys/sched | NBUF=5/3、cortn/thread、O0/O2の8構成 | pass |
-| esh/pipe、sched、pipeline_exec | 各cortn/thread、O0/O2 | pass |
-| esh/cortn、pipeline | 各O0/O2 | pass |
-| esh/exe | 既定build、test1〜10とgolden比較 | pass |
-| esh/par | run_test1.sh、run_test2.shとgolden比較 | pass |
+| shell/pipe、sched、pipeline_exec | 各cortn/thread、O0/O2 | pass |
+| shell/cortn、pipeline | 各O0/O2 | pass |
+| shell/exe | 既定build、test1〜10とgolden比較 | pass |
+| shell/par | run_test1.sh、run_test2.shとgolden比較 | pass |
 | Windows main | cortn/thread、O0/O2の4構成 | pass |
 
 Windows mainは4構成とも端末で起動し、# promptを確認してsam1、sam2 1 10 100、
@@ -1352,7 +1352,7 @@ parに既存のtest_par.exeがあったため退避し、試験後のclean完了
 復元した。既存_outputは変更していない。git diff --checkと、変更Cのtab幅8での
 80 column検査も成功した。.gitignoreとAGENTS.mdの既存変更は本Stepに含めない。
 
-変更対象はWindows esh_adapt.c、Windows Makefile、esh/pipeline_execのMakefileと
+変更対象はWindows esh_adapt.c、Windows Makefile、shell/pipeline_execのMakefileと
 test_pipeline_exec.c、および本書の5 file。Step 0〜6の完了条件を満たした。
 
 ### 完成範囲と制約
@@ -1418,7 +1418,7 @@ sys/bioへ以下を追加した。修正前は追加試験が失敗し、修正�
 | sys/header | C/C++、include順序と単独include、O0/O2 | pass |
 | sys/bdev、ramdisk、file、pipe | 各O0/O2 | pass |
 | sys/sched | NBUF=5/3、cortn/thread、O0/O2の8構成 | pass |
-| esh/pipeline_exec | 実際の起動関数を含むcortn/thread、O0/O2の4構成 | pass |
+| shell/pipeline_exec | 実際の起動関数を含むcortn/thread、O0/O2の4構成 | pass |
 
 関連8 suiteで成功した。今回の変更箇所に対する回帰範囲とし、Step 6で実施済みの
 Windows本体の対話試験、legacy parser/executor等の全体回帰は繰り返していない。

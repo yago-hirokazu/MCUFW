@@ -30,7 +30,7 @@ OUTDIR = _output
 vpath %.c .
 vpath %.c ../..
 vpath %.c ../../../usr/cmd
-vpath %.c ../../../elib
+vpath %.c ../../../lib
 vpath %.c ../../../sys/dev
 vpath %.c ../../../sys/conf
 vpath %.c ../../../sys/sys
@@ -107,7 +107,7 @@ CFLAGS += -g -O0
 
 INCLUDES := -I.
 INCLUDES += -I../../include
-INCLUDES += -I../../../elib
+INCLUDES += -I../../../lib
 INCLUDES += -I../../../sys/h
 INCLUDES += -I../../../sys/dev/windows
 INCLUDES += -I../../target/windows

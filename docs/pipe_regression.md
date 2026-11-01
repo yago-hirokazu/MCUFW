@@ -77,7 +77,7 @@ bash ./run_test.sh
 cd ../sched
 bash ./run_test.sh
 
-cd ../../../esh/test/cortn
+cd ../../../shell/test/cortn
 bash ./run_test.sh
 cd ../pipe
 bash ./run_test.sh

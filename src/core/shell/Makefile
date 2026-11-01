@@ -1,6 +1,6 @@
 
 # CFLAGS
-CFLAGS=-I./include -I./target/windows -I../elib -I./stub
+CFLAGS=-I./include -I./target/windows -I../lib -I./stub
 
 .PHONY: check-syntax
 check-syntax:

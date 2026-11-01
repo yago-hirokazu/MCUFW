@@ -12,9 +12,9 @@ Windows coroutine実装を`esh`層からWindows依存層へ移し、file/inode t
 
 最終状態は次のとおり。
 
-- `src/core/esh/cortn.c`を
+- `src/core/shell/cortn.c`を
   `src/core/sys/dev/windows/cortn.c`へ移動
-- `src/core/esh/include/cortn.h`を
+- `src/core/shell/include/cortn.h`を
   `src/core/sys/dev/windows/cortn.h`へ移動
 - `file_system_init()`を`finit()`へ改名
 - `finit()`は`file[]`と`inode[]`だけを初期化
@@ -166,17 +166,17 @@ bundled UNIX V7の`usr/sys/sys/main.c`では、`binit()`は起動処理から独
 
 次のMakefileは旧`cortn.c`を直接指定している。
 
-- `src/core/esh/test/cortn/Makefile`
-- `src/core/esh/test/sched/Makefile`
-- `src/core/esh/test/pipe/Makefile`
+- `src/core/shell/test/cortn/Makefile`
+- `src/core/shell/test/sched/Makefile`
+- `src/core/shell/test/pipe/Makefile`
 - `src/core/sys/test/sched/Makefile`
 
 次は`SCHED_CSOURCES = cortn.c ...`と`vpath`を使用している。物理移動後も新しい
 `sys/dev/windows`から解決されることを確認する。
 
 - `src/core/sys/dev/windows/sched_adapt.mk`
-- `src/core/esh/test/exe/Makefile`
-- `src/core/esh/test/pipeline_exec/Makefile`
+- `src/core/shell/test/exe/Makefile`
+- `src/core/shell/test/pipeline_exec/Makefile`
 - `src/target/windows/Makefile`
 - `src/target/windows/TDM-GCC/Makefile`
 
@@ -184,9 +184,9 @@ bundled UNIX V7の`usr/sys/sys/main.c`では、`binit()`は起動処理から独
 
 作成時点で次に呼出しがある。
 
-- `src/core/esh/target/windows/esh_adapt.c`
-- `src/core/esh/test/pipe/test_pipe.c`
-- `src/core/esh/test/pipeline_exec/test_pipeline_exec.c`
+- `src/core/shell/target/windows/esh_adapt.c`
+- `src/core/shell/test/pipe/test_pipe.c`
+- `src/core/shell/test/pipeline_exec/test_pipeline_exec.c`
 - `src/core/sys/test/file/test_file.c`
 - `src/core/sys/test/pipe/test_pipe.c`
 - `src/core/sys/test/sched/test_sched.c`
@@ -213,16 +213,16 @@ source、header、Makefileは変更しない。本書のStep状態と結果欄�
 3. 次の旧symbolと旧pathの検索結果を記録
    - `file_system_init`
    - `binit(`
-   - `src/core/esh/cortn.c`
-   - `src/core/esh/include/cortn.h`
+   - `src/core/shell/cortn.c`
+   - `src/core/shell/include/cortn.h`
 4. MSYS2 MINGW64 shellで次を実行
-   - `src/core/esh/test/cortn/run_test.sh`
+   - `src/core/shell/test/cortn/run_test.sh`
    - `src/core/sys/test/file/run_test.sh`
    - `src/core/sys/test/bio/run_test.sh`
    - `src/core/sys/test/pipe/run_test.sh`
    - `src/core/sys/test/sched/run_test.sh`
-   - `src/core/esh/test/pipe/run_test.sh`
-   - `src/core/esh/test/pipeline_exec/run_test.sh`
+   - `src/core/shell/test/pipe/run_test.sh`
+   - `src/core/shell/test/pipeline_exec/run_test.sh`
 5. 各suiteの成否、backend、最適化条件を結果欄へ記録
 
 ### 完了条件
@@ -243,24 +243,24 @@ source、header、Makefileは変更しない。本書のStep状態と結果欄�
 - `file_system_init()`は宣言、定義、呼出しを含め34箇所
 - `binit()`は`bio.c`で定義、`buf.h`で宣言
 - `binit()`の既存呼出しは`fio.c`、bdev試験、bio試験に存在
-- `src/core/esh/cortn.c`と`src/core/esh/include/cortn.h`は追跡対象として存在
+- `src/core/shell/cortn.c`と`src/core/shell/include/cortn.h`は追跡対象として存在
 - 旧`cortn.c`を直接指定するMakefileは次の4個
-  - `src/core/esh/test/cortn/Makefile`
-  - `src/core/esh/test/sched/Makefile`
-  - `src/core/esh/test/pipe/Makefile`
+  - `src/core/shell/test/cortn/Makefile`
+  - `src/core/shell/test/sched/Makefile`
+  - `src/core/shell/test/pipe/Makefile`
   - `src/core/sys/test/sched/Makefile`
 
 基準試験結果:
 
 | Suite | 条件 | 結果 |
 |---|---|---|
-| `core/esh/test/cortn` | `-O0`, `-O2` | pass |
+| `core/shell/test/cortn` | `-O0`, `-O2` | pass |
 | `core/sys/test/file` | `-O0`, `-O2` | pass |
 | `core/sys/test/bio` | `-O0`, `-O2` | pass |
 | `core/sys/test/pipe` | `-O0`, `-O2` | pass |
 | `core/sys/test/sched` | cortn/thread × `-O0`/`-O2` | pass |
-| `core/esh/test/pipe` | cortn/thread × `-O0`/`-O2` | pass |
-| `core/esh/test/pipeline_exec` | cortn/thread × `-O0`/`-O2` | pass |
+| `core/shell/test/pipe` | cortn/thread × `-O0`/`-O2` | pass |
+| `core/shell/test/pipeline_exec` | cortn/thread × `-O0`/`-O2` | pass |
 
 sandbox内の初回起動ではMSYS2 runtimeのnamed object作成が
 `0xC0000022`で拒否され、試験開始前に終了した。sandbox外のMSYS2 MINGW64
@@ -301,10 +301,10 @@ coroutine engineをWindows backendのdirectoryへ配置する。
 次の2ファイルの物理移動だけを行う。
 
 ```text
-src/core/esh/cortn.c
+src/core/shell/cortn.c
   -> src/core/sys/dev/windows/cortn.c
 
-src/core/esh/include/cortn.h
+src/core/shell/include/cortn.h
   -> src/core/sys/dev/windows/cortn.h
 ```
 
@@ -345,9 +345,9 @@ src/core/esh/include/cortn.h
 - 実施日: 2026-10-14
 - 開始時HEAD: `e55990d Record coroutine relocation baseline`
 - 次の2ファイルを指定先へ移動
-  - `src/core/esh/cortn.c`
+  - `src/core/shell/cortn.c`
     -> `src/core/sys/dev/windows/cortn.c`
-  - `src/core/esh/include/cortn.h`
+  - `src/core/shell/include/cortn.h`
     -> `src/core/sys/dev/windows/cortn.h`
 - 移動先に同名fileが存在しないことを移動前に確認
 - 移動後、旧pathにfileが存在しないことを確認
@@ -369,9 +369,9 @@ src/core/esh/include/cortn.h
 ### 次Stepへの引継事項
 
 - 旧pathを直接指定する次の4個のMakefileはStep 2まで一時的に失敗する
-  - `src/core/esh/test/cortn/Makefile`
-  - `src/core/esh/test/sched/Makefile`
-  - `src/core/esh/test/pipe/Makefile`
+  - `src/core/shell/test/cortn/Makefile`
+  - `src/core/shell/test/sched/Makefile`
+  - `src/core/shell/test/pipe/Makefile`
   - `src/core/sys/test/sched/Makefile`
 - Step 2で上記4個のsource pathを新配置へ変更する
 - `sys/dev/windows`を既に`vpath`へ含むbuild経路も新しい`cortn.c`を選ぶことを
@@ -395,8 +395,8 @@ src/core/esh/include/cortn.h
 1. 旧`cortn.c`を直接指定する4個のMakefileを新pathへ変更
 2. `cortn.h`が`sys/dev/windows`のinclude pathから解決されることを確認
 3. `src/core/sys/test/sched/Makefile`の
-   `-I../../../esh/include`がcoroutine headerのためだけなら削除
-4. esh試験で必要な`esh/include`は削除しない
+   `-I../../../shell/include`がcoroutine headerのためだけなら削除
+4. esh試験で必要な`shell/include`は削除しない
 5. `sched_adapt.mk`のbare filenameは維持
 6. `vpath`使用buildが`sys/dev/windows/cortn.c`を選ぶことを依存fileまたは
    build出力で確認
@@ -406,10 +406,10 @@ src/core/esh/include/cortn.h
 
 MSYS2 MINGW64 shellで次を実行する。
 
-- `src/core/esh/test/cortn/run_test.sh`
-- `src/core/esh/test/sched/run_test.sh`
-- `src/core/esh/test/pipe/run_test.sh`
-- `src/core/esh/test/pipeline_exec/run_test.sh`
+- `src/core/shell/test/cortn/run_test.sh`
+- `src/core/shell/test/sched/run_test.sh`
+- `src/core/shell/test/pipe/run_test.sh`
+- `src/core/shell/test/pipeline_exec/run_test.sh`
 - `src/core/sys/test/sched/run_test.sh`
 
 coroutine/thread両backendを持つsuiteは両方、`-O0`と`-O2`の両方を確認する。
@@ -426,12 +426,12 @@ coroutine/thread両backendを持つsuiteは両方、`-O0`と`-O2`の両方を確
 - 実施日: 2026-10-14
 - 開始時HEAD: `1773369 Move coroutine engine to Windows backend`
 - 旧`cortn.c`を直接指定していた次のMakefileを新pathへ変更
-  - `src/core/esh/test/cortn/Makefile`
-  - `src/core/esh/test/sched/Makefile`
-  - `src/core/esh/test/pipe/Makefile`
+  - `src/core/shell/test/cortn/Makefile`
+  - `src/core/shell/test/sched/Makefile`
+  - `src/core/shell/test/pipe/Makefile`
   - `src/core/sys/test/sched/Makefile`
 - `src/core/sys/test/sched/Makefile`から不要な
-  `-I../../../esh/include`を削除
+  `-I../../../shell/include`を削除
 - `sched_adapt.mk`のbare filename定義は変更なし
 - `pipeline_exec/run_test.sh`へ構成別cleanを追加
   - `-B`でも古い`.d`内の消滅済みpathが解決されるため、build前cleanが必要
@@ -441,10 +441,10 @@ coroutine/thread両backendを持つsuiteは両方、`-O0`と`-O2`の両方を確
   - `../../../sys/dev/windows/cortn.c`
   - `../../../sys/dev/windows/cortn.h`
 - MSYS2 MINGW64 shellで次の試験が成功
-  - `src/core/esh/test/cortn/run_test.sh`: O0/O2
-  - `src/core/esh/test/sched/run_test.sh`: cortn/thread x O0/O2
-  - `src/core/esh/test/pipe/run_test.sh`: cortn/thread x O0/O2
-  - `src/core/esh/test/pipeline_exec/run_test.sh`: cortn/thread x O0/O2
+  - `src/core/shell/test/cortn/run_test.sh`: O0/O2
+  - `src/core/shell/test/sched/run_test.sh`: cortn/thread x O0/O2
+  - `src/core/shell/test/pipe/run_test.sh`: cortn/thread x O0/O2
+  - `src/core/shell/test/pipeline_exec/run_test.sh`: cortn/thread x O0/O2
   - `src/core/sys/test/sched/run_test.sh`: cortn/thread x O0/O2
 - sandbox内の初回実行はMSYS2 named object作成拒否で失敗
   - 通常のMINGW64環境で再実行し、全試験成功
@@ -537,9 +537,9 @@ void finit(void)
 ### 次Stepへの引継事項
 
 - Step 4で旧名が残る次の6 sourceを更新する
-  - `src/core/esh/target/windows/esh_adapt.c`
-  - `src/core/esh/test/pipe/test_pipe.c`
-  - `src/core/esh/test/pipeline_exec/test_pipeline_exec.c`
+  - `src/core/shell/target/windows/esh_adapt.c`
+  - `src/core/shell/test/pipe/test_pipe.c`
+  - `src/core/shell/test/pipeline_exec/test_pipeline_exec.c`
   - `src/core/sys/test/file/test_file.c`
   - `src/core/sys/test/pipe/test_pipe.c`
   - `src/core/sys/test/sched/test_sched.c`
@@ -578,9 +578,9 @@ void finit(void)
 
 対象候補は次のとおり。
 
-- `src/core/esh/target/windows/esh_adapt.c`
-- `src/core/esh/test/pipe/test_pipe.c`
-- `src/core/esh/test/pipeline_exec/test_pipeline_exec.c`
+- `src/core/shell/target/windows/esh_adapt.c`
+- `src/core/shell/test/pipe/test_pipe.c`
+- `src/core/shell/test/pipeline_exec/test_pipeline_exec.c`
 - `src/core/sys/test/file/test_file.c`
 - `src/core/sys/test/pipe/test_pipe.c`
 - `src/core/sys/test/sched/test_sched.c`
@@ -593,8 +593,8 @@ MSYS2 MINGW64 shellで次を実行する。
 - `src/core/sys/test/bio/run_test.sh`
 - `src/core/sys/test/pipe/run_test.sh`
 - `src/core/sys/test/sched/run_test.sh`
-- `src/core/esh/test/pipe/run_test.sh`
-- `src/core/esh/test/pipeline_exec/run_test.sh`
+- `src/core/shell/test/pipe/run_test.sh`
+- `src/core/shell/test/pipeline_exec/run_test.sh`
 
 ### 完了条件
 
@@ -615,8 +615,8 @@ MSYS2 MINGW64 shellで次を実行する。
   ```
 
 - `buf.h`を次のsourceへ追加
-  - `src/core/esh/target/windows/esh_adapt.c`
-  - `src/core/esh/test/pipeline_exec/test_pipeline_exec.c`
+  - `src/core/shell/target/windows/esh_adapt.c`
+  - `src/core/shell/test/pipeline_exec/test_pipeline_exec.c`
 - `esh_adapt.c`の混在していたCRLF/LFをLFへ統一
 - 残り4 sourceは既存の`buf.h`includeを使用
 - sourceとheaderに`file_system_init`が残っていないことを確認
@@ -626,8 +626,8 @@ MSYS2 MINGW64 shellで次を実行する。
   - `src/core/sys/test/bio/run_test.sh`: O0/O2
   - `src/core/sys/test/pipe/run_test.sh`: O0/O2
   - `src/core/sys/test/sched/run_test.sh`: cortn/thread x O0/O2
-  - `src/core/esh/test/pipe/run_test.sh`: cortn/thread x O0/O2
-  - `src/core/esh/test/pipeline_exec/run_test.sh`: cortn/thread x O0/O2
+  - `src/core/shell/test/pipe/run_test.sh`: cortn/thread x O0/O2
+  - `src/core/shell/test/pipeline_exec/run_test.sh`: cortn/thread x O0/O2
 - sandbox内の初回実行はMSYS2 named object作成拒否で失敗
   - 通常のMINGW64環境で再実行し、全試験成功
 - `pipeline_exec`の既存warningと異常系試験のerror表示は基準状態と同じ
@@ -721,10 +721,10 @@ MSYS2 MINGW64 shellで次を実行する。
 
 1. 現行source、header、Makefileに`file_system_init`がない
 2. build定義に次の旧pathがない
-   - `src/core/esh/cortn.c`
-   - `src/core/esh/include/cortn.h`
+   - `src/core/shell/cortn.c`
+   - `src/core/shell/include/cortn.h`
    - 相対pathの`../../cortn.c`
-   - 相対pathの`../../../esh/cortn.c`
+   - 相対pathの`../../../shell/cortn.c`
 3. `fio.c`に`binit`と`buf.h`がない
 4. `finit()`の定義が1個、公開宣言が1個
 5. 初期化呼出しは`binit()`、`finit()`の順
@@ -750,10 +750,10 @@ MSYS2 MINGW64 shellで次を実行する。
 - 開始時HEAD: `c896067 Update coroutine and file initialization docs`
 - 追跡対象の現行source、header、Makefileに`file_system_init`なし
 - build定義に次の旧path参照なし
-  - `src/core/esh/cortn.c`
-  - `src/core/esh/include/cortn.h`
+  - `src/core/shell/cortn.c`
+  - `src/core/shell/include/cortn.h`
   - 相対pathの`../../cortn.c`
-  - 相対pathの`../../../esh/cortn.c`
+  - 相対pathの`../../../shell/cortn.c`
 - `src/core/sys/sys/fio.c`に`binit`と`buf.h`なし
 - `finit()`は定義1個、公開宣言1個
   - 定義: `src/core/sys/sys/fio.c`
@@ -806,7 +806,7 @@ MSYS2 MINGW64 shell内でclean buildして実行する。
 #### coroutine単体
 
 ```sh
-cd /c/usr/src/MCUFW/src/core/esh/test/cortn
+cd /c/usr/src/MCUFW/src/core/shell/test/cortn
 bash ./run_test.sh
 ```
 
@@ -834,7 +834,7 @@ bash ./run_test.sh
 #### esh結合
 
 ```sh
-cd /c/usr/src/MCUFW/src/core/esh/test/pipe
+cd /c/usr/src/MCUFW/src/core/shell/test/pipe
 bash ./run_test.sh
 cd ../sched
 bash ./run_test.sh
@@ -888,7 +888,7 @@ sam3 -a -b string
 - 実施日: 2026-10-15
 - 開始時HEAD: `eb1b90a Record static dependency verification`
 - MSYS2 MINGW64 shellで次の回帰試験が成功
-  - `core/esh/test/cortn`: `-O0`, `-O2`
+  - `core/shell/test/cortn`: `-O0`, `-O2`
   - `core/sys/test/bio`: `-O0`, `-O2`
   - `core/sys/test/bdev`: `-O0`, `-O2`
   - `core/sys/test/file`: `-O0`, `-O2`
@@ -896,12 +896,12 @@ sam3 -a -b string
   - `core/sys/test/sched`: cortn/thread x `-O0`/`-O2`
   - `core/sys/test/header`: C/C++、通常/reverse x `-O0`/`-O2`
   - `core/sys/test/table`: `-O0`, `-O2`
-  - `core/esh/test/pipe`: cortn/thread x `-O0`/`-O2`
-  - `core/esh/test/sched`: cortn/thread x `-O0`/`-O2`
-  - `core/esh/test/pipeline_exec`: cortn/thread x `-O0`/`-O2`
-  - `core/esh/test/par/run_test1.sh`: `test pass`
-  - `core/esh/test/par/run_test2.sh`: `test pass`
-  - `core/esh/test/exe`: `all tests passed`
+  - `core/shell/test/pipe`: cortn/thread x `-O0`/`-O2`
+  - `core/shell/test/sched`: cortn/thread x `-O0`/`-O2`
+  - `core/shell/test/pipeline_exec`: cortn/thread x `-O0`/`-O2`
+  - `core/shell/test/par/run_test1.sh`: `test pass`
+  - `core/shell/test/par/run_test2.sh`: `test pass`
+  - `core/shell/test/exe`: `all tests passed`
 - `pipeline_exec`の既存warningと異常系試験のerror表示は基準状態と同じ
 - Windows targetは専用の新規出力先を使用して両backendをbuild
   - `SCHED_BACKEND=cortn`: pass
@@ -926,13 +926,13 @@ sam3 -a -b string
   - `docs/cortn_finit_refactoring_handoff.md`
   - `docs/cortn_windows.md`
   - `docs/pipe_core.md`
-  - `src/core/esh/target/windows/esh_adapt.c`
-  - `src/core/esh/test/cortn/Makefile`
-  - `src/core/esh/test/pipe/Makefile`
-  - `src/core/esh/test/pipe/test_pipe.c`
-  - `src/core/esh/test/pipeline_exec/run_test.sh`
-  - `src/core/esh/test/pipeline_exec/test_pipeline_exec.c`
-  - `src/core/esh/test/sched/Makefile`
+  - `src/core/shell/target/windows/esh_adapt.c`
+  - `src/core/shell/test/cortn/Makefile`
+  - `src/core/shell/test/pipe/Makefile`
+  - `src/core/shell/test/pipe/test_pipe.c`
+  - `src/core/shell/test/pipeline_exec/run_test.sh`
+  - `src/core/shell/test/pipeline_exec/test_pipeline_exec.c`
+  - `src/core/shell/test/sched/Makefile`
   - `src/core/sys/dev/windows/cortn.c`
   - `src/core/sys/dev/windows/cortn.h`
   - `src/core/sys/h/file.h`

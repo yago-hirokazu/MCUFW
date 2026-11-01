@@ -85,7 +85,7 @@ MCU stack容量と配置はSTM32移植時に決定する。
 
 ## 試験
 
-`src/core/esh/test/cortn/run_test.sh`はO0/O2、`-Werror`で次を確認する。
+`src/core/shell/test/cortn/run_test.sh`はO0/O2、`-Werror`で次を確認する。
 
 - 初回resumeとentry引数
 - nested関数からの複数yield

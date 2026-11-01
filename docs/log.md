@@ -12,9 +12,9 @@ __weak void usec(DELAY_UWORD us)
 
 dlyinitとusecの実装  
 ```
-MCUFW\elib\stm32\delay_adapt.c
-MCUFW\elib\windows
-MCUFW\elib\cygwin
+MCUFW\lib\stm32\delay_adapt.c
+MCUFW\lib\windows
+MCUFW\lib\cygwin
 ```
 
 cygwinのシリアル端末設定はどこにある？HDD？gridなんかで検索すれば見つかるかも。  

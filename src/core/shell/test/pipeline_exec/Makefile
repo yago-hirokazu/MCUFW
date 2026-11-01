@@ -6,7 +6,7 @@ include ../../../sys/dev/windows/sched_adapt.mk
 
 CFLAGS = -mno-ms-bitfields -g
 CFLAGS += -Wall -Wextra
-CFLAGS += -I. -I../../include -I../../../elib -I../../../sys/h
+CFLAGS += -I. -I../../include -I../../../lib -I../../../sys/h
 CFLAGS += -I../../target/windows -I../../../sys/dev/windows
 CFLAGS += -I../../../../target/windows/Adapt
 CFLAGS += -DUSE_STACKMACH
@@ -29,7 +29,7 @@ ASOURCES = $(SCHED_ASOURCES)
 OBJS = $(addprefix $(OUTDIR)/,$(CSOURCES:.c=.o))
 OBJS += $(addprefix $(OUTDIR)/,$(ASOURCES:.S=.o))
 
-vpath %.c . ../.. ../../../usr/cmd ../../../elib ../../target/windows
+vpath %.c . ../.. ../../../usr/cmd ../../../lib ../../target/windows
 vpath %.c ../../../sys/dev ../../../sys/conf
 vpath %.c ../../../sys/sys
 vpath %.c ../../../sys/dev/windows

@@ -79,7 +79,7 @@ Pipe、scheduler、coroutine の厳格buildではwarningは発生しなかった
 
 #### 4.1.1 Debug build のコンパイル不良
 
-`src/core/esh/run.c` の `DEBUG_SHELL` 分岐に `ffush(stdout)` がある。
+`src/core/shell/run.c` の `DEBUG_SHELL` 分岐に `ffush(stdout)` がある。
 通常設定では展開されないためbaselineを通過するが、debug buildでは
 未定義シンボルになる。
 
@@ -88,7 +88,7 @@ Pipe、scheduler、coroutine の厳格buildではwarningは発生しなかった
 #### 4.1.2 設計文書と実装のstack容量不一致
 
 `docs/pipe_api.md` は Windows coroutine stack初期容量を16 KiBと記載する。
-現行実装は `src/core/esh/include/cortn.h` で64 KiBを使用する。
+現行実装は `src/core/shell/include/cortn.h` で64 KiBを使用する。
 
 16 KiBでCRT formatting結合試験に問題が発生し、64 KiBへ変更した経緯は
 stdio文書と引継ぎ書に記録されている。現行実装と実測結果に合わせて
