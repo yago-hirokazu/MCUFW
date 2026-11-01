@@ -152,7 +152,7 @@ OP_CMD_EXE
 ```mermaid
 flowchart LR
     A["echo の fd table<br/>fd 1：stdout"] --> W["write側 esh_file"]
-    W --> P["共有 esh_pipe_inode<br/>ring buffer<br/>read/write待機先"]
+    W --> P["共有 pipe_inode<br/>ring buffer<br/>read/write待機先"]
     B["cat の fd table<br/>fd 0：stdin"] --> R["read側 esh_file"]
     R --> P
 ```
@@ -181,7 +181,7 @@ flowchart LR
 
 ### pipe inode：パイプ本体
 
-`struct esh_pipe_inode` が、共有されるパイプの実体です。
+`struct pipe_inode` が、共有されるパイプの実体です。
 
 保持するのは、次の情報です。
 
@@ -199,7 +199,7 @@ flowchart LR
 
 この二段階の管理によって、一つの fd を閉じただけで、まだ参照されている endpoint が消えることを防いでいます。
 
-実装は [file.c](C:/usr/src/MCUFW/src/core/esh/file.c) と [esh_pipe.h](C:/usr/src/MCUFW/src/core/esh/include/esh_pipe.h) にあります。
+実装は [file.c](C:/usr/src/MCUFW/src/core/esh/file.c) と [pipe.h](C:/usr/src/MCUFW/src/core/esh/include/pipe.h) にあります。
 
 ## 5. pipeline の接続と起動
 
@@ -261,8 +261,8 @@ flowchart LR
 
 ### 下層：待たずに、一回だけ試す
 
-- `esh_pipe_read_nonblock()`
-- `esh_pipe_write_nonblock()`
+- `pipe_read_nonblock()`
+- `pipe_write_nonblock()`
 
 これらは、現在の状態で何ができるかを判断します。
 
@@ -308,7 +308,7 @@ flowchart LR
 
 当時はbackendがない状態で待機が必要になると、`EAGAIN`または書き込み済み量を返していました。
 2026-11-01にこの経路を廃止し、pipe I/Oを`sched_prepare()`済みの実行コンテキストから
-使用する前提へ統一しました。現行仕様は`esh_pipe_api.md`を参照してください。
+使用する前提へ統一しました。現行仕様は`pipe_api.md`を参照してください。
 
 ## 8. 256 byte の pipe で、500 byte を転送する例
 

@@ -1,4 +1,4 @@
-# esh pipe: review & refactoring 引継ぎ書
+# pipe: review & refactoring 引継ぎ書
 
 作成日: 2026-10-03
 対象リポジトリ: `C:\usr\src\MCUFW`
@@ -35,19 +35,19 @@ MSP/PSP、FPU、割り込み規則、MCU stack 計測、RTOS backend の実装�
 
 Milestone 9 は 18 ファイル、788 行追加・105 行削除。
 新規ファイルは `cat.c`、`script.c`、`include/script.h`、
-`docs/esh_pipe_regression.md`。
+`docs/pipe_regression.md`。
 最新コミット以降の変更は開始時に再確認すること。
 
 ## 3. 最初に読む文書
 
 1. 作業ディレクトリの `AGENTS.md`。現行内容に従う
 2. `docs/coding_style_summary_linux_kernel.md`
-3. `.agents/skills/esh_pipe/references/esh_pipe_coroutine_summary.md`
+3. `.agents/skills/pipe/references/pipe_coroutine_summary.md`
    の「11. 実行作業プラン」、特に Milestone 9/10 と Definition of Done
-4. [回帰試験と堅牢化](esh_pipe_regression.md)
-5. [Thread backend](esh_pipe_thread.md) と [stdio 接続](esh_pipe_stdio.md)
-6. `esh_pipe_api.md`、`esh_pipe_core.md`、`esh_pipe_sched.md`、
-   `esh_pipe_parser.md`、`esh_pipe_executor.md` を対象コードに合わせて読む
+4. [回帰試験と堅牢化](pipe_regression.md)
+5. [Thread backend](pipe_thread.md) と [stdio 接続](pipe_stdio.md)
+6. `pipe_api.md`、`pipe_core.md`、`pipe_sched.md`、
+   `pipe_parser.md`、`pipe_executor.md` を対象コードに合わせて読む
 
 `.agents/` と coding style 文書は現状未追跡。
 別 checkout/worktree や clone には存在しない可能性がある。
@@ -60,7 +60,7 @@ Milestone 9 は 18 ファイル、788 行追加・105 行削除。
 |---|---|---|
 | Console | `tty.c`, `script.c`, `include/script.h` | 入力、複数行蓄積、実行、変数保持 |
 | Interpreter | `lex.c`, `par.c`, `code.c`, `exe.c`, `break.c` | Token/bytecode、制御文、pipeline |
-| Pipe core | `file.c`, `pipe.c`, `include/esh_file.h`, `include/esh_pipe.h` | Fd、参照数、ring、EOF/EPIPE |
+| Pipe core | `file.c`, `pipe.c`, `include/esh_file.h`, `include/pipe.h` | Fd、参照数、ring、EOF/EPIPE |
 | Scheduler | `sched.c`, `include/esh_sched.h`, `include/esh_sched_backend.h` | Process と wait/wakeup 契約 |
 | Coroutine | `cortn.c`, Windows `cortn_context.c`, `cortn_switch.S`, `sched_cortn.c` | Context、stack、backend |
 | Thread | sys Windows `sched_thread.c` | TLS、SRW lock、CV、thread handle |
@@ -143,13 +143,13 @@ esh adapterは`src/core/esh/target/windows/`に残る。
 - 正常 status、shell 制御文 status、負の内部 error を区別して期待値を整理
 - 未追跡の break 試験を clean checkout でどう再現するか確認。
   既存ファイルを承諾なくコミット対象に混ぜない
-- 古い文書と現行実装の相違を整理。`esh_pipe_api.md` の初期 stack 16 KiB と
+- 古い文書と現行実装の相違を整理。`pipe_api.md` の初期 stack 16 KiB と
   現行 64 KiB は歴史的な記述。stdio/thread/regression 文書と整合を取る
 - Sanitizer 未実施を「検証済み」に置き換えない
 
 ## 7. 検証基準と再現手順
 
-Milestone 9 の確認結果は `docs/esh_pipe_regression.md` に記録済み。
+Milestone 9 の確認結果は `docs/pipe_regression.md` に記録済み。
 本引継ぎ書の作成時には試験を再実行していない。
 
 - Pipeline/pipe/scheduler: cortn/thread × O0/O2 成功
@@ -245,7 +245,7 @@ Milestone 10 はこの段階でも未着手として残す。
 ## 10. 新しいタスクの依頼文例
 
 > C:\usr\src\MCUFW の
-> docs/esh_pipe_review_refactoring_handoff.md を読んで、Milestone 1〜9 の
+> docs/pipe_review_refactoring_handoff.md を読んで、Milestone 1〜9 の
 > review & refactoring を進めてください。Milestone 10 の Cortex-M/RTOS
 > 移植は未着手のまま残してください。まず現行 AGENTS.md と作業ツリー、
 > baseline 試験を確認し、レビュー結果と整理方針を提示してください。

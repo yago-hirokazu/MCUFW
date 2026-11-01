@@ -1,4 +1,4 @@
-# ESH pipeline parser
+# pipeline parser
 
 ## Syntax
 

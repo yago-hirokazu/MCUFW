@@ -7,7 +7,7 @@
 
 ## 1. 次タスクの目的
 
-現在のanonymous pipeは、各`struct esh_pipe_inode`が固定長ring bufferを直接
+現在のanonymous pipeは、各`struct pipe_inode`が固定長ring bufferを直接
 所有している。次タスクではpayload格納先をUNIX V7風buffer cacheへ移し、
 将来の通常ファイルと物理block deviceに再利用できる基盤を追加する。
 
@@ -38,7 +38,7 @@ free-block管理、実I/Oを含めない。Windows上でbuffer cache単体と既
 
 | ファイル | 現在の役割 |
 |---|---|
-| `src/core/esh/include/esh_pipe.h` | pipe inode、ring、I/O結果 |
+| `src/core/esh/include/pipe.h` | pipe inode、ring、I/O結果 |
 | `src/core/esh/pipe.c` | pipe生成、read/write、EOF/EPIPE、待機 |
 | `src/core/esh/include/esh_file.h` | fd table、file object |
 | `src/core/esh/file.c` | file pool、参照数、close |
@@ -54,12 +54,12 @@ free-block管理、実I/Oを含めない。Windows上でbuffer cache単体と既
 struct esh_proc
   -> struct esh_fd_table
        -> struct esh_file
-            -> struct esh_pipe_inode
-                 -> struct esh_pipe_buffer
+            -> struct pipe_inode
+                 -> struct pipe_buffer
                       -> pb_data[256]
 ```
 
-現在の`struct esh_pipe_buffer`は次を所有する。
+現在の`struct pipe_buffer`は次を所有する。
 
 ```c
 unsigned char pb_data[ESH_PIPE_BUFFER_SIZE];
@@ -256,7 +256,7 @@ src/core/sys/sys/     V7 usr/sys/sys相当のgeneric kernel処理
 src/core/sys/conf/    fixed tableとdevice configuration
 ```
 
-既存の`src/core/esh/pipe.c`と`src/core/esh/include/esh_pipe.h`は最初の移行では
+既存の`src/core/esh/pipe.c`と`src/core/esh/include/pipe.h`は最初の移行では
 移動しない。これらは`buf.h`を利用するconsumerとして変更する。source配置は
 V7を踏襲するが、historical sourceを無変更でcopyせず、PDP-11依存部を除いた
 modern Cとして実装する。
@@ -280,7 +280,7 @@ struct buf bfreelist;
 ```
 
 実際のheaderではmacro定義順による循環includeを避けること。望ましい方向は、
-buffer cache側に`BSIZE`と`NBUF`を置き、`esh_pipe.h`が`buf.h`をincludeして
+buffer cache側に`BSIZE`と`NBUF`を置き、`pipe.h`が`buf.h`をincludeして
 `ESH_PIPE_BUFFER_SIZE`を`BSIZE`へ対応付けることである。将来NBUFだけをtarget
 configurationで増減できるようにする。
 
@@ -343,7 +343,7 @@ pipeごとのblock keyは次を推奨する。
 
 ```text
 b_dev   = PIPEDEV
-b_blkno = esh_pipe_tableのindex
+b_blkno = pipe_tableのindex
 ```
 
 同じinode slotを再利用すると同じcache keyになるため、allocation時にpayloadと
@@ -354,7 +354,7 @@ ring metadataを必ず初期化する。
 payloadだけを`struct buf`へ移し、ring位置はpipe inodeに残す。
 
 ```c
-struct esh_pipe_inode {
+struct pipe_inode {
 	unsigned char pi_used;
 	unsigned char pi_refs;
 	unsigned char pi_readers;
@@ -369,7 +369,7 @@ struct esh_pipe_inode {
 ```
 
 read/writeのpayload参照は`inode->pi_buf->b_addr[index]`へ変更する。
-`struct esh_pipe_buffer`とその`pb_data[]`は移行完了後に削除する。
+`struct pipe_buffer`とその`pb_data[]`は移行完了後に削除する。
 
 ### 5.6 最初のpipe buffer lifecycle
 
@@ -394,7 +394,7 @@ pipe inode allocation
 pipe lifetime全体になる点である。
 
 pipe生成途中でfile/fd allocationに失敗した場合も`brelse()`まで巻き戻す。
-`esh_pipe_inode_discard()`と最終`esh_pipe_endpoint_close()`の両方にbuffer解放経路が
+`pipe_inode_discard()`と最終`pipe_endpoint_close()`の両方にbuffer解放経路が
 必要になる。二重解放を避けるため、解放前にlocalへ退避し`pi_buf = NULL`とする。
 
 ## 6. 明示的device queue
@@ -540,8 +540,8 @@ MinGW gccを直接起動しない。
 
 1. `esh_file_system_init()`から`binit()`を呼ぶ
 2. ESH関連Makefileへ`src/core/sys/h`とsys sourceを追加
-3. `esh_pipe.h`から`buf.h`をincludeする
-4. `esh_pipe_inode_alloc()`でpipe table indexを求める
+3. `pipe.h`から`buf.h`をincludeする
+4. `pipe_inode_alloc()`でpipe table indexを求める
 5. `getblk(PIPEDEV, index)`でbufferを取得
 6. buffer取得失敗ならinode allocationを完全に巻き戻す
 7. `pi_buf`へbufferを所有させる
@@ -552,7 +552,7 @@ MinGW gccを直接起動しない。
 1. `pb_read/pb_write/pb_count`を`pi_read/pi_write/pi_count`へ移す
 2. `pb_data[]`参照を`pi_buf->b_addr[]`へ移す
 3. wrap、partial read/write、満杯・空判定を維持
-4. `struct esh_pipe_buffer`を削除
+4. `struct pipe_buffer`を削除
 5. `ESH_PIPE_BUFFER_SIZE`利用箇所を互換macroまたは`BSIZE`へ整理
 
 ### Step 4: 回帰・failure cleanup
@@ -637,7 +637,7 @@ fixed pool、将来のstrategy/iodone境界は保つ。
 
 最初の実装taskは次をすべて満たした時点で完了とする。
 
-1. pipe payloadが`struct esh_pipe_buffer.pb_data`ではなく`buffers[][]`に存在
+1. pipe payloadが`struct pipe_buffer.pb_data`ではなく`buffers[][]`に存在
 2. payloadを指すheaderが`buf[]`の`struct buf`
 3. V7由来source/headerが`src/core/sys/`に配置されている
 4. `src/core/esh/`にはsys実装を重複して置いていない

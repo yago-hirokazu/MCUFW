@@ -1,4 +1,4 @@
-# esh pipe Milestone 1〜9 review & refactoring 初期レビュー結果
+# pipe Milestone 1〜9 review & refactoring 初期レビュー結果
 
 作成日: 2026-10-03
 対象リポジトリ: `C:\usr\src\MCUFW`
@@ -36,8 +36,8 @@ Baseline 試験は元の作業ツリーを変更しない独立スナップシ�
 
 - 現行 `AGENTS.md`
 - `docs/coding_style_summary_linux_kernel.md`
-- `docs/esh_pipe_review_refactoring_handoff.md`
-- `.agents/skills/esh_pipe/references/esh_pipe_coroutine_summary.md`
+- `docs/pipe_review_refactoring_handoff.md`
+- `.agents/skills/pipe/references/pipe_coroutine_summary.md`
 - pipe 関連設計文書と回帰試験文書
 
 特に次を維持条件とする。
@@ -87,7 +87,7 @@ Pipe、scheduler、coroutine の厳格buildではwarningは発生しなかった
 
 #### 4.1.2 設計文書と実装のstack容量不一致
 
-`docs/esh_pipe_api.md` は Windows coroutine stack初期容量を16 KiBと記載する。
+`docs/pipe_api.md` は Windows coroutine stack初期容量を16 KiBと記載する。
 現行実装は `src/core/esh/include/cortn.h` で64 KiBを使用する。
 
 16 KiBでCRT formatting結合試験に問題が発生し、64 KiBへ変更した経緯は
@@ -169,7 +169,7 @@ Historical UNIXの完全再現ではなく、pipeに必要な観測可能な意�
 |---|---|
 | process fd table | `struct esh_fd_table` |
 | global file table | 固定長`struct esh_file` pool |
-| pipe inode | 固定長`struct esh_pipe_inode` pool |
+| pipe inode | 固定長`struct pipe_inode` pool |
 | inode-backed pipe data | inode内256-byte ring buffer |
 | `sleep`/`wakeup` wait channel | portable scheduler wait channel |
 | process scheduling | coroutine/thread backend |
@@ -261,4 +261,4 @@ I/O契約を維持したまま終了処理とexecutor検査を小さく整理す
 Milestone 10 は本レビューおよびrefactoring完了後も未着手として残す。
 
 具体的な実行単位、依存関係、選別実行方法は
-`docs/esh_pipe_review_refactoring_plan.md` に記録する。
+`docs/pipe_review_refactoring_plan.md` に記録する。

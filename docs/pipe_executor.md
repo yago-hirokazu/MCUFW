@@ -1,4 +1,4 @@
-# ESH pipeline executor
+# pipeline executor
 
 ## Scope
 

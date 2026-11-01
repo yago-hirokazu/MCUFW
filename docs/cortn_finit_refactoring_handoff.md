@@ -635,7 +635,7 @@ MSYS2 MINGW64 shellで次を実行する。
 
 ### 次Stepへの引継事項
 
-- Step 5で`docs/cortn_windows.md`と`docs/esh_pipe_core.md`を更新する
+- Step 5で`docs/cortn_windows.md`と`docs/pipe_core.md`を更新する
 - coroutine engineの配置を`src/core/sys/dev/windows`として説明する
 - scheduler backend固有のsource構成を現在のbuild定義へ合わせる
 - buffer cache初期化とfile/inode table初期化の責務分離を説明する
@@ -656,12 +656,12 @@ MSYS2 MINGW64 shellで次を実行する。
 ### 更新対象
 
 - `docs/cortn_windows.md`
-- `docs/esh_pipe_core.md`
+- `docs/pipe_core.md`
 
 ### 作業手順
 
 1. `cortn_windows.md`のcoroutine engine配置を新pathへ更新
-2. `esh_pipe_core.md`の初期化説明を次の責務へ更新
+2. `pipe_core.md`の初期化説明を次の責務へ更新
    - `binit()`はbuffer cache
    - `finit()`はfile/inode table
    - 完全初期化は`binit()`、`finit()`の順
@@ -686,7 +686,7 @@ MSYS2 MINGW64 shellで次を実行する。
   - cortn backendのC sourceとassembly sourceを記録
   - thread backendが`sched_thread.c`だけを使用することを記録
   - 更新日を2026-10-15へ変更
-- `docs/esh_pipe_core.md`を次の初期化責務へ更新
+- `docs/pipe_core.md`を次の初期化責務へ更新
   - `binit()`はbuffer cacheを初期化
   - `finit()`はfile tableとinode tableを初期化
   - 完全初期化順は`binit()`、`finit()`
@@ -925,7 +925,7 @@ sam3 -a -b string
 - 最終変更file一覧
   - `docs/cortn_finit_refactoring_handoff.md`
   - `docs/cortn_windows.md`
-  - `docs/esh_pipe_core.md`
+  - `docs/pipe_core.md`
   - `src/core/esh/target/windows/esh_adapt.c`
   - `src/core/esh/test/cortn/Makefile`
   - `src/core/esh/test/pipe/Makefile`

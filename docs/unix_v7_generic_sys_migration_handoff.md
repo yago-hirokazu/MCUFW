@@ -66,7 +66,7 @@ GCCは必ずMSYS2 MINGW64 shell経由で実行する。PowerShellから
 直接の移行対象は次のファイルである。
 
 - `src/core/esh/include/esh_file.h`
-- `src/core/esh/include/esh_pipe.h`
+- `src/core/esh/include/pipe.h`
 - `src/core/esh/include/esh_sched.h`
 - `src/core/esh/include/esh_sched_backend.h`
 - `src/core/esh/file.c`
@@ -91,7 +91,7 @@ GCCは必ずMSYS2 MINGW64 shell経由で実行する。PowerShellから
 struct esh_proc
   -> struct esh_fd_table
        -> struct esh_file
-            -> struct esh_pipe_inode
+            -> struct pipe_inode
                  -> struct buf
                       -> buffers[NBUF][BSIZE]
 ```
@@ -124,7 +124,7 @@ V7の主要な対応は次のとおり。
 | `struct esh_file` | `struct file` |
 | `f_refs` | `f_count` |
 | direction enum | `f_flag`と`FREAD/FWRITE/FPIPE` |
-| `struct esh_pipe_inode` | `struct inode` |
+| `struct pipe_inode` | `struct inode` |
 | `pi_count` | `i_size` |
 | reader offset | `struct file.f_offset` |
 | file pool | `file[NFILE]` |
@@ -332,7 +332,7 @@ offsetとsizeは非負で`PIPSIZ`以下に制限されるため、host依存の`
 | 現行symbol | 汎用sys symbol | 公開区分、配置 |
 |---|---|---|
 | `struct esh_file` | `struct file` | 公開定義、`h/file.h` |
-| `struct esh_pipe_inode` | `struct inode` | sys内部型、`h/inode.h` |
+| `struct pipe_inode` | `struct inode` | sys内部型、`h/inode.h` |
 | `struct esh_proc` | `struct proc` | 公開型、`h/sched.h` |
 | executor `struct proc` | `struct exe_proc` | esh内部型、`esh/include/exe.h` |
 | `struct esh_wait_chan` | `struct wait_channel` | sys内部型、`h/sched.h` |
@@ -352,10 +352,10 @@ offsetとsizeは非負で`PIPSIZ`以下に制限されるため、host依存の`
 | `esh_file_put` | `closef` | sys内部、`fio.c` |
 | `esh_fd_install_at` | `fd_install_at` | 移行補助、`fio.c` |
 | `esh_close_all` | `close_all` | 公開、`fio.c` |
-| `esh_pipe_inode_alloc` | `ialloc` | sys内部、`alloc.c` |
-| `esh_pipe_inode_discard` | `iput` | sys内部、`iget.c` |
-| `esh_pipe_for_proc` | `pipe_for_proc` | sys内部、`pipe.c` |
-| `esh_pipe` | `sys_pipe` | 公開、`pipe.c` |
+| `pipe_inode_alloc` | `ialloc` | sys内部、`alloc.c` |
+| `pipe_inode_discard` | `iput` | sys内部、`iget.c` |
+| `pipe_for_proc` | `pipe_for_proc` | sys内部、`pipe.c` |
+| `pipe` | `sys_pipe` | 公開、`pipe.c` |
 | pipe一回read/write helper | `pipe_read_once`/`pipe_write_once` | `pipe.c`の`static` |
 | pipe read/write | `readp`/`writep` | sys内部、`pipe.c` |
 | inode read/write | `readi`/`writei` | sys内部、`rdwri.c` |
@@ -607,7 +607,7 @@ helperはStep 4で`pipe.c`の`static`関数として実装する。
 - `file_system_init`実装はStep 3の`fio.c`まで追加しない
 - fd枯渇は`SYS_EMFILE`、global file/inode枯渇は`SYS_ENFILE`とする
 - fileとinodeの枯渇stageは同じerror値でも試験上は別々に確認する
-- 旧`esh_file_table`、`esh_pipe_table`は変更または削除しない
+- 旧`esh_file_table`、`pipe_table`は変更または削除しない
 
 ## 10. Step 2 file table inode table追加
 
@@ -634,7 +634,7 @@ V7の`conf/c.c`と同様に、汎用file tableとinode tableの所有場所を�
 4. 初期化後の全entry未使用条件を試験
 5. 既存`buf[]`、`bfreelist`、`bdevsw[]`との配置順を規約に合わせる
 
-旧`esh_file_table`と`esh_pipe_table`はこのStepでは削除しない。新旧tableを同じ
+旧`esh_file_table`と`pipe_table`はこのStepでは削除しない。新旧tableを同じ
 binaryへlinkする場合も、symbol名と利用経路を分離する。
 
 ### 完了条件
@@ -688,7 +688,7 @@ file tableとinode tableの所有場所とした。定義は`conf.c`だけに置
 `i_count == 0`を未使用inode entryの判定条件とする。他fieldも未使用時はzeroを
 保つ。`file_system_init`による再初期化は予定どおりStep 3の`fio.c`で実装する。
 
-旧`esh_file_table`と`esh_pipe_table`は変更、削除していない。新旧tableは異なる
+旧`esh_file_table`と`pipe_table`は変更、削除していない。新旧tableは異なる
 symbolと利用経路を持つため、現段階でも同じbinaryへlinkできる。
 
 #### 試験
@@ -903,7 +903,7 @@ mappingと十分な`NBUF`が必要であり、別仕様として扱う。
 - wakeup後に条件を再検査
 - closeでpeerが永久待機しない
 - buffer、file、inodeのleakなし
-- 旧esh pipe試験も成功
+- 旧pipe試験も成功
 
 ### 最小試験
 
@@ -934,7 +934,7 @@ V7との差分を明記し、esh本番経路の切替とStep 5以降は行わな
 V7の責務名と状態遷移に合わせ、`sys/pipe.c`と`sys/rdwri.c`を追加した。
 `pipe_for_proc`と`sys_pipe`がinode、read file、write fileを組み立てる。
 `readp`と`writep`が待機を含むpipe処理、`readi`と`writei`が一つのbuffer内の
-転送を担当する。旧esh pipeと本番経路は変更していない。
+転送を担当する。旧pipeと本番経路は変更していない。
 
 #### dataとoffset
 
@@ -1336,7 +1336,7 @@ esh executorとstdioを新しいsys file/pipe/schedulerへ接続し、旧esh専�
 
 ```text
 src/core/esh/include/esh_file.h
-src/core/esh/include/esh_pipe.h
+src/core/esh/include/pipe.h
 src/core/esh/include/esh_sched.h
 src/core/esh/include/esh_sched_backend.h
 src/core/esh/file.c
@@ -1407,7 +1407,7 @@ Windows `eshinit`は最初のpipeline実行前にbuffer、file、inode tableを
 
 次の旧esh専用実装を削除した。
 
-- `include/esh_file.h`、`include/esh_pipe.h`
+- `include/esh_file.h`、`include/pipe.h`
 - `include/esh_sched.h`、`include/esh_sched_backend.h`
 - `file.c`、`pipe.c`、`sched.c`
 - `target/windows/sched_compat.mk`
@@ -1487,11 +1487,11 @@ pipelineには従来のhelp、lex、par、test由来warningと意図されたpar
 
 最低限、次を現行の型名、path、pipe意味へ更新する。
 
-- `docs/esh_pipe_api.md`
-- `docs/esh_pipe_core.md`
-- `docs/esh_pipe_sched.md`
-- `docs/esh_pipe_thread.md`
-- `docs/esh_pipe_regression.md`
+- `docs/pipe_api.md`
+- `docs/pipe_core.md`
+- `docs/pipe_sched.md`
+- `docs/pipe_thread.md`
+- `docs/pipe_regression.md`
 - `docs/cortn_windows.md`
 - 本引継ぎ書の全Step状態
 
@@ -1519,12 +1519,12 @@ pipelineには従来のhelp、lex、par、test由来warningと意図されたpar
 
 次の文書を現行の型名、path、V7型offset方式、buffer cache構成へ更新した。
 
-- `docs/esh_pipe_api.md`
-- `docs/esh_pipe_core.md`
-- `docs/esh_pipe_sched.md`
-- `docs/esh_pipe_thread.md`
-- `docs/esh_pipe_stdio.md`
-- `docs/esh_pipe_regression.md`
+- `docs/pipe_api.md`
+- `docs/pipe_core.md`
+- `docs/pipe_sched.md`
+- `docs/pipe_thread.md`
+- `docs/pipe_stdio.md`
+- `docs/pipe_regression.md`
 - `docs/cortn_windows.md`
 - 本引継ぎ書のStep状態と完了記録
 

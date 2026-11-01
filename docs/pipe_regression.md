@@ -48,8 +48,8 @@ sys層では`struct proc.p_ofile[]`が`struct file`を参照し、read/write end
 inode lock、参照数、wait listを保護する。process終了時はfdをcloseしてから
 lock外でbackendをreleaseまたはjoinする。
 
-詳細は`esh_pipe_api.md`、`esh_pipe_core.md`、`esh_pipe_sched.md`、
-`esh_pipe_thread.md`、`esh_pipe_stdio.md`を参照する。
+詳細は`pipe_api.md`、`pipe_core.md`、`pipe_sched.md`、
+`pipe_thread.md`、`pipe_stdio.md`を参照する。
 
 ## Pipe意味の回帰点
 
@@ -96,11 +96,11 @@ make -B
 ```
 
 bio、file/inode、sys pipe、coroutineはO0/O2を試験する。file/inode、sys pipe、
-coroutine、esh pipe、schedulerは`-Wall -Wextra -Werror -pedantic`を使用する。
-esh pipe、scheduler、pipelineはcoroutine/threadをO0/O2で試験する。
+coroutine、pipe、schedulerは`-Wall -Wextra -Werror -pedantic`を使用する。
+pipe、scheduler、pipelineはcoroutine/threadをO0/O2で試験する。
 
 sys pipe単体はscheduler stubで準備済みコンテキストと相手側の進行を模擬する。
-esh pipeの公開API・EOF・EPIPE試験は`sched_prepare()`したentry内で実行する。
+pipeの公開API・EOF・EPIPE試験は`sched_prepare()`したentry内で実行する。
 offset試験では`PIPSIZ + 1`byteのwriteを途中で待機させ、1byteだけのreadでは
 writerが待機を続けること、全data読取後に残りを転送して全byte数を返すことを
 確認する。inode lock競合の待機・再開はsys scheduler試験で確認する。

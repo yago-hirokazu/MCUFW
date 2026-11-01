@@ -93,5 +93,5 @@ MCU stack容量と配置はSTM32移植時に決定する。
 - stack guardとwatermark
 - XMM6、x87 control word、MXCSRの復元
 
-`src/core/sys/test/sched`とesh pipe/pipeline suiteがscheduler backendとの結合を
+`src/core/sys/test/sched`とpipe/pipeline suiteがscheduler backendとの結合を
 coroutine/thread双方で確認する。
