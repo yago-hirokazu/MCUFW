@@ -58,7 +58,8 @@ DEPS = $(OBJS:%.o=%.d)
 
 # CFLAGS
 CFLAGS = -mno-ms-bitfields
-CFLAGS += -g -O0
+OPT ?= -O0
+CFLAGS += -g $(OPT)
 
 INCLUDES := -I.
 INCLUDES += -I../../include

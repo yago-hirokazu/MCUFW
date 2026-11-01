@@ -69,7 +69,8 @@ int sys_pipe(int fd[2])
 	return result;
 }
 
-ptrdiff_t readp(struct proc *proc, struct file *fp, void *buf, size_t count)
+/* Read available data, sleeping until data or EOF */
+ptrdiff_t readp(struct file *fp, void *buf, size_t count)
 {
 	struct pipe_io_status status;
 	struct inode *ip;
@@ -89,8 +90,6 @@ ptrdiff_t readp(struct proc *proc, struct file *fp, void *buf, size_t count)
 		case PIPE_IO_EOF:
 			return status.io_count;
 		case PIPE_IO_WAIT_READ:
-			if (proc->p_ctx == NULL)
-				return -SYS_EAGAIN;
 			result = sched_sleep((char *)ip + 2, WAIT_READ);
 			if (result < 0)
 				return result;
@@ -101,8 +100,8 @@ ptrdiff_t readp(struct proc *proc, struct file *fp, void *buf, size_t count)
 	}
 }
 
-ptrdiff_t writep(struct proc *proc, struct file *fp, const void *buf,
-		 size_t count)
+/* Complete requested transfer, sleeping while pipe remains full */
+ptrdiff_t writep(struct file *fp, const void *buf, size_t count)
 {
 	const unsigned char *bytes;
 	struct pipe_io_status status;
@@ -129,11 +128,6 @@ ptrdiff_t writep(struct proc *proc, struct file *fp, const void *buf,
 				return (ptrdiff_t)transferred;
 			break;
 		case PIPE_IO_WAIT_WRITE:
-			if (proc->p_ctx == NULL) {
-				if (transferred != 0)
-					return (ptrdiff_t)transferred;
-				return -SYS_EAGAIN;
-			}
 			result = sched_sleep((char *)ip + 1, WAIT_WRITE);
 			if (result < 0)
 				return result;
@@ -144,16 +138,13 @@ ptrdiff_t writep(struct proc *proc, struct file *fp, const void *buf,
 	}
 }
 
+/* Acquire inode lock, sleeping until current owner releases it */
 int plock(struct inode *ip)
 {
-	struct proc *proc;
 	int result;
 
 	while (ip->i_flag & ILOCK) {
 		ip->i_flag |= IWANT;
-		proc = current_proc();
-		if (!proc || !proc->p_ctx)
-			return -SYS_EAGAIN;
 		result = sched_sleep((char *)ip, WAIT_LOCK);
 		if (result < 0)
 			return result;

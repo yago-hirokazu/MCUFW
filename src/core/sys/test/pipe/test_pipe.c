@@ -1,4 +1,7 @@
-/* test_pipe.c */
+/*
+ * Pipe unit tests => scheduler stub => peer-data and lock-release hooks
+ * Prepared context integration => esh/test/pipe and sys/test/sched
+ */
 
 #include <stdio.h>
 #include <string.h>
@@ -22,10 +25,10 @@
 	} while (0)
 
 static int failures;
-static struct proc *hook_proc;
 static struct file *hook_file;
 static struct inode *hook_inode;
 static ptrdiff_t hook_result;
+static unsigned char hook_data[PIPSIZ];
 
 static void init_proc(struct proc *proc);
 static ptrdiff_t call_read(struct proc *proc, int fd, void *buf,
@@ -64,10 +67,13 @@ int main(void)
 	return 0;
 }
 
+/* Model active process for scheduler stub */
 static void init_proc(struct proc *proc)
 {
 	memset(proc, 0, sizeof(*proc));
-	proc->p_state = PROC_NEW;
+	/* Model prepared execution context with scheduler stub */
+	proc->p_ctx = proc;
+	proc->p_state = PROC_RUNNING;
 }
 
 static ptrdiff_t call_read(struct proc *proc, int fd, void *buf,
@@ -76,7 +82,7 @@ static ptrdiff_t call_read(struct proc *proc, int fd, void *buf,
 	ptrdiff_t result;
 
 	kernel_lock();
-	result = readp(proc, getf(proc, fd), buf, count);
+	result = readp(getf(proc, fd), buf, count);
 	kernel_unlock();
 	return result;
 }
@@ -87,7 +93,7 @@ static ptrdiff_t call_write(struct proc *proc, int fd, const void *buf,
 	ptrdiff_t result;
 
 	kernel_lock();
-	result = writep(proc, getf(proc, fd), buf, count);
+	result = writep(getf(proc, fd), buf, count);
 	kernel_unlock();
 	return result;
 }
@@ -120,13 +126,12 @@ static void supply_read_hook(char *chan, enum wait_reason reason)
 	hook_result = writei(hook_inode, &offset, &data, 1);
 }
 
+/* Drain unread data while writer sleeps */
 static void drain_write_hook(char *chan, enum wait_reason reason)
 {
-	unsigned char data[PIPSIZ];
-
 	CHECK(chan == (char *)hook_inode + 1);
 	CHECK(reason == WAIT_WRITE);
-	hook_result = readp(hook_proc, hook_file, data, sizeof(data));
+	hook_result = readp(hook_file, hook_data, sizeof(hook_data));
 }
 
 static void unlock_hook(char *chan, enum wait_reason reason)
@@ -145,8 +150,8 @@ static void test_zero_length(void)
 	finit();
 	init_proc(&proc);
 	sched_stub_reset(&proc);
-	CHECK(readp(NULL, NULL, NULL, 0) == 0);
-	CHECK(writep(NULL, NULL, NULL, 0) == 0);
+	CHECK(readp(NULL, NULL, 0) == 0);
+	CHECK(writep(NULL, NULL, 0) == 0);
 	CHECK(file_in_use() == 0);
 	CHECK(inode_in_use() == 0);
 	sched_stub_reset(&proc);
@@ -202,6 +207,7 @@ static void test_create_and_data_path(void)
 	CHECK(inode_in_use() == 0);
 }
 
+/* Keep writer waiting until unread tail is drained */
 static void test_full_and_offset_reset(void)
 {
 	unsigned char input[PIPSIZ + 1];
@@ -221,18 +227,25 @@ static void test_full_and_offset_reset(void)
 	ip = rf->f_inode;
 	for (i = 0; i < PIPSIZ + 1; i++)
 		input[i] = (unsigned char)i;
-	CHECK(call_write(&proc, fd[1], input, sizeof(input)) == PIPSIZ);
+	CHECK(call_write(&proc, fd[1], input, PIPSIZ) == PIPSIZ);
 	CHECK(ip->i_size == PIPSIZ);
 	CHECK(call_read(&proc, fd[0], output, 1) == 1);
 	CHECK(rf->f_offset == 1);
 	CHECK(ip->i_size == PIPSIZ);
-	CHECK(call_write(&proc, fd[1], input, 1) == -SYS_EAGAIN);
-	CHECK(call_read(&proc, fd[0], output + 1, PIPSIZ - 1) ==
-	      PIPSIZ - 1);
-	CHECK(memcmp(input, output, PIPSIZ) == 0);
+	hook_file = rf;
+	hook_inode = ip;
+	hook_result = -1;
+	sched_stub_set_sleep_hook(drain_write_hook);
+	CHECK(call_write(&proc, fd[1], input + PIPSIZ, 1) == 1);
+	CHECK(sched_stub_sleep_count() == 1);
+	CHECK(hook_result == PIPSIZ - 1);
+	CHECK(output[0] == input[0]);
+	CHECK(memcmp(input + 1, hook_data, PIPSIZ - 1) == 0);
 	CHECK(rf->f_offset == 0);
+	CHECK(ip->i_size == 1);
+	CHECK(call_read(&proc, fd[0], output, 1) == 1);
+	CHECK(output[0] == input[PIPSIZ]);
 	CHECK(ip->i_size == 0);
-	CHECK(call_write(&proc, fd[1], input, 1) == 1);
 	call_close_all(&proc);
 }
 
@@ -267,9 +280,10 @@ static void test_eof_epipe_and_close_wakeup(void)
 	CHECK(pipe_in_use() == 0);
 }
 
+/* Retry empty read and complete write across full buffer */
 static void test_wait_rechecks(void)
 {
-	unsigned char data[PIPSIZ];
+	unsigned char data[PIPSIZ + 1];
 	struct proc proc;
 	struct file *rf;
 	char byte;
@@ -278,7 +292,6 @@ static void test_wait_rechecks(void)
 	binit();
 	finit();
 	init_proc(&proc);
-	proc.p_ctx = &proc;
 	sched_stub_reset(&proc);
 	CHECK(sys_pipe(fd) == 0);
 	rf = getf(&proc, fd[0]);
@@ -292,15 +305,16 @@ static void test_wait_rechecks(void)
 	CHECK(sched_stub_last_reason() == WAIT_READ);
 
 	memset(data, 0x5a, sizeof(data));
-	CHECK(call_write(&proc, fd[1], data, sizeof(data)) == PIPSIZ);
-	hook_proc = &proc;
 	hook_file = rf;
 	hook_result = -1;
 	sched_stub_set_sleep_hook(drain_write_hook);
-	CHECK(call_write(&proc, fd[1], "W", 1) == 1);
+	CHECK(call_write(&proc, fd[1], data, sizeof(data)) == PIPSIZ + 1);
 	CHECK(hook_result == PIPSIZ);
+	CHECK(memcmp(data, hook_data, PIPSIZ) == 0);
 	CHECK(sched_stub_sleep_count() == 2);
 	CHECK(sched_stub_last_reason() == WAIT_WRITE);
+	CHECK(call_read(&proc, fd[0], &byte, 1) == 1);
+	CHECK(byte == 0x5a);
 	call_close_all(&proc);
 }
 
@@ -313,7 +327,6 @@ static void test_pipe_lock(void)
 	binit();
 	finit();
 	init_proc(&proc);
-	proc.p_ctx = &proc;
 	sched_stub_reset(&proc);
 	CHECK(sys_pipe(fd) == 0);
 	ip = getf(&proc, fd[0])->f_inode;

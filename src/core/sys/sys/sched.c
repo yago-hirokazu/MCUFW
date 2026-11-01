@@ -57,7 +57,7 @@ int sched_sleep(char *chan, enum wait_reason reason)
 	unsigned int h;
 
 	proc = current_proc();
-	if (proc == NULL || proc->p_ctx == NULL || !kernel_is_locked())
+	if (proc == NULL || !kernel_is_locked())
 		return -SYS_EINVAL;
 	if (proc->p_wchan)
 		return -SYS_EINVAL;
@@ -120,7 +120,7 @@ void sched_wakeup(char *chan)
 			slpque[h] = next;
 		proc->p_wchan = NULL;
 		proc->p_link = NULL;
-		if (proc->p_ctx && sched_adapt_wake(proc) == 0)
+		if (sched_adapt_wake(proc) == 0)
 			proc->p_state = PROC_RUNNABLE;
 		else
 			proc->p_state = PROC_ERROR;

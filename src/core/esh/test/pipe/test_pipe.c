@@ -1,4 +1,7 @@
-/* test_pipe.c */
+/*
+ * Prepared test entries => sys_read() / sys_write() => pipe sleep/wakeup
+ * Controller => sched_resume() => verify wait state and transferred data
+ */
 
 #include <stdio.h>
 #include <string.h>
@@ -44,20 +47,22 @@ static void close_all_locked(struct proc *proc);
 static int connect_pipe(struct proc *writer, struct proc *reader,
 			int *write_fd, int *read_fd);
 static int run_scheduler(struct proc *procs, int count);
+static void run_prepared(void (*entry)(void *arg));
 static void write_entry(void *arg);
 static void read_entry(void *arg);
-static void test_public_api(void);
+static void offset_read_entry(void *arg);
+static void public_api_entry(void *arg);
 static void test_v7_offset(void);
-static void test_peer_close(void);
+static void peer_close_entry(void *arg);
 static void test_blocking_transfer(void);
 static void test_reader_close_wakeup(void);
 static void test_writer_close_wakeup(void);
 
 int main(void)
 {
-	test_public_api();
+	run_prepared(public_api_entry);
 	test_v7_offset();
-	test_peer_close();
+	run_prepared(peer_close_entry);
 	test_blocking_transfer();
 	test_reader_close_wakeup();
 	test_writer_close_wakeup();
@@ -172,22 +177,39 @@ static void read_entry(void *arg)
 	CHECK(sys_close(reader->fd) == 0);
 }
 
-static void test_public_api(void)
+/* Run synchronous API checks from prepared execution context */
+static void run_prepared(void (*entry)(void *arg))
 {
 	struct proc proc;
+
+	binit();
+	finit();
+	pinit(&proc);
+	CHECK(sched_prepare(&proc, entry, NULL) == 0);
+	CHECK(sched_resume(&proc) == 0);
+	CHECK(proc.p_state == PROC_FINISHED);
+	close_all_locked(&proc);
+	sched_release(&proc);
+	CHECK(file_in_use() == 0);
+	CHECK(pipe_in_use() == 0);
+	CHECK(buffer_in_use() == 0);
+}
+
+/* Check descriptor mapping and partial reads within active process */
+static void public_api_entry(void *arg)
+{
+	struct proc *proc;
 	struct file *rf;
 	struct file *wf;
 	struct inode *ip;
 	char data[4];
 	int fd[2];
 
-	binit();
-	finit();
-	pinit(&proc);
-	sched_set_current_proc(&proc);
+	(void)arg;
+	proc = current_proc();
 	CHECK(sys_pipe(fd) == 0);
-	rf = getf(&proc, fd[0]);
-	wf = getf(&proc, fd[1]);
+	rf = getf(proc, fd[0]);
+	wf = getf(proc, fd[1]);
 	CHECK(rf && rf->f_flag == (FREAD | FPIPE));
 	CHECK(wf && wf->f_flag == (FWRITE | FPIPE));
 	CHECK(rf->f_inode == wf->f_inode);
@@ -206,51 +228,98 @@ static void test_public_api(void)
 	CHECK(sys_read(NOFILE, data, 1) == -SYS_EBADF);
 	CHECK(sys_write(NOFILE, data, 1) == -SYS_EBADF);
 	CHECK(sys_close(NOFILE) == -SYS_EBADF);
-	close_all_locked(&proc);
-	sched_set_current_proc(NULL);
+	close_all_locked(proc);
 	CHECK(file_in_use() == 0);
 	CHECK(pipe_in_use() == 0);
 	CHECK(buffer_in_use() == 0);
 }
 
-static void test_v7_offset(void)
+/* Pause after partial read so controller can inspect blocked writer */
+static void offset_read_entry(void *arg)
 {
-	struct proc proc;
-	struct file *rf;
-	unsigned char data[PIPSIZ];
-	unsigned char byte;
-	int fd[2];
+	struct read_arg *reader;
 
-	memset(data, 0x5a, sizeof(data));
-	binit();
-	finit();
-	pinit(&proc);
-	sched_set_current_proc(&proc);
-	CHECK(sys_pipe(fd) == 0);
-	CHECK(sys_write(fd[1], data, sizeof(data)) == PIPSIZ);
-	CHECK(sys_read(fd[0], &byte, 1) == 1);
-	rf = getf(&proc, fd[0]);
-	CHECK(rf->f_offset == 1);
-	CHECK(rf->f_inode->i_size == PIPSIZ);
-	CHECK(sys_write(fd[1], &byte, 1) == -SYS_EAGAIN);
-	CHECK(sys_read(fd[0], data, PIPSIZ - 1) == PIPSIZ - 1);
-	CHECK(rf->f_offset == 0);
-	CHECK(rf->f_inode->i_size == 0);
-	CHECK(sys_write(fd[1], &byte, 1) == 1);
-	close_all_locked(&proc);
-	sched_set_current_proc(NULL);
+	reader = arg;
+	CHECK(sys_read(reader->fd, reader->data, 1) == 1);
+	kernel_lock();
+	CHECK(sched_sleep((char *)reader, WAIT_READ) == 0);
+	kernel_unlock();
+	CHECK(sys_read(reader->fd, reader->data + 1, PIPSIZ - 1) ==
+	      PIPSIZ - 1);
+	/* Empty pipe now blocks until writer supplies final byte */
+	CHECK(sys_read(reader->fd, reader->data + PIPSIZ, 1) == 1);
+	CHECK(sys_read(reader->fd, reader->data, 1) == 0);
+	CHECK(sys_close(reader->fd) == 0);
 }
 
-static void test_peer_close(void)
+/* Require full drain before writer can finish oversized request */
+static void test_v7_offset(void)
 {
-	struct proc proc;
+	struct write_arg writer;
+	struct read_arg reader;
+	struct proc procs[2];
+	struct file *rf;
+	struct inode *ip;
+	unsigned char source[PIPSIZ + 1];
+	unsigned char output[PIPSIZ + 1];
+	int write_fd;
+	int read_fd;
+	int i;
+
+	for (i = 0; i < PIPSIZ + 1; i++)
+		source[i] = (unsigned char)(i * 37 + 11);
+	memset(output, 0, sizeof(output));
+	binit();
+	finit();
+	pinit(&procs[0]);
+	pinit(&procs[1]);
+	CHECK(connect_pipe(&procs[0], &procs[1], &write_fd, &read_fd) == 0);
+	rf = getf(&procs[1], read_fd);
+	ip = rf->f_inode;
+	writer.data = source;
+	writer.count = sizeof(source);
+	writer.fd = write_fd;
+	writer.result = -1;
+	memset(&reader, 0, sizeof(reader));
+	reader.data = output;
+	reader.fd = read_fd;
+	CHECK(sched_prepare(&procs[0], write_entry, &writer) == 0);
+	CHECK(sched_prepare(&procs[1], offset_read_entry, &reader) == 0);
+	CHECK(sched_resume(&procs[0]) == 0);
+	CHECK(procs[0].p_state == PROC_WAIT_WRITE);
+	CHECK(writer.result == -1);
+	CHECK(ip->i_size == PIPSIZ);
+	CHECK(sched_resume(&procs[1]) == 0);
+	CHECK(procs[1].p_state == PROC_WAIT_READ);
+	CHECK(rf->f_offset == 1);
+	CHECK(ip->i_size == PIPSIZ);
+	CHECK(procs[0].p_state == PROC_WAIT_WRITE);
+	CHECK(procs[0].p_wchan == (char *)ip + 1);
+	kernel_lock();
+	sched_wakeup((char *)&reader);
+	kernel_unlock();
+	CHECK(sched_resume(&procs[1]) == 0);
+	CHECK(rf->f_offset == 0);
+	CHECK(ip->i_size == 0);
+	CHECK(procs[0].p_state == PROC_RUNNABLE);
+	CHECK(procs[1].p_state == PROC_WAIT_READ);
+	CHECK(run_scheduler(procs, 2) == 0);
+	CHECK(writer.result == PIPSIZ + 1);
+	CHECK(memcmp(source, output, sizeof(source)) == 0);
+	sched_release(&procs[0]);
+	sched_release(&procs[1]);
+	CHECK(file_in_use() == 0);
+	CHECK(pipe_in_use() == 0);
+	CHECK(buffer_in_use() == 0);
+}
+
+/* Check EOF and broken pipe from prepared execution context */
+static void peer_close_entry(void *arg)
+{
 	unsigned char byte;
 	int fd[2];
 
-	binit();
-	finit();
-	pinit(&proc);
-	sched_set_current_proc(&proc);
+	(void)arg;
 	CHECK(sys_pipe(fd) == 0);
 	CHECK(sys_close(fd[1]) == 0);
 	CHECK(sys_read(fd[0], &byte, 1) == 0);
@@ -259,7 +328,6 @@ static void test_peer_close(void)
 	CHECK(sys_close(fd[0]) == 0);
 	CHECK(sys_write(fd[1], &byte, 1) == -SYS_EPIPE);
 	CHECK(sys_close(fd[1]) == 0);
-	sched_set_current_proc(NULL);
 	CHECK(file_in_use() == 0);
 	CHECK(pipe_in_use() == 0);
 }

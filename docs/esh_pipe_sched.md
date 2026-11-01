@@ -1,6 +1,6 @@
 # sys pipe sleep・wakeup
 
-更新日: 2026-10-30
+更新日: 2026-11-01
 
 ## 役割
 
@@ -19,7 +19,13 @@ pipe状態、inode lock、file/inode参照、wait listを単一の非再帰kerne
 
 ## Sleep
 
-`sched_sleep()`はlock保持中に呼び出す。
+`sched_sleep()`は`sched_prepare()`に成功した実行コンテキストから、kernel lockを
+保持して呼び出す。schedulerがそのprocessをcurrent processとして実行中である
+ことを前提とし、`p_ctx`のNULL判定は行わない。
+
+current processが存在しない場合、kernel lockを保持していない場合、または
+`p_wchan`に待機先が登録済みの場合は、従来どおり`-SYS_EINVAL`を返す。
+backendのyield失敗時も待機登録を除去し、エラーを返す。
 
 ```text
 pipeまたはinode lock条件を検査
@@ -34,10 +40,15 @@ wait登録前に実行権を返さないため、条件検査直後のwakeupを�
 
 ## Wakeup
 
-`sched_wakeup()`はkernel lock保持中に呼び出す。channel上の全processを
-wait listから外し、backendをwakeして
-`PROC_RUNNABLE`へ変更する。wake後にI/O可能とは限らない。各processは条件を
-再検査し、満たされていなければ再びsleepする。
+`sched_wakeup()`はkernel lock保持中に呼び出す。wait list上のprocessは、
+`sched_prepare()`で準備した有効な実行コンテキストを保持していることを
+前提とし、起床対象の`p_ctx`のNULL判定は行わない。起床を通知する呼出し元は
+実行コンテキストを持たなくてもよい。
+
+channel上の全processをwait listから外し、backendをwakeする。
+`sched_adapt_wake()`が成功すれば`PROC_RUNNABLE`、失敗すれば`PROC_ERROR`へ
+変更する。wake後にI/O可能とは限らない。各processは条件を再検査し、
+満たされていなければ再びsleepする。
 
 channelは格納領域を持つ構造体ではなく、出来事を識別する`char *`である。
 pipeではV7と同じく、inode先頭アドレスをlock、先頭+1 byteをwrite、
@@ -68,8 +79,16 @@ runnable processの選択を維持する。`pinit()`で共通wait hashを初期�
 `sys_write()`は`writep()`を呼び、要求全体を転送するまで部分writeとsleepを
 繰り返す。待機中に最終readerがcloseした場合は`-SYS_EPIPE`を返す。
 
-backendをbindしていないprocessでは、待機が必要な場合に`-SYS_EAGAIN`または
-転送済みbyte数を返す。
+pipe I/Oと`plock()`は、`sched_prepare()`に成功した実行コンテキストを
+schedulerが実行していることを前提とする。`readp()`、`writep()`、`plock()`は
+`p_ctx`を検査せず、待機条件が成立したら`sched_sleep()`を呼ぶ。満杯による
+部分writeでは呼出し元へ戻らず、残りの転送を再開する。
+
+backend未設定process向けの`-SYS_EAGAIN`や部分byte数の返却はサポートしない。
+`sched_sleep()`も準備済みコンテキストを前提とし、その他の実行条件検査と
+エラー伝播を維持する。パイプラインは
+全processの`sched_prepare()`が成功してから`sched_resume()`で実行を開始し、
+準備失敗時はコマンドを開始せず資源を回収する。
 
 ## Scheduler状態
 
@@ -88,7 +107,9 @@ backendをbindしていないprocessでは、待機が必要な場合に`-SYS_EA
 processを返す。runnable processがなく未完了processが残る場合、executorは
 idleまたはdeadlockとして扱う。
 
-`sched_release()`はprocessをwait listから外し、backend handleをkernel lock外で
+`sched_release()`はkernel lock保持中にprocessをwait listから外してから
+`p_ctx`をNULLにする。この順序により、起床処理が実行コンテキストを失った
+processをwait listから取り出すことを防ぐ。backend handleはkernel lock外で
 解放する。thread join中にworkerがlockを必要とするため、lock内でjoinしない。
 
 ## V7との差分

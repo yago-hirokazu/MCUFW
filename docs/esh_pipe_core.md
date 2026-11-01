@@ -1,6 +1,6 @@
 # sys file・fd・pipeコア
 
-更新日: 2026-10-15
+更新日: 2026-11-01
 
 ## 役割
 
@@ -72,8 +72,15 @@ read offsetと`i_size`を0へ戻す。`writei()`は`i_size`から`PIPSIZ`まで�
 未読dataが残る間はbuffer先頭へ回り込まない。
 
 `readp()`は現在取得可能なdataを返す。`writep()`は要求全体を完了するまで部分
-転送と待機を繰り返す。backend未設定processで待機が必要な場合は
-`-SYS_EAGAIN`、またはすでに転送済みのbyte数を返す。
+転送と待機を繰り返す。pipe I/Oと`plock()`は、`sched_prepare()`に成功し、
+schedulerから実行中のcurrent processで使用する。空・満杯・inode lock競合は
+`sched_sleep()`で待機し、再開後に条件を再検査する。これらの関数には
+`p_ctx == NULL`の判定や`-SYS_EAGAIN`を返す経路を設けない。
+
+backend未設定processでのpipe I/Oはサポートしない。`readp()`と`writep()`は
+`struct file *`、buffer、byte数を受け取り、待機対象processはschedulerが解決する。
+fd作成・接続・closeは実行準備前にも行えるため、接続用の一時的なprocessには
+backendを必要としない。
 
 最終writer close後もbuffer内のdataを読み出せる。その後のreadは0を返す。
 reader不在時のwriteは`-SYS_EPIPE`を返し、signalは発生させない。

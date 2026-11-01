@@ -172,7 +172,7 @@ static ptrdiff_t proc_read(int fd, void *buf, size_t count)
 
 	kernel_lock();
 	proc = current_proc();
-	result = readp(proc, getf(proc, fd), buf, count);
+	result = readp(getf(proc, fd), buf, count);
 	kernel_unlock();
 	return result;
 }
@@ -184,7 +184,7 @@ static ptrdiff_t proc_write(int fd, const void *buf, size_t count)
 
 	kernel_lock();
 	proc = current_proc();
-	result = writep(proc, getf(proc, fd), buf, count);
+	result = writep(getf(proc, fd), buf, count);
 	kernel_unlock();
 	return result;
 }
@@ -713,28 +713,36 @@ static void locked_ram_strategy(struct buf *bp)
 	ramstrategy(bp);
 }
 
+/* Seed pipe buffers for cache-capacity checks outside process execution */
 static void make_full_pipes(struct proc *owner, int pipes[NINODE][2])
 {
 	unsigned char marker;
+	size_t offset;
 	int i;
 
 	for (i = 0; i < NINODE; i++) {
 		CHECK(pipe_for_proc(owner, pipes[i]) == 0);
 		marker = (unsigned char)(0x30 + i);
-		CHECK(writep(owner, getf(owner, pipes[i][1]), &marker, 1) == 1);
+		offset = 0;
+		CHECK(writei(getf(owner, pipes[i][1])->f_inode,
+			     &offset, &marker, 1) == 1);
 	}
 	CHECK(pipe_in_use() == NINODE);
 	CHECK(file_in_use() == NINODE * 2);
 }
 
+/* Verify seeded data before releasing pipe buffers */
 static void drain_full_pipes(struct proc *owner, int pipes[NINODE][2])
 {
 	unsigned char marker;
+	size_t offset;
 	int i;
 
 	for (i = 0; i < NINODE; i++) {
 		marker = 0;
-		CHECK(readp(owner, getf(owner, pipes[i][0]), &marker, 1) == 1);
+		offset = 0;
+		CHECK(readi(getf(owner, pipes[i][0])->f_inode,
+			    &offset, &marker, 1) == 1);
 		CHECK(marker == (unsigned char)(0x30 + i));
 	}
 	close_all(owner);

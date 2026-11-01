@@ -1,6 +1,6 @@
 # sys pipe移行回帰試験
 
-更新日: 2026-10-13
+更新日: 2026-11-01
 
 ## Windows対話入力
 
@@ -54,6 +54,7 @@ lock外でbackendをreleaseまたはjoinする。
 ## Pipe意味の回帰点
 
 - `sys_pipe()`はcurrent processへread/write fdを作る
+- pipe I/Oは`sched_prepare()`済みの実行コンテキストから呼ぶ
 - `sys_read()`は現在取得可能なdataを返し、空ならwriter有無を再判定する
 - `sys_write()`は要求全体を完了するまで部分転送と待機を繰り返す
 - 最終writer close後は残存dataを読み切ってからEOFを返す
@@ -61,6 +62,7 @@ lock外でbackendをreleaseまたはjoinする。
 - closeはread/write waiterを起こす
 - data位置はV7型offset方式で、未読dataをringとして回り込ませない
 - 全data読取後に`f_offset`と`i_size`を0へ戻してbufferを再利用する
+- 部分readでは満杯のwriterは待機を続け、全data読取後に残りを転送する
 - coroutine/threadで同じ転送結果、EOF、EPIPE、終了statusを返す
 
 ## 回帰試験
@@ -96,6 +98,12 @@ make -B
 bio、file/inode、sys pipe、coroutineはO0/O2を試験する。file/inode、sys pipe、
 coroutine、esh pipe、schedulerは`-Wall -Wextra -Werror -pedantic`を使用する。
 esh pipe、scheduler、pipelineはcoroutine/threadをO0/O2で試験する。
+
+sys pipe単体はscheduler stubで準備済みコンテキストと相手側の進行を模擬する。
+esh pipeの公開API・EOF・EPIPE試験は`sched_prepare()`したentry内で実行する。
+offset試験では`PIPSIZ + 1`byteのwriteを途中で待機させ、1byteだけのreadでは
+writerが待機を続けること、全data読取後に残りを転送して全byte数を返すことを
+確認する。inode lock競合の待機・再開はsys scheduler試験で確認する。
 
 pipelineは0、1、256、257、2089 byteと2/3/4段を確認する。各組合せを反復し、
 NULを含むbinary data、順序、変換結果、file/inode使用数0を確認する。2089 byteは

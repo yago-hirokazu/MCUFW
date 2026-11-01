@@ -960,9 +960,10 @@ partial read直後に先頭領域へwrapしてwriteしない。
 | full、readerあり | data転送 | `WAIT_WRITE` |
 | readerなし | 残存dataを読み切った後EOF | `SYS_EPIPE` |
 
-backend未接続processで待機が必要な場合、read/writeは`-SYS_EAGAIN`を返す。
-writeがfullになるまで一部転送済みなら、その転送byte数を返す。backend接続時は
-`sched_sleep`から戻った後にinode lockを取り直し、条件を再検査する。
+2026-11-01更新: pipe I/Oと`plock()`は`sched_prepare()`済みの実行コンテキスト
+から使用する。backend未接続process向けの`-SYS_EAGAIN`や部分byte数の返却は
+廃止した。空・満杯・lock競合時は`sched_sleep()`で待機し、戻った後にinode
+lockを取り直して条件を再検査する。writeは残りを転送し、正常時は全byte数を返す。
 
 `closef`は最終file参照を閉じる時、inode参照を減らす前にread/write両wait
 channelを起床する。これによりwriter close後のEOFとreader close後のEPIPEを

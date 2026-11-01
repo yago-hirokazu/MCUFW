@@ -31,6 +31,7 @@ struct file {
 extern struct file file[];
 
 int sys_pipe(int fd[2]);
+/* Pipe I/O requires current process running after sched_prepare() */
 ptrdiff_t sys_read(int fd, void *buf, size_t count);
 ptrdiff_t sys_write(int fd, const void *buf, size_t count);
 int sys_close(int fd);

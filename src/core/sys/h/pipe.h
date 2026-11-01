@@ -38,10 +38,9 @@ struct inode;
 struct proc;
 
 int pipe_for_proc(struct proc *proc, int fd[2]);
-ptrdiff_t readp(struct proc *proc, struct file *fp, void *buf,
-		size_t count);
-ptrdiff_t writep(struct proc *proc, struct file *fp, const void *buf,
-		 size_t count);
+/* I/O and plock require sched_prepare() context and kernel lock held */
+ptrdiff_t readp(struct file *fp, void *buf, size_t count);
+ptrdiff_t writep(struct file *fp, const void *buf, size_t count);
 int plock(struct inode *ip);
 void prele(struct inode *ip);
 size_t pipe_in_use(void);

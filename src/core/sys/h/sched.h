@@ -45,7 +45,9 @@ void kernel_unlock(void);
 int kernel_is_locked(void);
 /* Channel identifies event by address; storage must outlive wait */
 /* Sleep and wakeup require kernel lock held */
+/* Sleep requires current process running after sched_prepare() */
 int sched_sleep(char *chan, enum wait_reason reason);
+/* Wakeup requires valid execution contexts for processes in wait list */
 void sched_wakeup(char *chan);
 struct proc *current_proc(void);
 /* Initialize process before descriptors or backend setup */

@@ -20,7 +20,7 @@ ptrdiff_t sys_read(int fd, void *buf, size_t count)
 		result = -SYS_EBADF;
 		goto out;
 	}
-	result = readp(proc, fp, buf, count);
+	result = readp(fp, buf, count);
 out:
 	kernel_unlock();
 	return result;
@@ -41,7 +41,7 @@ ptrdiff_t sys_write(int fd, const void *buf, size_t count)
 		result = -SYS_EBADF;
 		goto out;
 	}
-	result = writep(proc, fp, buf, count);
+	result = writep(fp, buf, count);
 out:
 	kernel_unlock();
 	return result;

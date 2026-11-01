@@ -159,6 +159,19 @@ mingw64 シェルで `src/core/esh/test/exe` に移動し、下記を実行し�
 
 4. 引数チェックはユーザーから指示があるまでいれないこと。
 
+5. if 文で 0 と NULL の判定は明示的に記述すること。
+例：
+
+``` c
+int a;
+if (a == 0)
+if (a != 0)
+
+char *a;
+if (a == NULL)
+if (a != NULL)
+```
+
 
 ## UNIX V7 移植時のルール
 

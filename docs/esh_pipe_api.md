@@ -1,6 +1,6 @@
 # sys pipe API・データモデル
 
-更新日: 2026-10-13
+更新日: 2026-11-01
 
 ## 対象範囲
 
@@ -55,6 +55,11 @@ struct proc
 - `sys_write()`：fdへ書き込む
 - `sys_close()`：fdを閉じる
 
+pipe I/Oは`sched_prepare()`に成功した実行コンテキストから呼び出す。
+schedulerがそのprocessをcurrent processとして実行していることを前提とし、
+backend未設定での非blocking利用はサポートしない。空・満杯・inode lock競合時は
+内部で待機・再試行する。`sys_pipe()`やfdの接続・closeは実行準備前にも行える。
+
 sys層内部とesh executorは、明示的な`struct proc *`を受け取る
 `pipe_for_proc()`、`getf()`、`fd_install_at()`、`fd_close()`、`close_all()`も
 使用する。
@@ -70,6 +75,8 @@ sys層内部とesh executorは、明示的な`struct proc *`を受け取る
 
 内部pipe処理は`PIPE_IO_*`で進行、read待ち、write待ち、EOF、broken pipe、
 errorを区別する。`sys_read()`と`sys_write()`が待機と再試行を隠す。
+内部の`readp(fp, buf, count)`、`writep(fp, buf, count)`、`plock(ip)`を直接呼ぶ
+場合も同じ実行コンテキストを必要とし、kernel lockを保持して呼び出す。
 
 ## Pipe data位置
 

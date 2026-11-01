@@ -412,7 +412,7 @@ EOF、EPIPE、部分転送、close wakeupの現行動作を明示する。
 - reader closeでwriterをwakeしEPIPE
 - writer closeでreaderをwakeしEOF
 - ring wrap境界で順序維持
-- 非backend利用時のEAGAINと部分byte数
+- 非backend利用時のEAGAINと部分byte数（2026-11-01に仕様廃止）
 - blocking write途中のreader close
 
 #### 完了条件
@@ -440,6 +440,10 @@ EOF、EPIPE、部分転送、close wakeupの現行動作を明示する。
 - Scheduler cortn/thread O0: pass
 - production code変更なし
 - Cortex-M/RTOS移植には未着手
+
+上記の非backend利用試験は当時の実施記録。2026-11-01にpipe I/Oを
+`sched_prepare()`済みの実行コンテキストに限定し、満杯時の待機・再開と
+全byte数の返却を確認する試験へ置き換えた。
 
 ### R7: Scheduler waiter・release試験
 
