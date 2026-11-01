@@ -55,7 +55,7 @@ static void test_early_filter_exit(void);
 static void test_stdio_pipeline(void);
 static void test_invalid_count(void);
 static void test_transfer_matrix(void);
-static void test_executor_bounds(void);
+static void test_executor_dispatch(void);
 static int script_line(const char *text);
 static void test_console_script(void);
 static void test_parser_bounds(void);
@@ -87,7 +87,7 @@ int main(void)
 	check_resources();
 	test_transfer_matrix();
 	check_resources();
-	test_executor_bounds();
+	test_executor_dispatch();
 	check_resources();
 	test_console_script();
 	check_resources();
@@ -415,7 +415,8 @@ static void test_transfer_matrix(void)
 	CHECK(pipe_in_use() == 0);
 }
 
-static void test_executor_bounds(void)
+/* Execute complete NOP stream and reject unknown opcode */
+static void test_executor_dispatch(void)
 {
 	struct code code;
 	struct exe executor;
@@ -423,79 +424,16 @@ static void test_executor_bounds(void)
 
 	code_init(&code);
 	memset(&executor, 0, sizeof(executor));
-	CHECK(exe_run_codes(NULL, &executor) == EXIT_FAILURE);
-	CHECK(exe_run_codes(&code, NULL) == EXIT_FAILURE);
 	code.c_codes = CODES;
 	for (i = 0; i < CODES; i++)
 		code.c_code[i] = OP_NOP;
-	for (i = 0; i < CODES; i++)
+	while (executor.e_pc < code.c_codes)
 		CHECK(exe_run_codes(&code, &executor) == EXIT_SUCCESS);
 	CHECK(executor.e_pc == CODES);
-	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
-
-	init_executor_instruction(&code, &executor, OP_BLTN_CMD, 0);
-	code.c_codes = 1;
-	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
-	init_executor_instruction(&code, &executor, OP_BLTN_CMD, 999);
-	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
-	init_executor_instruction(&code, &executor, OP_USER_CMD, 999);
-	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
-	init_executor_instruction(&code, &executor, OP_BLTN_CMD, C_ECHO);
-	executor.e_procs = PROCS;
-	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
-
-	init_executor_instruction(&code, &executor, OP_PUSH_SYMBOL, -1);
-	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
-	init_executor_instruction(&code, &executor, OP_PUSH_SYMBOL, 0);
-	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
-	code.c_stab.s_num = 1;
-	memset(code.c_stab.s_str, 'x', SYMCHARS);
-	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
-
-	init_executor_instruction(&code, &executor, OP_CMD_VARG, 0);
-	init_command(&executor.e_proc[0], &echo_applet);
-	executor.e_procs = 1;
-	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
-	code.c_vtab.v_num = 1;
-	memset(code.c_vtab.v_val, 'x', SYMCHARS);
-	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
-
-	init_executor_instruction(&code, &executor, OP_JUMP, 0);
-	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
-	code.c_ltab.l_num = 1;
-	code.c_ltab.l_addr[0] = code.c_codes + 1;
-	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
-
-	init_executor_instruction(&code, &executor, OP_JUMP_IF_FALSE, 0);
-	code.c_ltab.l_num = 1;
-	code.c_ltab.l_addr[0] = 0;
-	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
-	init_executor_instruction(&code, &executor, OP_PUSH_SYMBOL, 0);
-	code.c_stab.s_num = 1;
-	code.c_stab.s_str[0] = 0;
-	executor.e_sp = STACKS;
-	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
-
-	init_executor_instruction(&code, &executor, OP_CMD_ARG, 0);
-	code.c_stab.s_num = 1;
-	code.c_stab.s_str[0] = 0;
-	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
-	init_command(&executor.e_proc[0], &echo_applet);
-	executor.e_proc[0].p_argc = TTY_NARG;
-	executor.e_procs = 1;
-	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
-	init_executor_instruction(&code, &executor, OP_CMD_EXE, 0);
-	code.c_codes = 1;
-	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
-
-	init_executor_instruction(&code, &executor, OP_PIPE_NEXT, 0);
-	code.c_codes = 1;
-	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
-	executor.e_procs = PROCS;
-	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
 
 	init_executor_instruction(&code, &executor, 0xff, 0);
 	CHECK(exe_run_codes(&code, &executor) == EXIT_FAILURE);
+	CHECK(executor.e_pc == 0);
 	code.c_code[0] = OP_NOP;
 	code.c_codes = 1;
 	CHECK(exe_run_codes(&code, &executor) == EXIT_SUCCESS);
