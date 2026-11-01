@@ -53,11 +53,11 @@ static void basic_entry(struct cortn *self, void *arg);
 static void wait_entry(struct cortn *self, void *arg);
 static void round_entry(struct cortn *self, void *arg);
 static void simd_entry(struct cortn *self, void *arg);
-static void corrupt_guard_entry(struct cortn *self, void *arg);
+static void corrupt_stack_boundary_guard_entry(struct cortn *self, void *arg);
 static void test_basic(void);
 static void test_wait(void);
 static void test_round_robin(void);
-static void test_stack_guard(void);
+static void test_stack_boundary_guard(void);
 static void test_simd_and_fpu(void);
 
 int main(void)
@@ -65,7 +65,7 @@ int main(void)
 	test_basic();
 	test_wait();
 	test_round_robin();
-	test_stack_guard();
+	test_stack_boundary_guard();
 	test_simd_and_fpu();
 	if (failures) {
 		printf("%d tests failed\n", failures);
@@ -221,7 +221,7 @@ static void test_round_robin(void)
 }
 
 /* Corrupt guard while running to exercise resume return path */
-static void corrupt_guard_entry(struct cortn *self, void *arg)
+static void corrupt_stack_boundary_guard_entry(struct cortn *self, void *arg)
 {
 	(void)arg;
 	self->c_stack[0] = 0;
@@ -229,7 +229,7 @@ static void corrupt_guard_entry(struct cortn *self, void *arg)
 }
 
 /* Detect guard damage before entry and after context returns */
-static void test_stack_guard(void)
+static void test_stack_boundary_guard(void)
 {
 	struct cortn cortn;
 	struct basic_data data;
@@ -249,7 +249,8 @@ static void test_stack_guard(void)
 	CHECK(cortn_stack_used(&cortn) == 0);
 
 	CHECK(cortn_init(&cortn, basic_stack, sizeof(basic_stack),
-			 corrupt_guard_entry, NULL) == CORTN_SUCCESS);
+			 corrupt_stack_boundary_guard_entry, NULL) ==
+	      CORTN_SUCCESS);
 	CHECK(cortn_resume(&cortn) == CORTN_ERR_STACK);
 	CHECK(cortn.c_state == CORTN_ERROR);
 	CHECK(cortn.c_reason == CORTN_YIELD_ERROR);

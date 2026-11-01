@@ -1,6 +1,6 @@
 /*
  * Scheduler backend => resume => context switch => entry / yield
- * Resume => stack guard checks before and after context switch
+ * Resume => stack boundary guard checks before and after context switch
  * Wake => waiting coroutine becomes runnable for next resume
  */
 
@@ -9,10 +9,10 @@
 
 #include "cortn.h"
 
-#define CORTN_GUARD_PATTERN	0xa5
+#define CORTN_STACK_BOUNDARY_GUARD_PATTERN	0xa5
 #define CORTN_UNUSED_PATTERN	0xcc
 
-static int cortn_guard_is_valid(const unsigned char *guard);
+static int cortn_stack_boundary_guard_is_valid(const unsigned char *guard);
 static unsigned char *cortn_stack_top(const struct cortn *self);
 
 int cortn_init(struct cortn *self, void *stack, size_t stack_size,
@@ -24,9 +24,11 @@ int cortn_init(struct cortn *self, void *stack, size_t stack_size,
 	bytes = stack;
 	memset(self, 0, sizeof(*self));
 	memset(bytes, CORTN_UNUSED_PATTERN, stack_size);
-	memset(bytes, CORTN_GUARD_PATTERN, CORTN_STACK_GUARD_SIZE);
-	upper_guard = bytes + stack_size - CORTN_STACK_GUARD_SIZE;
-	memset(upper_guard, CORTN_GUARD_PATTERN, CORTN_STACK_GUARD_SIZE);
+	memset(bytes, CORTN_STACK_BOUNDARY_GUARD_PATTERN,
+	       CORTN_STACK_BOUNDARY_GUARD_SIZE);
+	upper_guard = bytes + stack_size - CORTN_STACK_BOUNDARY_GUARD_SIZE;
+	memset(upper_guard, CORTN_STACK_BOUNDARY_GUARD_PATTERN,
+	       CORTN_STACK_BOUNDARY_GUARD_SIZE);
 
 	self->c_entry = entry;
 	self->c_arg = arg;
@@ -38,7 +40,7 @@ int cortn_init(struct cortn *self, void *stack, size_t stack_size,
 	return CORTN_SUCCESS;
 }
 
-/* Resume runnable coroutine with stack guards checked on both sides */
+/* Resume runnable coroutine with boundary guards checked on both sides */
 int cortn_resume(struct cortn *self)
 {
 	if (self->c_state != CORTN_RUNNABLE)
@@ -98,9 +100,9 @@ int cortn_stack_check(const struct cortn *self)
 	const unsigned char *upper_guard;
 
 	upper_guard = self->c_stack + self->c_stack_size -
-		      CORTN_STACK_GUARD_SIZE;
-	if (!cortn_guard_is_valid(self->c_stack) ||
-	    !cortn_guard_is_valid(upper_guard))
+		      CORTN_STACK_BOUNDARY_GUARD_SIZE;
+	if (cortn_stack_boundary_guard_is_valid(self->c_stack) == 0 ||
+	    cortn_stack_boundary_guard_is_valid(upper_guard) == 0)
 		return CORTN_ERR_STACK;
 	return CORTN_SUCCESS;
 }
@@ -112,7 +114,7 @@ size_t cortn_stack_used(const struct cortn *self)
 
 	if (cortn_stack_check(self) != CORTN_SUCCESS)
 		return 0;
-	first = self->c_stack + CORTN_STACK_GUARD_SIZE;
+	first = self->c_stack + CORTN_STACK_BOUNDARY_GUARD_SIZE;
 	top = cortn_stack_top(self);
 	while (first < top && *first == CORTN_UNUSED_PATTERN)
 		first++;
@@ -133,12 +135,12 @@ void cortn_boot_main(struct cortn *self)
 		;
 }
 
-static int cortn_guard_is_valid(const unsigned char *guard)
+static int cortn_stack_boundary_guard_is_valid(const unsigned char *guard)
 {
 	size_t i;
 
-	for (i = 0; i < CORTN_STACK_GUARD_SIZE; i++) {
-		if (guard[i] != CORTN_GUARD_PATTERN)
+	for (i = 0; i < CORTN_STACK_BOUNDARY_GUARD_SIZE; i++) {
+		if (guard[i] != CORTN_STACK_BOUNDARY_GUARD_PATTERN)
 			return 0;
 	}
 	return 1;
@@ -149,7 +151,7 @@ static unsigned char *cortn_stack_top(const struct cortn *self)
 	uintptr_t top;
 
 	top = (uintptr_t)(self->c_stack + self->c_stack_size -
-			  CORTN_STACK_GUARD_SIZE);
+			  CORTN_STACK_BOUNDARY_GUARD_SIZE);
 	top &= ~(uintptr_t)0xf;
 	return (unsigned char *)top;
 }
