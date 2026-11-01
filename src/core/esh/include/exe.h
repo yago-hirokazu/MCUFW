@@ -26,7 +26,7 @@ struct exe_proc {
 	struct applet *p_cmd;		/* Command */
 	char p_argc;			/* # of command arguments */
 	char *p_argv[TTY_NARG];		/* Command arguments */
-	char p_argbuf[TTY_NARG][SYMCHARS]; /* Expanded arguments */
+	char p_args[TTY_NARG][SYMCHARS]; /* Expanded arguments */
 };
 
 struct exe {

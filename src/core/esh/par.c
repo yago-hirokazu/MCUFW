@@ -48,12 +48,9 @@ static void add_code(int byte, struct code *code);
 static void par_mark_error(void);
 static char find_symbol(char *sym, char sym_tab[]);
 static char make_symbol(char *sym, char sym_tab[], char *sym_num);
-extern void set_symbol_to_variable(char var_p, char *sym, struct code *code);
-extern char *get_symbol_from_variable(char var_p, struct code *code);
 static char make_label(struct code *code);
 static char set_code_addr_to_label(char label_p, int code_addr,
 				   struct code *code);
-extern char *get_string(char id, struct code *code);
 static int find_cmd(struct token *tok, const struct applet *cmd);
 
 static char parse_cmdarg(struct token *token, struct code *code);
@@ -186,29 +183,6 @@ static char make_symbol(char *sym, char sym_tab[], char *sym_num)
 	return n2;
 }
 
-extern void set_symbol_to_variable(char var_p, char *sym, struct code *code)
-{
-	struct variable_table *v;
-
-	if (!code || !sym || var_p < 0 || var_p >= SYMBOLS) {
-		par_mark_error();
-		return;
-	}
-	v = &code->c_vtab;
-	strncpy(&v->v_val[var_p * SYMCHARS], sym, SYMCHARS - 1);
-	v->v_val[var_p * SYMCHARS + SYMCHARS - 1] = 0;
-}
-
-extern char *get_symbol_from_variable(char var_p, struct code *code)
-{
-	struct variable_table *v;
-
-	if (!code || var_p < 0 || var_p >= SYMBOLS)
-		return NULL;
-	v = &code->c_vtab;
-	return (char *)&v->v_val[var_p * SYMCHARS];
-}
-
 static char make_label(struct code *code)
 {
 	char label_p = code->c_ltab.l_num;
@@ -232,13 +206,6 @@ static char set_code_addr_to_label(char label_p, int code_addr,
 	DP("l_addr[%d] = %3d", label_p, code_addr);
 	code->c_ltab.l_addr[label_p] = code_addr;
 	return PARDONE;
-}
-
-extern char *get_string(char id, struct code *code)
-{
-	if (!code || id < 0 || id >= SYMBOLS)
-		return NULL;
-	return (char *)&code->c_stab.s_str[id * SYMCHARS];
 }
 
 static int find_cmd(struct token *tok, const struct applet *cmd)

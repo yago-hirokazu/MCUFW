@@ -1,5 +1,8 @@
 
-/* exe.c */
+/*
+ * par.c => bytecode => exe_run_codes() => command / exe_run_pipeline()
+ *   => variable table / string table => expanded command arguments
+ */
 
 #include "esh.h"
 #include "esh_debug.h"
@@ -32,12 +35,13 @@ do {\
 #define DP(...)
 #endif
 
+extern int exe_run_pipeline(struct exe_proc *proc, int count);
 
-extern void set_symbol_to_variable(char var_p, char *val, struct code *code);
-extern char *get_symbol_from_variable(char var_p, struct code *code);
-extern char *get_string(char id, struct code *code);
+static void set_symbol_to_variable(char var_p, char *val, struct code *code);
+static char *get_symbol_from_variable(char var_p, struct code *code);
+static char *get_string(char id, struct code *code);
 
-static void expand_quoted_arg(char *dst, char *src, struct code *code);
+static void expand_quote(char *dst, char *src, struct code *code);
 static void proc_entry(void *arg);
 static void close_proc_fds(struct exe_proc *proc, int count);
 static void cleanup_pipeline(struct exe_proc *proc, int pipe_count,
@@ -45,131 +49,6 @@ static void cleanup_pipeline(struct exe_proc *proc, int pipe_count,
 static int connect_proc(struct exe_proc *writer, struct exe_proc *reader);
 static int execute_commands(struct exe *exe);
 static void reset_commands(struct exe *exe);
-
-static void proc_entry(void *arg)
-{
-	struct exe_proc *proc;
-
-	proc = arg;
-	proc->p_exec.p_ret = proc->p_cmd->main(proc->p_argc,
-						    proc->p_argv);
-	kernel_lock();
-	close_all(&proc->p_exec);
-	kernel_unlock();
-}
-
-static void close_proc_fds(struct exe_proc *proc, int count)
-{
-	int i;
-
-	kernel_lock();
-	for (i = 0; i < count; i++)
-		close_all(&proc[i].p_exec);
-	kernel_unlock();
-}
-
-static void cleanup_pipeline(struct exe_proc *proc, int pipe_count,
-			     int prepared)
-{
-	int i;
-
-	close_proc_fds(proc, pipe_count + 1);
-	for (i = 0; i < prepared; i++)
-		sched_release(&proc[i].p_exec);
-}
-
-static int connect_proc(struct exe_proc *writer, struct exe_proc *reader)
-{
-	struct proc owner;
-	struct file *read_file;
-	struct file *write_file;
-	int fd[2];
-	int result;
-
-	pinit(&owner);
-	kernel_lock();
-	result = pipe_for_proc(&owner, fd);
-	if (result < 0)
-		goto out;
-	read_file = getf(&owner, fd[0]);
-	write_file = getf(&owner, fd[1]);
-	result = fd_install_at(&writer->p_exec, FD_STDOUT, write_file);
-	if (result < 0)
-		goto out;
-	result = fd_install_at(&reader->p_exec, FD_STDIN, read_file);
-	if (result < 0)
-		fd_close(&writer->p_exec, FD_STDOUT);
-out:
-	close_all(&owner);
-	kernel_unlock();
-	return result < 0 ? result : 0;
-}
-
-int exe_run_pipeline(struct exe_proc *proc, int count)
-{
-	int finished;
-	int pipe_count;
-	int prepared;
-	int progress;
-	int result;
-	int i;
-
-	if (!proc || count < 2 || count > PROCS)
-		return -SYS_EINVAL;
-	for (i = 0; i < count; i++) {
-		if (!proc[i].p_cmd || !proc[i].p_cmd->main ||
-		    !proc[i].p_cmd->name || proc[i].p_argc < 1 ||
-		    proc[i].p_argc > TTY_NARG || !proc[i].p_argv[0])
-			return -SYS_EINVAL;
-	}
-	for (i = 0; i < count; i++) {
-		pinit(&proc[i].p_exec);
-	}
-	pipe_count = 0;
-	prepared = 0;
-	for (i = 0; i < count - 1; i++) {
-		result = connect_proc(&proc[i], &proc[i + 1]);
-		if (result < 0)
-			goto out;
-		pipe_count++;
-	}
-	for (i = 0; i < count; i++) {
-		result = sched_prepare(&proc[i].p_exec, proc_entry,
-				       &proc[i]);
-		if (result < 0)
-			goto out;
-		prepared++;
-	}
-
-	result = -SYS_EINVAL;
-	for (;;) {
-		finished = 0;
-		progress = 0;
-		for (i = 0; i < count; i++) {
-			if (proc[i].p_exec.p_state == PROC_FINISHED) {
-				finished++;
-				continue;
-			}
-			if (proc[i].p_exec.p_state == PROC_ERROR)
-				goto out;
-			if (proc[i].p_exec.p_state != PROC_RUNNABLE)
-				continue;
-			if (sched_resume(&proc[i].p_exec) < 0)
-				goto out;
-			progress = 1;
-		}
-		if (finished == count) {
-			result = proc[count - 1].p_exec.p_ret;
-			break;
-		}
-		if (!progress)
-			break;
-	}
-
-out:
-	cleanup_pipeline(proc, pipe_count, prepared);
-	return result;
-}
 
 static int execute_commands(struct exe *exe)
 {
@@ -206,8 +85,8 @@ static void reset_commands(struct exe *exe)
 		exe->e_proc[i].p_argc = 0;
 		memset(exe->e_proc[i].p_argv, 0,
 		       sizeof(exe->e_proc[i].p_argv));
-		memset(exe->e_proc[i].p_argbuf, 0,
-		       sizeof(exe->e_proc[i].p_argbuf));
+		memset(exe->e_proc[i].p_args, 0,
+		       sizeof(exe->e_proc[i].p_args));
 	}
 	exe->e_procs = 0;
 }
@@ -292,8 +171,8 @@ int exe_run_codes(struct code *code, struct exe *exe)
 		proc = &exe->e_proc[(int)exe->e_procs - 1];
 		c = proc->p_argc;
 		sid = code->c_code[pc+1];
-		expand_quoted_arg(proc->p_argbuf[c], get_string(sid, code), code);
-		proc->p_argv[c] = proc->p_argbuf[c];
+		expand_quote(proc->p_args[c], get_string(sid, code), code);
+		proc->p_argv[c] = proc->p_args[c];
 		proc->p_argc = ++c;
 
 		pc += 2;
@@ -420,7 +299,116 @@ int exe_run_codes(struct code *code, struct exe *exe)
 	return EXIT_SUCCESS;
 }
 
-static void expand_quoted_arg(char *dst, char *src, struct code *code)
+int exe_run_pipeline(struct exe_proc *proc, int count)
+{
+	int finished;
+	int pipe_count;
+	int prepared;
+	int progress;
+	int result;
+	int i;
+
+	if (!proc || count < 2 || count > PROCS)
+		return -SYS_EINVAL;
+	for (i = 0; i < count; i++) {
+		if (!proc[i].p_cmd || !proc[i].p_cmd->main ||
+		    !proc[i].p_cmd->name || proc[i].p_argc < 1 ||
+		    proc[i].p_argc > TTY_NARG || !proc[i].p_argv[0])
+			return -SYS_EINVAL;
+	}
+	for (i = 0; i < count; i++) {
+		pinit(&proc[i].p_exec);
+	}
+	pipe_count = 0;
+	prepared = 0;
+	for (i = 0; i < count - 1; i++) {
+		result = connect_proc(&proc[i], &proc[i + 1]);
+		if (result < 0)
+			goto out;
+		pipe_count++;
+	}
+	for (i = 0; i < count; i++) {
+		result = sched_prepare(&proc[i].p_exec, proc_entry,
+				       &proc[i]);
+		if (result < 0)
+			goto out;
+		prepared++;
+	}
+
+	result = -SYS_EINVAL;
+	for (;;) {
+		finished = 0;
+		progress = 0;
+		for (i = 0; i < count; i++) {
+			if (proc[i].p_exec.p_state == PROC_FINISHED) {
+				finished++;
+				continue;
+			}
+			if (proc[i].p_exec.p_state == PROC_ERROR)
+				goto out;
+			if (proc[i].p_exec.p_state != PROC_RUNNABLE)
+				continue;
+			if (sched_resume(&proc[i].p_exec) < 0)
+				goto out;
+			progress = 1;
+		}
+		if (finished == count) {
+			result = proc[count - 1].p_exec.p_ret;
+			break;
+		}
+		if (!progress)
+			break;
+	}
+
+out:
+	cleanup_pipeline(proc, pipe_count, prepared);
+	return result;
+}
+
+/*
+ * Store symbol in variable table
+ */
+static void set_symbol_to_variable(char var_p, char *sym, struct code *code)
+{
+	struct variable_table *v;
+
+	if (!code || !sym || var_p < 0 || var_p >= SYMBOLS) {
+		EP("Invalid variable assignment");
+		return;
+	}
+	v = &code->c_vtab;
+	strncpy(&v->v_val[var_p * SYMCHARS], sym, SYMCHARS - 1);
+	v->v_val[var_p * SYMCHARS + SYMCHARS - 1] = 0;
+}
+
+/*
+ * Fetch value from variable table
+ */
+static char *get_symbol_from_variable(char var_p, struct code *code)
+{
+	struct variable_table *v;
+
+	if (!code || var_p < 0 || var_p >= SYMBOLS)
+		return NULL;
+	v = &code->c_vtab;
+	return (char *)&v->v_val[var_p * SYMCHARS];
+}
+
+
+/*
+ * Fetch string from bytecode string table
+ */
+static char *get_string(char id, struct code *code)
+{
+	if (!code || id < 0 || id >= SYMBOLS)
+		return NULL;
+	return (char *)&code->c_stab.s_str[id * SYMCHARS];
+}
+
+/*
+ * Expand quoted argument into command buffer
+ */
+static void expand_quote(char *dst, char *src, struct code *code)
 {
 	int d = 0;
 
@@ -476,6 +464,67 @@ static void expand_quoted_arg(char *dst, char *src, struct code *code)
 	}
 	dst[d] = '\0';
 }
+
+
+static void proc_entry(void *arg)
+{
+	struct exe_proc *proc;
+
+	proc = arg;
+	proc->p_exec.p_ret = proc->p_cmd->main(proc->p_argc,
+						    proc->p_argv);
+	kernel_lock();
+	close_all(&proc->p_exec);
+	kernel_unlock();
+}
+
+static void close_proc_fds(struct exe_proc *proc, int count)
+{
+	int i;
+
+	kernel_lock();
+	for (i = 0; i < count; i++)
+		close_all(&proc[i].p_exec);
+	kernel_unlock();
+}
+
+static void cleanup_pipeline(struct exe_proc *proc, int pipe_count,
+			     int prepared)
+{
+	int i;
+
+	close_proc_fds(proc, pipe_count + 1);
+	for (i = 0; i < prepared; i++)
+		sched_release(&proc[i].p_exec);
+}
+
+static int connect_proc(struct exe_proc *writer, struct exe_proc *reader)
+{
+	struct proc owner;
+	struct file *read_file;
+	struct file *write_file;
+	int fd[2];
+	int result;
+
+	pinit(&owner);
+	kernel_lock();
+	result = pipe_for_proc(&owner, fd);
+	if (result < 0)
+		goto out;
+	read_file = getf(&owner, fd[0]);
+	write_file = getf(&owner, fd[1]);
+	result = fd_install_at(&writer->p_exec, FD_STDOUT, write_file);
+	if (result < 0)
+		goto out;
+	result = fd_install_at(&reader->p_exec, FD_STDIN, read_file);
+	if (result < 0)
+		fd_close(&writer->p_exec, FD_STDOUT);
+out:
+	close_all(&owner);
+	kernel_unlock();
+	return result < 0 ? result : 0;
+}
+
 
 /* EOF */
 
