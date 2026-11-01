@@ -1,6 +1,6 @@
 # Windows thread scheduler backend
 
-更新日: 2026-10-13
+更新日: 2026-11-01
 
 ## Backend選択
 
@@ -40,6 +40,15 @@ coroutine/threadをO0/O2の別directoryへbuildする。
 
 pipeline controllerは単一threadのままである。nested pipeline、複数controller、
 background実行、CPU-only commandの強制cancelはscheduler契約外である。
+
+backendのreleaseはprepareで得た有効な未解放handleを直接使用し、slotを探索しない。
+wakeはwait listから取り出したprocessを対象とし、slotの使用中・終了・停止の
+検査は行わない。resume時の終了判定は、初回token待ちでnative waitが失敗して
+workerが終了した場合にも必要なため維持する。停止判定は待機loopとentryに残す。
+
+coroutine backendのinitは常に成功する。yieldとwakeはschedulerが保証する
+実行状態を前提とし、戻り値の検査を行わない。resumeはstack guard破損を検出する
+可能性があるため、エラー判定を維持する。
 
 ## Lockとwait契約
 

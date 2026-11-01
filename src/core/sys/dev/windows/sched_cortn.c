@@ -1,10 +1,12 @@
-/* sched_cortn.c */
+/*
+ * Scheduler => prepared slot => coroutine init / resume / yield / wake
+ * Backend handle => first slot member => release slot for reuse
+ */
 
 #include <string.h>
 
 #include "cortn.h"
 #include "sched_adapt.h"
-#include "sys_error.h"
 
 struct sched_cortn_slot {
 	struct cortn cs_cortn;
@@ -47,6 +49,7 @@ int sched_adapt_is_locked(void)
 	return kernel_lock_held != 0;
 }
 
+/* Prepare coroutine in available slot */
 void *sched_adapt_prepare(void (*entry)(void *arg), void *arg)
 {
 	struct sched_cortn_slot *slot;
@@ -54,37 +57,30 @@ void *sched_adapt_prepare(void (*entry)(void *arg), void *arg)
 
 	for (i = 0; i < PIPELINE_MAX; i++) {
 		slot = &cortn_slots[i];
-		if (slot->cs_used)
+		if (slot->cs_used != 0)
 			continue;
 		memset(slot, 0, sizeof(*slot));
 		slot->cs_used = 1;
 		slot->cs_entry = entry;
 		slot->cs_arg = arg;
-		if (cortn_init(&slot->cs_cortn, slot->cs_stack,
-			       sizeof(slot->cs_stack), sched_cortn_entry,
-			       slot) != CORTN_SUCCESS) {
-			memset(slot, 0, sizeof(*slot));
-			return NULL;
-		}
+		cortn_init(&slot->cs_cortn, slot->cs_stack,
+			   sizeof(slot->cs_stack), sched_cortn_entry, slot);
 		return &slot->cs_cortn;
 	}
 	return NULL;
 }
 
+/* Release slot owning prepared coroutine handle */
 void sched_adapt_release(void *backend)
 {
 	struct sched_cortn_slot *slot;
-	int i;
 
-	for (i = 0; i < PIPELINE_MAX; i++) {
-		slot = &cortn_slots[i];
-		if (&slot->cs_cortn != backend)
-			continue;
-		memset(slot, 0, sizeof(*slot));
-		return;
-	}
+	/* Coroutine is first slot member */
+	slot = backend;
+	memset(slot, 0, sizeof(*slot));
 }
 
+/* Yield running coroutine and restore kernel lock on resume */
 int sched_adapt_yield(struct proc *proc, enum wait_reason reason)
 {
 	struct cortn *cortn;
@@ -98,21 +94,18 @@ int sched_adapt_yield(struct proc *proc, enum wait_reason reason)
 	else
 		yield_reason = CORTN_YIELD_WAIT_WRITE;
 	kernel_unlock();
-	if (cortn_yield(cortn, yield_reason) != CORTN_SUCCESS) {
-		kernel_lock();
-		return -SYS_EINVAL;
-	}
+	cortn_yield(cortn, yield_reason);
 	kernel_lock();
 	return 0;
 }
 
+/* Mark waiting coroutine runnable */
 int sched_adapt_wake(struct proc *proc)
 {
 	struct cortn *cortn;
 
 	cortn = proc->p_ctx;
-	if (cortn_wake(cortn) != CORTN_SUCCESS)
-		return -SYS_EINVAL;
+	cortn_wake(cortn);
 	return 0;
 }
 

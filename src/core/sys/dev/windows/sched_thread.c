@@ -1,4 +1,7 @@
-/* sched_thread.c */
+/*
+ * Scheduler => prepared slot => native worker and condition variables
+ * Release => stop request => cooperative unwind => join => reuse slot
+ */
 
 #ifndef _WIN32_WINNT
 #define _WIN32_WINNT 0x0600
@@ -59,6 +62,7 @@ int sched_adapt_is_locked(void)
 	return kernel_lock_held;
 }
 
+/* Create worker awaiting execution token in available slot */
 void *sched_adapt_prepare(void (*entry)(void *arg), void *arg)
 {
 	struct sched_thread_slot *slot;
@@ -68,7 +72,7 @@ void *sched_adapt_prepare(void (*entry)(void *arg), void *arg)
 	kernel_lock();
 	for (i = 0; i < PIPELINE_MAX; i++) {
 		slot = &thread_slots[i];
-		if (slot->ts_used)
+		if (slot->ts_used != 0)
 			continue;
 		memset(slot, 0, sizeof(*slot));
 		slot->ts_used = 1;
@@ -78,7 +82,7 @@ void *sched_adapt_prepare(void (*entry)(void *arg), void *arg)
 		InitializeConditionVariable(&slot->ts_report_cv);
 		thread = _beginthreadex(NULL, 0, sched_thread_entry, slot,
 				       0, NULL);
-		if (!thread) {
+		if (thread == 0) {
 			memset(slot, 0, sizeof(*slot));
 			kernel_unlock();
 			return NULL;
@@ -91,27 +95,22 @@ void *sched_adapt_prepare(void (*entry)(void *arg), void *arg)
 	return NULL;
 }
 
+/* Stop and join prepared worker before reclaiming slot */
 void sched_adapt_release(void *backend)
 {
 	struct sched_thread_slot *slot;
-	int i;
 
-	for (i = 0; i < PIPELINE_MAX; i++) {
-		slot = &thread_slots[i];
-		if (slot != backend || !slot->ts_used)
-			continue;
-		kernel_lock();
-		slot->ts_stop = 1;
-		WakeAllConditionVariable(&slot->ts_run_cv);
-		kernel_unlock();
-		/* Wait for cooperative unwind before reclaiming slot */
-		WaitForSingleObject(slot->ts_thread, INFINITE);
-		CloseHandle(slot->ts_thread);
-		kernel_lock();
-		memset(slot, 0, sizeof(*slot));
-		kernel_unlock();
-		return;
-	}
+	slot = backend;
+	kernel_lock();
+	slot->ts_stop = 1;
+	WakeAllConditionVariable(&slot->ts_run_cv);
+	kernel_unlock();
+	/* Wait for cooperative unwind before reclaiming slot */
+	WaitForSingleObject(slot->ts_thread, INFINITE);
+	CloseHandle(slot->ts_thread);
+	kernel_lock();
+	memset(slot, 0, sizeof(*slot));
+	kernel_unlock();
 }
 
 int sched_adapt_yield(struct proc *proc, enum wait_reason reason)
@@ -129,24 +128,25 @@ int sched_adapt_yield(struct proc *proc, enum wait_reason reason)
 	return slot->ts_stop ? -SYS_EINVAL : 0;
 }
 
+/* Notify prepared worker after scheduler removes wait registration */
 int sched_adapt_wake(struct proc *proc)
 {
 	struct sched_thread_slot *slot = proc->p_ctx;
 
-	if (!slot->ts_used || slot->ts_done || slot->ts_stop)
-		return -SYS_EINVAL;
 	/* Executor grants run token after shared state becomes runnable */
 	WakeAllConditionVariable(&slot->ts_run_cv);
 	return 0;
 }
 
+/* Run prepared worker until next wait or completion */
 enum proc_state sched_adapt_resume(struct proc *proc)
 {
 	struct sched_thread_slot *slot = proc->p_ctx;
 	enum proc_state state;
 
 	kernel_lock();
-	if (slot->ts_done || slot->ts_stop) {
+	/* Initial native wait may fail before first execution token */
+	if (slot->ts_done != 0) {
 		kernel_unlock();
 		return PROC_ERROR;
 	}
