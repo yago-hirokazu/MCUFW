@@ -57,10 +57,6 @@ int sched_sleep(char *chan, enum wait_reason reason)
 	unsigned int h;
 
 	proc = current_proc();
-	if (proc == NULL || !kernel_is_locked())
-		return -SYS_EINVAL;
-	if (proc->p_wchan)
-		return -SYS_EINVAL;
 
 	if (reason == WAIT_LOCK)
 		proc->p_state = PROC_WAIT_LOCK;
@@ -140,29 +136,23 @@ void pinit(struct proc *proc)
 	proc->p_state = PROC_NEW;
 }
 
+/* Bind initialized process to prepared backend */
 int sched_bind_proc_to_coroutine(struct proc *proc, void *backend)
 {
-	if (proc->p_state != PROC_NEW)
-		return -SYS_EINVAL;
 	proc->p_ctx = backend;
 	proc->p_state = PROC_RUNNABLE;
 	return 0;
 }
 
+/* Prepare execution context for initialized process */
 int sched_prepare(struct proc *proc, void (*entry)(void *arg), void *arg)
 {
 	void *backend;
 
-	if (proc->p_state != PROC_NEW)
-		return -SYS_EINVAL;
 	backend = sched_adapt_prepare(entry, arg);
-	if (!backend)
+	if (backend == NULL)
 		return -SYS_ENOMEM;
-	if (sched_bind_proc_to_coroutine(proc, backend) < 0) {
-		sched_adapt_release(backend);
-		return -SYS_EINVAL;
-	}
-	return 0;
+	return sched_bind_proc_to_coroutine(proc, backend);
 }
 
 /* Unlink prepared process and release backend outside kernel lock */
@@ -184,13 +174,7 @@ int sched_resume(struct proc *proc)
 {
 	int result;
 
-	if (current_proc() != NULL)
-		return -SYS_EINVAL;
 	kernel_lock();
-	if (proc->p_state != PROC_RUNNABLE) {
-		kernel_unlock();
-		return -SYS_EINVAL;
-	}
 	sched_set_current_proc(proc);
 	proc->p_state = PROC_RUNNING;
 	kernel_unlock();

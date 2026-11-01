@@ -23,9 +23,9 @@ pipe状態、inode lock、file/inode参照、wait listを単一の非再帰kerne
 保持して呼び出す。schedulerがそのprocessをcurrent processとして実行中である
 ことを前提とし、`p_ctx`のNULL判定は行わない。
 
-current processが存在しない場合、kernel lockを保持していない場合、または
-`p_wchan`に待機先が登録済みの場合は、従来どおり`-SYS_EINVAL`を返す。
-backendのyield失敗時も待機登録を除去し、エラーを返す。
+current processの存在、kernel lockの保持、`p_wchan`が未登録であることは
+呼出し側の前提とし、実行時の検査は行わない。
+backendのyield失敗時は待機登録を除去し、エラーを返す。
 
 ```text
 pipeまたはinode lock条件を検査
@@ -85,18 +85,24 @@ schedulerが実行していることを前提とする。`readp()`、`writep()`�
 部分writeでは呼出し元へ戻らず、残りの転送を再開する。
 
 backend未設定process向けの`-SYS_EAGAIN`や部分byte数の返却はサポートしない。
-`sched_sleep()`も準備済みコンテキストを前提とし、その他の実行条件検査と
+`sched_sleep()`も準備済みコンテキストを前提とし、backendからの
 エラー伝播を維持する。パイプラインは
 全processの`sched_prepare()`が成功してから`sched_resume()`で実行を開始し、
 準備失敗時はコマンドを開始せず資源を回収する。
 
 ## Scheduler状態
 
+`sched_prepare()`と`sched_bind_proc_to_coroutine()`は、`pinit()`で初期化した
+backend未設定のprocessを対象とし、`PROC_NEW`の検査は行わない。
+backend準備時の資源不足は`-SYS_ENOMEM`で返す。
+
 `sched_resume()`と`sched_release()`は、実行コンテキストの準備に成功し、
 まだ解放していないprocessを対象とする。両関数は`p_ctx`のNULL判定を行わない。
 準備失敗時は成功済みのprocessだけを解放し、二重解放や解放後の再開は行わない。
 
-`sched_resume()`はbackendを再開し、戻った状態を次のportable状態へ写す。
+`sched_resume()`は、呼出し元にcurrent processがなく、対象processが
+`PROC_RUNNABLE`であることを前提とし、両条件の検査は行わない。
+backendを再開し、戻った状態を次のportable状態へ写す。
 
 - `PROC_NEW`
 - `PROC_RUNNABLE`

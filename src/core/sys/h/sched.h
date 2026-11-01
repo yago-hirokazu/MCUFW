@@ -46,16 +46,19 @@ int kernel_is_locked(void);
 /* Channel identifies event by address; storage must outlive wait */
 /* Sleep and wakeup require kernel lock held */
 /* Sleep requires current process running after sched_prepare() */
+/* Current process must not already belong to wait list */
 int sched_sleep(char *chan, enum wait_reason reason);
 /* Wakeup requires valid execution contexts for processes in wait list */
 void sched_wakeup(char *chan);
 struct proc *current_proc(void);
 /* Initialize process before descriptors or backend setup */
 void pinit(struct proc *proc);
+/* Bind and prepare require initialized process without backend */
 int sched_bind_proc_to_coroutine(struct proc *proc, void *backend);
 int sched_prepare(struct proc *proc, void (*entry)(void *arg), void *arg);
 /* Release and resume require prepared context not yet released */
 void sched_release(struct proc *proc);
+/* Resume requires runnable process and no current process in caller */
 int sched_resume(struct proc *proc);
 void sched_set_current_proc(struct proc *proc);
 #ifdef SCHED_TEST
