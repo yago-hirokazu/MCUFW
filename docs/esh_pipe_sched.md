@@ -92,6 +92,10 @@ backend未設定process向けの`-SYS_EAGAIN`や部分byte数の返却はサポ�
 
 ## Scheduler状態
 
+`sched_resume()`と`sched_release()`は、実行コンテキストの準備に成功し、
+まだ解放していないprocessを対象とする。両関数は`p_ctx`のNULL判定を行わない。
+準備失敗時は成功済みのprocessだけを解放し、二重解放や解放後の再開は行わない。
+
 `sched_resume()`はbackendを再開し、戻った状態を次のportable状態へ写す。
 
 - `PROC_NEW`

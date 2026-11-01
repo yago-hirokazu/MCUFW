@@ -54,6 +54,7 @@ struct proc *current_proc(void);
 void pinit(struct proc *proc);
 int sched_bind_proc_to_coroutine(struct proc *proc, void *backend);
 int sched_prepare(struct proc *proc, void (*entry)(void *arg), void *arg);
+/* Release and resume require prepared context not yet released */
 void sched_release(struct proc *proc);
 int sched_resume(struct proc *proc);
 void sched_set_current_proc(struct proc *proc);

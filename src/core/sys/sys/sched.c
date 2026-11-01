@@ -165,12 +165,10 @@ int sched_prepare(struct proc *proc, void (*entry)(void *arg), void *arg)
 	return 0;
 }
 
+/* Unlink prepared process and release backend outside kernel lock */
 void sched_release(struct proc *proc)
 {
 	void *backend;
-
-	if (proc->p_ctx == NULL)
-		return;
 
 	kernel_lock();
 	if (proc->p_wchan)
@@ -181,11 +179,12 @@ void sched_release(struct proc *proc)
 	sched_adapt_release(backend);
 }
 
+/* Resume prepared runnable process from scheduler controller */
 int sched_resume(struct proc *proc)
 {
 	int result;
 
-	if (proc->p_ctx == NULL || current_proc() != NULL)
+	if (current_proc() != NULL)
 		return -SYS_EINVAL;
 	kernel_lock();
 	if (proc->p_state != PROC_RUNNABLE) {
