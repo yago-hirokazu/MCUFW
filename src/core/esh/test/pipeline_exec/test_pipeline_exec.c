@@ -486,6 +486,7 @@ static void test_console_script(void)
 static void test_parser_bounds(void)
 {
 	struct code code;
+	struct code saved_code;
 	struct token token;
 	struct tty_arg args;
 	char line[TTY_NBUF];
@@ -497,8 +498,6 @@ static void test_parser_bounds(void)
 	memset(&token, 0, sizeof(token));
 	token.t_type = T_BLTN_CMD;
 	strcpy(token.t_symbol, "echo");
-	CHECK(par_make_code(NULL, &code) == PARINVLD);
-	CHECK(par_make_code(&token, NULL) == PARINVLD);
 	code.c_codes = CODES;
 	CHECK(par_make_code(&token, &code) == PARINVLD);
 	CHECK(code.c_codes == CODES);
@@ -525,6 +524,20 @@ static void test_parser_bounds(void)
 	code.c_ltab.l_num = LABELS;
 	CHECK(par_make_code(&token, &code) == PARINVLD);
 	CHECK(code.c_ltab.l_num == LABELS);
+	/* Failed while label allocation must not index label table */
+	code_init(&code);
+	par_init();
+	token.t_type = T_WHILE;
+	strcpy(token.t_symbol, "while");
+	CHECK(par_make_code(&token, &code) == PARONGO);
+	code.c_ltab.l_num = LABELS;
+	code.c_codes = 1;
+	code.c_code[0] = OP_NOP;
+	memcpy(&saved_code, &code, sizeof(code));
+	token.t_type = T_LBRACKET;
+	strcpy(token.t_symbol, "[");
+	CHECK(par_make_code(&token, &code) == PARINVLD);
+	CHECK(memcmp(&code, &saved_code, sizeof(code)) == 0);
 	memset(line, 'x', sizeof(line));
 	CHECK(tokenize(line, &args) == NULL);
 	CHECK(tokenize(NULL, &args) == NULL);

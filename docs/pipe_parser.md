@@ -15,6 +15,15 @@ start or end with `|`, and adjacent `|` operators are rejected.
 
 ## Tokenization
 
+`par_make_code()` requires valid lexer tokens with terminated symbols and code
+storage initialized by `code_init()`. Call `par_init()` before starting parser
+session. NULL pointers, malformed token storage and corrupted table counters
+are outside parser API contract and are not checked.
+
+Code, symbol and label capacity limits and syntax checks remain enforced.
+Label allocation failure is checked before writing label address table.
+Caller must discard invalid bytecode and reset parser after `PARINVLD`.
+
 `tokenize()` inserts token boundaries around unquoted `|` characters before
 splitting input line. Quote state is tracked during this pass so quoted pipe
 characters are not changed. Expansion uses existing fixed `TTY_NBUF` storage;

@@ -61,6 +61,7 @@ struct parse {
 	} p_label;
 };
 
+/* Requires valid lexer token and initialized code storage */
 char par_make_code(struct token *tok, struct code *code);
 void par_init(void);
 

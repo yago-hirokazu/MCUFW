@@ -1,5 +1,9 @@
-﻿
-/* par.c */
+
+/*
+ * Lexer token => par_make_code() => parser state => bytecode and tables
+ * code_init() / par_init() => valid storage before token processing
+ * Capacity failure => parse_error => PARINVLD => caller resets parser
+ */
 
 #include "esh.h"
 #include "esh_debug.h"
@@ -77,17 +81,11 @@ static void dump_context(const char *s, struct token *tok);
 #endif
 
 
+/* Translate lexer token into bytecode using initialized code storage */
 char par_make_code(struct token *tok, struct code *code)
 {
 	char status;
 
-	if (!tok || !code || code->c_codes < 0 || code->c_codes > CODES ||
-	    !memchr(tok->t_symbol, 0, SYMCHARS) ||
-	    tok->t_type < T_UNDEF || tok->t_type > T_UNKNOWN ||
-	    code->c_stab.s_num < 0 || code->c_stab.s_num > SYMBOLS ||
-	    code->c_vtab.v_num < 0 || code->c_vtab.v_num > SYMBOLS ||
-	    code->c_ltab.l_num < 0 || code->c_ltab.l_num > LABELS)
-		return PARINVLD;
 	parse_error = 0;
 	if (parse[0].p_state1 == PAR_HALT) {
 		DP("parse[nest_p=%d].p_state1 == PAR_HALT",nest_p);
@@ -152,19 +150,15 @@ static char find_symbol(char *sym, char sym_tab[])
 	return NO_SYMBOL;
 }
 
+/* Append symbol unless table capacity is exhausted */
 static char make_symbol(char *sym, char sym_tab[], char *sym_num)
 {
 	char n1 = *sym_num;
 	char n2 = n1;
-	if (n1 < 0 || n1 >= SYMBOLS || !sym ||
-	    !memchr(sym, 0, SYMCHARS)) {
+	if (n1 >= SYMBOLS) {
 		par_mark_error();
 		return NO_SYMBOL;
 	}
-
-	assert(sym != NULL);
-	assert(*sym != 0);
-	assert(sym_num != NULL);
 
 	P("sym = \"%s\"\n", (*sym == 0) ? "(null)" : sym);
 	P("*sym_num = %d\n", *sym_num);
@@ -183,10 +177,11 @@ static char make_symbol(char *sym, char sym_tab[], char *sym_num)
 	return n2;
 }
 
+/* Reserve label unless table capacity is exhausted */
 static char make_label(struct code *code)
 {
 	char label_p = code->c_ltab.l_num;
-	if (label_p < 0 || label_p >= LABELS) {
+	if (label_p >= LABELS) {
 		par_mark_error();
 		return NO_SYMBOL;
 	}
@@ -195,11 +190,11 @@ static char make_label(struct code *code)
 	return label_p;
 }
 
+/* Store code address unless label allocation failed */
 static char set_code_addr_to_label(char label_p, int code_addr,
 				   struct code *code)
 {
-	if (label_p < 0 || label_p >= LABELS ||
-	    code_addr < 0 || code_addr > CODES) {
+	if (label_p < 0 || label_p >= LABELS) {
 		par_mark_error();
 		return PARINVLD;
 	}
