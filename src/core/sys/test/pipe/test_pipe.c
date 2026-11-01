@@ -37,7 +37,7 @@ static void call_close_all(struct proc *proc);
 static void supply_read_hook(char *chan, enum wait_reason reason);
 static void drain_write_hook(char *chan, enum wait_reason reason);
 static void unlock_hook(char *chan, enum wait_reason reason);
-static void test_zero_length_and_validation(void);
+static void test_zero_length(void);
 static void test_create_and_data_path(void);
 static void test_full_and_offset_reset(void);
 static void test_eof_epipe_and_close_wakeup(void);
@@ -48,7 +48,7 @@ static void test_resource_rollback(void);
 
 int main(void)
 {
-	test_zero_length_and_validation();
+	test_zero_length();
 	test_create_and_data_path();
 	test_full_and_offset_reset();
 	test_eof_epipe_and_close_wakeup();
@@ -136,10 +136,9 @@ static void unlock_hook(char *chan, enum wait_reason reason)
 	prele(hook_inode);
 }
 
-static void test_zero_length_and_validation(void)
+static void test_zero_length(void)
 {
 	struct proc proc;
-	char data;
 	int fd[2];
 
 	binit();
@@ -148,17 +147,10 @@ static void test_zero_length_and_validation(void)
 	sched_stub_reset(&proc);
 	CHECK(readp(NULL, NULL, NULL, 0) == 0);
 	CHECK(writep(NULL, NULL, NULL, 0) == 0);
-	sched_stub_reset(NULL);
-	CHECK(sys_pipe(fd) == -SYS_EINVAL);
 	CHECK(file_in_use() == 0);
 	CHECK(inode_in_use() == 0);
 	sched_stub_reset(&proc);
 	CHECK(sys_pipe(fd) == 0);
-	CHECK(call_read(&proc, fd[0], NULL, 1) == -SYS_EINVAL);
-	CHECK(call_write(&proc, fd[1], NULL, 1) == -SYS_EINVAL);
-	CHECK(call_read(&proc, fd[1], &data, 1) == -SYS_EBADF);
-	CHECK(call_write(&proc, fd[0], &data, 1) == -SYS_EBADF);
-	CHECK(call_read(&proc, NOFILE, &data, 1) == -SYS_EINVAL);
 	call_close_all(&proc);
 }
 

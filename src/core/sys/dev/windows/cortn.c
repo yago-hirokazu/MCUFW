@@ -19,11 +19,6 @@ int cortn_init(struct cortn *self, void *stack, size_t stack_size,
 	unsigned char *bytes;
 	unsigned char *upper_guard;
 
-	if (!self || !stack || !entry)
-		return CORTN_ERR_ARG;
-	if (stack_size < CORTN_STACK_MIN_SIZE)
-		return CORTN_ERR_STACK;
-
 	bytes = stack;
 	memset(self, 0, sizeof(*self));
 	memset(bytes, CORTN_UNUSED_PATTERN, stack_size);
@@ -43,8 +38,6 @@ int cortn_init(struct cortn *self, void *stack, size_t stack_size,
 
 int cortn_resume(struct cortn *self)
 {
-	if (!self)
-		return CORTN_ERR_ARG;
 	if (cortn_current || self->c_state != CORTN_RUNNABLE)
 		return CORTN_ERR_STATE;
 	if (cortn_stack_check(self) != CORTN_SUCCESS) {
@@ -69,7 +62,7 @@ int cortn_resume(struct cortn *self)
 
 int cortn_yield(struct cortn *self, enum cortn_yield_reason reason)
 {
-	if (!self || self != cortn_current)
+	if (self != cortn_current)
 		return CORTN_ERR_ARG;
 	if (self->c_state != CORTN_RUNNING)
 		return CORTN_ERR_STATE;
@@ -88,7 +81,7 @@ int cortn_yield(struct cortn *self, enum cortn_yield_reason reason)
 		self->c_state = CORTN_WAIT_WRITE;
 		break;
 	default:
-		return CORTN_ERR_ARG;
+		break;
 	}
 
 	self->c_reason = reason;
@@ -98,8 +91,6 @@ int cortn_yield(struct cortn *self, enum cortn_yield_reason reason)
 
 int cortn_wake(struct cortn *self)
 {
-	if (!self)
-		return CORTN_ERR_ARG;
 	if (self->c_state != CORTN_WAIT_LOCK &&
 	    self->c_state != CORTN_WAIT_READ &&
 	    self->c_state != CORTN_WAIT_WRITE)
@@ -112,9 +103,6 @@ int cortn_stack_check(const struct cortn *self)
 {
 	const unsigned char *upper_guard;
 
-	if (!self || !self->c_stack ||
-	    self->c_stack_size < CORTN_STACK_MIN_SIZE)
-		return CORTN_ERR_ARG;
 	upper_guard = self->c_stack + self->c_stack_size -
 		      CORTN_STACK_GUARD_SIZE;
 	if (!cortn_guard_is_valid(self->c_stack) ||

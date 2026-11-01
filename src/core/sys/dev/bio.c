@@ -5,7 +5,6 @@
  * bread() / bwrite() => geterror() => b_error
  */
 
-#include <assert.h>
 #include <string.h>
 
 #include "buf.h"
@@ -62,10 +61,7 @@ struct buf *getblk(unsigned int dev, unsigned long blkno)
 	struct buf *bp;
 	struct buf *dp;
 
-	/* V7 panics on invalid major or missing device table */
-	assert(major(dev) < (unsigned int)nblkdev);
 	dp = bdevsw[major(dev)].d_tab;
-	assert(dp != NULL);
 loop:
 	for (bp = dp->b_forw; bp != dp; bp = bp->b_forw) {
 		if (bp->b_dev != dev || bp->b_blkno != blkno)

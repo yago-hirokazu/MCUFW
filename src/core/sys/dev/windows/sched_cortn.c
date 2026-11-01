@@ -52,8 +52,6 @@ void *sched_adapt_prepare(void (*entry)(void *arg), void *arg)
 	struct sched_cortn_slot *slot;
 	int i;
 
-	if (!entry)
-		return NULL;
 	for (i = 0; i < PIPELINE_MAX; i++) {
 		slot = &cortn_slots[i];
 		if (slot->cs_used)
@@ -78,8 +76,6 @@ void sched_adapt_release(void *backend)
 	struct sched_cortn_slot *slot;
 	int i;
 
-	if (!backend)
-		return;
 	for (i = 0; i < PIPELINE_MAX; i++) {
 		slot = &cortn_slots[i];
 		if (&slot->cs_cortn != backend)
@@ -99,10 +95,8 @@ int sched_adapt_yield(struct proc *proc, enum wait_reason reason)
 		yield_reason = CORTN_YIELD_WAIT_LOCK;
 	else if (reason == WAIT_READ)
 		yield_reason = CORTN_YIELD_WAIT_READ;
-	else if (reason == WAIT_WRITE)
-		yield_reason = CORTN_YIELD_WAIT_WRITE;
 	else
-		return -SYS_EINVAL;
+		yield_reason = CORTN_YIELD_WAIT_WRITE;
 	kernel_unlock();
 	if (cortn_yield(cortn, yield_reason) != CORTN_SUCCESS) {
 		kernel_lock();

@@ -255,7 +255,6 @@ static void test_rejection(void)
 
 	raminit();
 	binit();
-	CHECK(bdev_check_io_request_valid(NULL) == -SYS_EINVAL);
 	bp = request(0, 0, 1);
 	bp->b_dev = PIPEDEV;
 	ramstrategy(bp);

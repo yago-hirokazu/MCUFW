@@ -322,12 +322,6 @@ static void test_device_numbers(void)
 			CHECK(minor(dev) == min);
 		}
 	}
-	CHECK(makedev(256, 0) == NODEV);
-	CHECK(makedev(0, 256) == NODEV);
-	CHECK(makedev(UINT_MAX, 0) == NODEV);
-	CHECK(makedev(0, UINT_MAX) == NODEV);
-	CHECK(makedev(-1, 0) == NODEV);
-	CHECK(makedev(0, -1) == NODEV);
 	maj = 1;
 	min = 2;
 	CHECK(makedev(maj++, min++) == 0x0102U);

@@ -17,8 +17,6 @@ void finit(void)
 
 struct file *getf(struct proc *proc, int fd)
 {
-	if (!proc || fd < 0 || fd >= NOFILE)
-		return NULL;
 	return proc->p_ofile[fd];
 }
 
@@ -26,8 +24,6 @@ int ufalloc(struct proc *proc)
 {
 	int fd;
 
-	if (!proc)
-		return -SYS_EINVAL;
 	for (fd = 0; fd < NOFILE; fd++) {
 		if (!proc->p_ofile[fd])
 			return fd;
@@ -41,12 +37,6 @@ struct file *falloc(struct proc *proc, int *fd)
 	int new_fd;
 	int i;
 
-	if (!fd)
-		return NULL;
-	if (!proc) {
-		*fd = -SYS_EINVAL;
-		return NULL;
-	}
 	new_fd = ufalloc(proc);
 	if (new_fd < 0) {
 		*fd = new_fd;
@@ -71,8 +61,6 @@ void closef(struct file *fp)
 	struct inode *ip;
 	unsigned char flag;
 
-	if (!fp || !fp->f_count)
-		return;
 	fp->f_count--;
 	if (fp->f_count)
 		return;
@@ -91,8 +79,6 @@ int fd_install(struct proc *proc, struct file *fp)
 {
 	int fd;
 
-	if (!proc || !fp || !fp->f_count)
-		return -SYS_EINVAL;
 	if (fp->f_count == UCHAR_MAX)
 		return -SYS_ENFILE;
 	fd = ufalloc(proc);
@@ -105,8 +91,6 @@ int fd_install(struct proc *proc, struct file *fp)
 
 int fd_install_at(struct proc *proc, int fd, struct file *fp)
 {
-	if (!proc || fd < 0 || fd >= NOFILE || !fp || !fp->f_count)
-		return -SYS_EINVAL;
 	if (proc->p_ofile[fd])
 		return -SYS_EMFILE;
 	if (fp->f_count == UCHAR_MAX)
@@ -132,8 +116,6 @@ void close_all(struct proc *proc)
 {
 	int fd;
 
-	if (!proc)
-		return;
 	for (fd = 0; fd < NOFILE; fd++) {
 		if (proc->p_ofile[fd])
 			fd_close(proc, fd);

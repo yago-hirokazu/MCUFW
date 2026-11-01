@@ -65,10 +65,6 @@ static void test_file_allocation(void)
 	finit();
 	init_proc(&proc);
 	CHECK(file_in_use() == 0);
-	CHECK(getf(&proc, -1) == NULL);
-	CHECK(getf(&proc, NOFILE) == NULL);
-	CHECK(getf(NULL, 0) == NULL);
-	CHECK(ufalloc(NULL) == -SYS_EINVAL);
 	fp = falloc(&proc, &fd);
 	CHECK(fp == &file[0]);
 	CHECK(fd == 0);
@@ -82,9 +78,6 @@ static void test_file_allocation(void)
 	CHECK(fd_close(&proc, fd) == 0);
 	CHECK(fd_close(&proc, fd) == -SYS_EBADF);
 	CHECK(file_in_use() == 0);
-	CHECK(falloc(NULL, &fd) == NULL);
-	CHECK(fd == -SYS_EINVAL);
-	CHECK(falloc(&proc, NULL) == NULL);
 }
 
 static void test_descriptor_helpers(void)
@@ -105,7 +98,6 @@ static void test_descriptor_helpers(void)
 	CHECK(fd_install_at(&proc, 4, fp) == 4);
 	CHECK(fp->f_count == 3);
 	CHECK(fd_install_at(&proc, 4, fp) == -SYS_EMFILE);
-	CHECK(fd_install_at(&proc, NOFILE, fp) == -SYS_EINVAL);
 	CHECK(fd_close(&proc, fd) == 0);
 	CHECK(fp->f_count == 2);
 	CHECK(fd_close(&proc, copy) == 0);

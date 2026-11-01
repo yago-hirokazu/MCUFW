@@ -65,8 +65,6 @@ void *sched_adapt_prepare(void (*entry)(void *arg), void *arg)
 	uintptr_t thread;
 	int i;
 
-	if (!entry)
-		return NULL;
 	kernel_lock();
 	for (i = 0; i < PIPELINE_MAX; i++) {
 		slot = &thread_slots[i];
@@ -120,9 +118,7 @@ int sched_adapt_yield(struct proc *proc, enum wait_reason reason)
 {
 	struct sched_thread_slot *slot = proc->p_ctx;
 
-	if (reason != WAIT_LOCK && reason != WAIT_READ &&
-	    reason != WAIT_WRITE)
-		return -SYS_EINVAL;
+	(void)reason;
 	slot->ts_run = 0;
 	WakeAllConditionVariable(&slot->ts_report_cv);
 	/* Predicate survives wakeup preceding native wait */

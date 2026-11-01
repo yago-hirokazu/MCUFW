@@ -43,7 +43,6 @@ void bdev_strategy(struct buf *bp)
 /* Report failed request through same completion path as device I/O */
 void bdev_io_error(struct buf *bp, int error)
 {
-	assert(bp != NULL && (bp->b_flags & B_BUSY));
 	bp->b_flags |= B_ERROR;
 	bp->b_error = error;
 	bp->b_resid = bp->b_bcount;
@@ -56,7 +55,7 @@ int bdev_check_io_request_valid(struct buf *bp)
 	struct bdevsw *dp;
 
 	/* Require owned buffer and registered strategy */
-	if (!bp || !(bp->b_flags & B_BUSY))
+	if (!(bp->b_flags & B_BUSY))
 		return -SYS_EINVAL;
 	dp = bdevsw_lookup(bp->b_dev);
 	if (!dp || !dp->d_strategy)
@@ -72,7 +71,7 @@ int bdev_check_buffer_available(struct buf *bp)
 	int result;
 	int i;
 
-	if (!bp || !(bp->b_flags & B_BUSY))
+	if (!(bp->b_flags & B_BUSY))
 		return -SYS_EINVAL;
 	/* Inspect every queue to detect ownership by another device */
 	found = 0;
@@ -93,8 +92,6 @@ int bdev_check_buffer_available(struct buf *bp)
 /* Initialize queue with no outstanding requests */
 void bdev_io_queue_init(struct bdev_io_queue *queue)
 {
-	if (!queue)
-		return;
 	/* Clear waiting list, active request and retry count */
 	queue->dq_head = NULL;
 	queue->dq_tail = NULL;
@@ -105,7 +102,7 @@ void bdev_io_queue_init(struct bdev_io_queue *queue)
 /* Append owned buffer to waiting list */
 int bdev_io_queue_enqueue(struct bdev_io_queue *queue, struct buf *bp)
 {
-	if (!queue || !bp || !(bp->b_flags & B_BUSY))
+	if (!(bp->b_flags & B_BUSY))
 		return -1;
 	/* Reject duplicate request or malformed destination queue */
 	if (bdev_io_queue_contains(queue, bp))
@@ -127,7 +124,7 @@ struct buf *bdev_io_queue_start(struct bdev_io_queue *queue)
 	struct buf *bp;
 
 	/* Allow only one active request per queue */
-	if (!queue || queue->dq_active || !queue->dq_head)
+	if (queue->dq_active || !queue->dq_head)
 		return NULL;
 	/* Detach waiting head before handing buffer to driver */
 	bp = queue->dq_head;
@@ -146,7 +143,7 @@ struct buf *bdev_io_queue_complete(struct bdev_io_queue *queue)
 {
 	struct buf *bp;
 
-	if (!queue || !queue->dq_active)
+	if (!queue->dq_active)
 		return NULL;
 	/* Drop queue ownership before iodone may release async buffer */
 	bp = queue->dq_active;
@@ -164,7 +161,7 @@ int bdev_io_queue_error(struct bdev_io_queue *queue, unsigned int retry_limit,
 {
 	struct buf *bp;
 
-	if (!queue || !queue->dq_active)
+	if (!queue->dq_active)
 		return BDEV_IO_QUEUE_FAILED;
 	/* Leave active request in place for caller to retry transfer */
 	if (queue->dq_errcnt < retry_limit) {
@@ -180,7 +177,7 @@ int bdev_io_queue_error(struct bdev_io_queue *queue, unsigned int retry_limit,
 }
 
 /*
- * Validate non-NULL queue and search active slot plus waiting list
+ * Search active slot plus waiting list
  * Return 1 if found, 0 if absent or negative error on malformed queue
  */
 static int bdev_io_queue_contains(struct bdev_io_queue *queue,

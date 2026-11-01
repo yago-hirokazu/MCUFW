@@ -27,8 +27,6 @@ int pipe_for_proc(struct proc *proc, int fd[2])
 	int write_fd;
 	int error;
 
-	if (!proc || !fd)
-		return -SYS_EINVAL;
 	ip = ialloc();
 	if (!ip)
 		return -SYS_ENFILE;
@@ -79,10 +77,8 @@ ptrdiff_t readp(struct proc *proc, struct file *fp, void *buf, size_t count)
 
 	if (!count)
 		return 0;
-	if (!buf)
-		return -SYS_EINVAL;
 	for (;;) {
-		ip = fp ? fp->f_inode : NULL;
+		ip = fp->f_inode;
 		result = plock(ip);
 		if (result < 0)
 			return result;
@@ -93,7 +89,7 @@ ptrdiff_t readp(struct proc *proc, struct file *fp, void *buf, size_t count)
 		case PIPE_IO_EOF:
 			return status.io_count;
 		case PIPE_IO_WAIT_READ:
-			if (!proc || !proc->p_ctx)
+			if (proc->p_ctx == NULL)
 				return -SYS_EAGAIN;
 			result = sched_sleep((char *)ip + 2, WAIT_READ);
 			if (result < 0)
@@ -116,12 +112,10 @@ ptrdiff_t writep(struct proc *proc, struct file *fp, const void *buf,
 
 	if (!count)
 		return 0;
-	if (!buf)
-		return -SYS_EINVAL;
 	bytes = buf;
 	transferred = 0;
 	for (;;) {
-		ip = fp ? fp->f_inode : NULL;
+		ip = fp->f_inode;
 		result = plock(ip);
 		if (result < 0)
 			return result;
@@ -135,8 +129,8 @@ ptrdiff_t writep(struct proc *proc, struct file *fp, const void *buf,
 				return (ptrdiff_t)transferred;
 			break;
 		case PIPE_IO_WAIT_WRITE:
-			if (!proc || !proc->p_ctx) {
-				if (transferred)
+			if (proc->p_ctx == NULL) {
+				if (transferred != 0)
 					return (ptrdiff_t)transferred;
 				return -SYS_EAGAIN;
 			}
@@ -155,8 +149,6 @@ int plock(struct inode *ip)
 	struct proc *proc;
 	int result;
 
-	if (!ip)
-		return -SYS_EINVAL;
 	while (ip->i_flag & ILOCK) {
 		ip->i_flag |= IWANT;
 		proc = current_proc();
@@ -172,8 +164,6 @@ int plock(struct inode *ip)
 
 void prele(struct inode *ip)
 {
-	if (!ip)
-		return;
 	ip->i_flag &= ~ILOCK;
 	if (ip->i_flag & IWANT) {
 		ip->i_flag &= ~IWANT;
@@ -211,12 +201,8 @@ static struct pipe_io_status pipe_read_once(struct file *fp, void *buf,
 	struct inode *ip;
 	ptrdiff_t transferred;
 
-	if (!fp || (fp->f_flag & (FREAD | FPIPE)) != (FREAD | FPIPE))
-		return pipe_status(PIPE_IO_ERROR, 0, -SYS_EBADF);
 	ip = fp->f_inode;
-	if (!ip || !ip->i_count || !ip->i_buf)
-		return pipe_status(PIPE_IO_ERROR, 0, -SYS_EBADF);
-	if (!ip->i_size) {
+	if (ip->i_size == 0) {
 		if (ip->i_count < 2)
 			return pipe_status(PIPE_IO_EOF, 0, 0);
 		return pipe_status(PIPE_IO_WAIT_READ, 0, 0);
@@ -240,12 +226,7 @@ static struct pipe_io_status pipe_write_once(struct file *fp,
 	size_t offset;
 	ptrdiff_t transferred;
 
-	if (!fp || (fp->f_flag & (FWRITE | FPIPE)) !=
-		   (FWRITE | FPIPE))
-		return pipe_status(PIPE_IO_ERROR, 0, -SYS_EBADF);
 	ip = fp->f_inode;
-	if (!ip || !ip->i_count || !ip->i_buf)
-		return pipe_status(PIPE_IO_ERROR, 0, -SYS_EBADF);
 	if (ip->i_count < 2)
 		return pipe_status(PIPE_IO_BROKEN, 0, -SYS_EPIPE);
 	if (ip->i_size >= PIPSIZ)

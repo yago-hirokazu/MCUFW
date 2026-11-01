@@ -166,7 +166,6 @@ static void test_empty(void)
 	CHECK(queue.dq_tail == NULL);
 	CHECK(queue.dq_active == NULL);
 	CHECK(queue.dq_errcnt == 0);
-	bdev_io_queue_init(NULL);
 	CHECK(bdev_io_queue_start(&mock_queue) == NULL);
 	CHECK(bdev_io_queue_complete(&mock_queue) == NULL);
 	CHECK(bdev_io_queue_error(&mock_queue, 0, MOCK_ERROR) ==
@@ -331,7 +330,6 @@ static void test_strategy_rejection(void)
 	size_t i;
 
 	setup();
-	check_rejection(NULL, -SYS_EINVAL);
 	bp = getblk(PIPEDEV, 50);
 	for (i = 0; i < sizeof(invalid) / sizeof(invalid[0]); i++) {
 		bp->b_dev = invalid[i];

@@ -13,8 +13,6 @@ ptrdiff_t sys_read(int fd, void *buf, size_t count)
 
 	if (!count)
 		return 0;
-	if (!buf)
-		return -SYS_EINVAL;
 	proc = current_proc();
 	kernel_lock();
 	fp = getf(proc, fd);
@@ -34,10 +32,8 @@ ptrdiff_t sys_write(int fd, const void *buf, size_t count)
 	struct file *fp;
 	ptrdiff_t result;
 
-	if (!count)
+	if (count == 0)
 		return 0;
-	if (!buf)
-		return -SYS_EINVAL;
 	proc = current_proc();
 	kernel_lock();
 	fp = getf(proc, fd);
@@ -57,8 +53,6 @@ int sys_close(int fd)
 	int result;
 
 	proc = current_proc();
-	if (!proc)
-		return -SYS_EINVAL;
 	kernel_lock();
 	result = fd_close(proc, fd);
 	kernel_unlock();

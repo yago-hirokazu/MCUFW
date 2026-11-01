@@ -5,7 +5,6 @@
 #include "buf.h"
 #include "inode.h"
 #include "pipe.h"
-#include "sys_error.h"
 
 ptrdiff_t readi(struct inode *ip, size_t *offset, void *buf, size_t count)
 {
@@ -14,10 +13,6 @@ ptrdiff_t readi(struct inode *ip, size_t *offset, void *buf, size_t count)
 
 	if (!count)
 		return 0;
-	if (!ip || !offset || !buf || !ip->i_buf)
-		return -SYS_EINVAL;
-	if (ip->i_size > PIPSIZ || *offset > ip->i_size)
-		return -SYS_EINVAL;
 	available = ip->i_size - *offset;
 	if (!available)
 		return 0;
@@ -35,14 +30,10 @@ ptrdiff_t writei(struct inode *ip, size_t *offset, const void *buf,
 	size_t available;
 	size_t transferred;
 
-	if (!count)
+	if (count == 0)
 		return 0;
-	if (!ip || !offset || !buf || !ip->i_buf)
-		return -SYS_EINVAL;
-	if (ip->i_size > PIPSIZ || *offset > PIPSIZ)
-		return -SYS_EINVAL;
 	available = PIPSIZ - *offset;
-	if (!available)
+	if (available == 0)
 		return 0;
 	transferred = count;
 	if (transferred > available)

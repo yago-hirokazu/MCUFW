@@ -9,8 +9,6 @@ void iput(struct inode *ip)
 {
 	struct buf *bp;
 
-	if (!ip || !ip->i_count)
-		return;
 	ip->i_count--;
 	if (ip->i_count)
 		return;
