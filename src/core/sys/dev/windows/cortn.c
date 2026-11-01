@@ -1,4 +1,8 @@
-/* cortn.c */
+/*
+ * Scheduler backend => resume => context switch => entry / yield
+ * Resume => stack guard checks before and after context switch
+ * Wake => waiting coroutine becomes runnable for next resume
+ */
 
 #include <stdint.h>
 #include <string.h>
@@ -7,8 +11,6 @@
 
 #define CORTN_GUARD_PATTERN	0xa5
 #define CORTN_UNUSED_PATTERN	0xcc
-
-static struct cortn *cortn_current;
 
 static int cortn_guard_is_valid(const unsigned char *guard);
 static unsigned char *cortn_stack_top(const struct cortn *self);
@@ -36,9 +38,10 @@ int cortn_init(struct cortn *self, void *stack, size_t stack_size,
 	return CORTN_SUCCESS;
 }
 
+/* Resume runnable coroutine with stack guards checked on both sides */
 int cortn_resume(struct cortn *self)
 {
-	if (cortn_current || self->c_state != CORTN_RUNNABLE)
+	if (self->c_state != CORTN_RUNNABLE)
 		return CORTN_ERR_STATE;
 	if (cortn_stack_check(self) != CORTN_SUCCESS) {
 		self->c_state = CORTN_ERROR;
@@ -48,9 +51,7 @@ int cortn_resume(struct cortn *self)
 
 	self->c_state = CORTN_RUNNING;
 	self->c_reason = CORTN_YIELD_NONE;
-	cortn_current = self;
 	cortn_switch(&self->c_caller, &self->c_context);
-	cortn_current = NULL;
 
 	if (cortn_stack_check(self) != CORTN_SUCCESS) {
 		self->c_state = CORTN_ERROR;
@@ -60,13 +61,9 @@ int cortn_resume(struct cortn *self)
 	return CORTN_SUCCESS;
 }
 
+/* Suspend running coroutine with requested wait or voluntary state */
 int cortn_yield(struct cortn *self, enum cortn_yield_reason reason)
 {
-	if (self != cortn_current)
-		return CORTN_ERR_ARG;
-	if (self->c_state != CORTN_RUNNING)
-		return CORTN_ERR_STATE;
-
 	switch (reason) {
 	case CORTN_YIELD_VOLUNTARY:
 		self->c_state = CORTN_RUNNABLE;
@@ -89,12 +86,9 @@ int cortn_yield(struct cortn *self, enum cortn_yield_reason reason)
 	return CORTN_SUCCESS;
 }
 
+/* Make waiting coroutine runnable */
 int cortn_wake(struct cortn *self)
 {
-	if (self->c_state != CORTN_WAIT_LOCK &&
-	    self->c_state != CORTN_WAIT_READ &&
-	    self->c_state != CORTN_WAIT_WRITE)
-		return CORTN_ERR_STATE;
 	self->c_state = CORTN_RUNNABLE;
 	return CORTN_SUCCESS;
 }

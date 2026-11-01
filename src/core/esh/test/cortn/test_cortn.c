@@ -53,6 +53,7 @@ static void basic_entry(struct cortn *self, void *arg);
 static void wait_entry(struct cortn *self, void *arg);
 static void round_entry(struct cortn *self, void *arg);
 static void simd_entry(struct cortn *self, void *arg);
+static void corrupt_guard_entry(struct cortn *self, void *arg);
 static void test_basic(void);
 static void test_wait(void);
 static void test_round_robin(void);
@@ -191,6 +192,7 @@ static void test_wait_reason(enum cortn_yield_reason reason,
 
 static void test_wait(void)
 {
+	test_wait_reason(CORTN_YIELD_WAIT_LOCK, CORTN_WAIT_LOCK);
 	test_wait_reason(CORTN_YIELD_WAIT_READ, CORTN_WAIT_READ);
 	test_wait_reason(CORTN_YIELD_WAIT_WRITE, CORTN_WAIT_WRITE);
 }
@@ -218,6 +220,15 @@ static void test_round_robin(void)
 		CHECK(order[i] == i % TEST_COROUTINES + 1);
 }
 
+/* Corrupt guard while running to exercise resume return path */
+static void corrupt_guard_entry(struct cortn *self, void *arg)
+{
+	(void)arg;
+	self->c_stack[0] = 0;
+	CHECK(cortn_yield(self, CORTN_YIELD_VOLUNTARY) == CORTN_SUCCESS);
+}
+
+/* Detect guard damage before entry and after context returns */
 static void test_stack_guard(void)
 {
 	struct cortn cortn;
@@ -234,6 +245,14 @@ static void test_stack_guard(void)
 			 basic_entry, &data) == CORTN_SUCCESS);
 	basic_stack[sizeof(basic_stack) - 1] = 0;
 	CHECK(cortn_stack_check(&cortn) == CORTN_ERR_STACK);
+	CHECK(cortn_resume(&cortn) == CORTN_ERR_STACK);
+	CHECK(cortn_stack_used(&cortn) == 0);
+
+	CHECK(cortn_init(&cortn, basic_stack, sizeof(basic_stack),
+			 corrupt_guard_entry, NULL) == CORTN_SUCCESS);
+	CHECK(cortn_resume(&cortn) == CORTN_ERR_STACK);
+	CHECK(cortn.c_state == CORTN_ERROR);
+	CHECK(cortn.c_reason == CORTN_YIELD_ERROR);
 }
 
 static void test_simd_and_fpu(void)

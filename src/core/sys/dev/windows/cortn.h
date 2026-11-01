@@ -59,7 +59,9 @@ struct cortn {
 int cortn_init(struct cortn *self, void *stack, size_t stack_size,
 	       void (*entry)(struct cortn *self, void *arg), void *arg);
 int cortn_resume(struct cortn *self);
+/* Yield requires self running on caller thread */
 int cortn_yield(struct cortn *self, enum cortn_yield_reason reason);
+/* Wake requires coroutine waiting for lock, read or write */
 int cortn_wake(struct cortn *self);
 int cortn_stack_check(const struct cortn *self);
 size_t cortn_stack_used(const struct cortn *self);

@@ -1,6 +1,6 @@
 # Windows stackful coroutine
 
-更新日: 2026-10-15
+更新日: 2026-11-01
 
 ## 役割
 
@@ -24,12 +24,16 @@ coroutine engine本体と公開headerはWindows固有context実装と同じdirec
 - `cortn_init()`：利用者所有stackとentry関数を登録する
 - `cortn_resume()`：RUNNABLE coroutineを再開する
 - `cortn_yield()`：理由付きで中断する
-- `cortn_wake()`：read/write待ちをRUNNABLEへ移す
+- `cortn_wake()`：lock/read/write待ちをRUNNABLEへ移す
 - `cortn_stack_check()`：上下guard patternを検査する
 - `cortn_stack_used()`：stack watermarkから最大使用量を返す
 
 entry関数がreturnすると`CORTN_FINISHED`へ遷移する。FINISHEDまたはERROR状態の
 coroutineは再開できない。scheduler backendがcoroutine状態を`PROC_*`へ写す。
+
+yieldは呼出しthreadで実行中のcoroutine、wakeはlock/read/write待ちのcoroutineを
+対象とする。これらの状態検査と入れ子resumeの検査は行わず、呼出し側の前提とする。
+resumeのRUNNABLE判定は維持し、終了済み・待機中coroutineの再開は拒否する。
 
 ## Scheduler backend選択
 
@@ -87,10 +91,10 @@ MCU stack容量と配置はSTM32移植時に決定する。
 - nested関数からの複数yield
 - yield前後のlocal variable
 - 2個のcoroutineのround-robin
-- WAIT_READとwake
+- WAIT_LOCK/READ/WRITEとwake
 - entry return後のFINISHED
 - FINISHED後のresume拒否
-- stack guardとwatermark
+- resume前後のstack guard破損検出とwatermark
 - XMM6、x87 control word、MXCSRの復元
 
 `src/core/sys/test/sched`とpipe/pipeline suiteがscheduler backendとの結合を
