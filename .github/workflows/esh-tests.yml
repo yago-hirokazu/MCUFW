@@ -29,8 +29,8 @@ jobs:
 
       - name: Test parser
         shell: msys2 {0}
-        run: bash ./src/core/shell/test/par/run_test.sh
+        run: bash ./src/core/shell/cli/test/par/run_test.sh
 
       - name: Test executor
         shell: msys2 {0}
-        run: bash ./src/core/shell/test/exe/run_test.sh
+        run: bash ./src/core/shell/cli/test/exe/run_test.sh

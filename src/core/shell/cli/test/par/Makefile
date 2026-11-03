@@ -28,12 +28,12 @@ OUTDIR = _output
 # Search path
 vpath %.c .
 vpath %.c ../..
-vpath %.c ../../../usr/cmd
-vpath %.c ../../../lib
+vpath %.c ../../../../usr/cmd
+vpath %.c ../../../../lib
 ifeq ($(OS),Windows_NT)
-vpath %.c ../../target/windows/
+vpath %.c ../../dev/windows/
 else
-vpath %.c ../../target/cygwin/
+vpath %.c ../../dev/cygwin/
 endif
 vpath %.o _output
 
@@ -56,14 +56,14 @@ CSOURCES += test.c
 CSOURCES += tok.c
 CSOURCES += tty.c
 
-## ../../target/windows/
+## ../../dev/windows/
 CSOURCES += stdio_adapt.c
 CSOURCES += tty_adapt.c
 
-## ../../../usr/cmd
+## ../../../../usr/cmd
 CSOURCES += cmd_sample.c
 
-## ../../../reuse
+## ../../../../reuse
 CSOURCES += qbyte.c
 CSOURCES += symchar.c
 
@@ -84,9 +84,9 @@ CFLAGS += -g -O0
 
 INCLUDES := -I.
 INCLUDES += -I../../include
-INCLUDES += -I../../../lib
-INCLUDES += -I../../target/windows
-INCLUDES += -I../../../../target/windows/Adapt
+INCLUDES += -I../../../../lib
+INCLUDES += -I../../dev/windows
+INCLUDES += -I../../../../../target/windows/Adapt
 
 CFLAGS += $(INCLUDES)
 CFLAGS += -DUSE_STACKMACH

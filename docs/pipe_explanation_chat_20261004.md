@@ -73,7 +73,7 @@ Windows で `ESH_SCRIPT` が有効な場合、完成した行を `esh_script_lin
 
 ### 2.2 `script.c`：解析と実行の区切りを管理する
 
-[script.c](C:/usr/src/MCUFW/src/core/shell/script.c) は、対話セッション用の `struct code` と `struct exe` を保持します。
+[script.c](C:/usr/src/MCUFW/src/core/shell/cli/script.c) は、対話セッション用の `struct code` と `struct exe` を保持します。
 
 通常の一行のコマンドは、解析完了後に実行します。一方、次のような入力は、`done` までコードを蓄積します。
 
@@ -117,7 +117,7 @@ OP_CMD_EXE
 
 ここでいう process は、Windows の独立したプロセスではありません。**一つのコマンドの実行状態を表す内部オブジェクト**です。
 
-[exe.h](C:/usr/src/MCUFW/src/core/shell/include/exe.h) では、二つの構造体を組み合わせています。
+[exe.h](C:/usr/src/MCUFW/src/core/shell/cli/include/exe.h) では、二つの構造体を組み合わせています。
 
 ### `struct proc`：shell 固有の情報
 
@@ -199,11 +199,11 @@ flowchart LR
 
 この二段階の管理によって、一つの fd を閉じただけで、まだ参照されている endpoint が消えることを防いでいます。
 
-実装は [file.c](C:/usr/src/MCUFW/src/core/shell/file.c) と [pipe.h](C:/usr/src/MCUFW/src/core/shell/include/pipe.h) にあります。
+実装は [file.c](C:/usr/src/MCUFW/src/core/shell/file.c) と [pipe.h](C:/usr/src/MCUFW/src/core/shell/cli/include/pipe.h) にあります。
 
 ## 5. pipeline の接続と起動
 
-[exe_run_pipeline()](C:/usr/src/MCUFW/src/core/shell/exe.c:291) は、次の順序で準備します。
+[exe_run_pipeline()](C:/usr/src/MCUFW/src/core/shell/cli/exe.c:291) は、次の順序で準備します。
 
 1. 全コマンドと段数を検査する
 2. 各 process の実行状態を初期化する
@@ -399,7 +399,7 @@ command main
 
 ### 保存する内容
 
-Windows x64 用の [cortn_switch.S](C:/usr/src/MCUFW/src/core/shell/target/windows/cortn_switch.S) は、ABI 上必要なものを保存・復元します。
+Windows x64 用の [cortn_switch.S](C:/usr/src/MCUFW/src/core/shell/cli/dev/windows/cortn_switch.S) は、ABI 上必要なものを保存・復元します。
 
 - stack pointer
 - 非 volatile の整数レジスタ
@@ -417,7 +417,7 @@ coroutine backend の kernel lock は、この単一実行・非プリエンプ�
 
 ## 11. thread backend：実行場所だけを Windows に任せる
 
-[ sched_thread.c ](C:/usr/src/MCUFW/src/core/shell/target/windows/sched_thread.c) は、コマンドごとに `_beginthreadex()` で worker thread を作ります。
+[ sched_thread.c ](C:/usr/src/MCUFW/src/core/shell/cli/dev/windows/sched_thread.c) は、コマンドごとに `_beginthreadex()` で worker thread を作ります。
 
 ただし、作成された thread はすぐに applet を実行しません。controller から実行許可を受けるまで待ちます。
 
@@ -442,7 +442,7 @@ coroutine と同じ制御契約を保ちながら、stack/context の管理を W
 
 ## 12. `printf()` や `getchar()` が pipe に接続される理由
 
-既存 applet を活かすため、Windows の [stdio_adapt.c](C:/usr/src/MCUFW/src/core/shell/target/windows/stdio_adapt.c) が入出力先を選びます。
+既存 applet を活かすため、Windows の [stdio_adapt.c](C:/usr/src/MCUFW/src/core/shell/cli/dev/windows/stdio_adapt.c) が入出力先を選びます。
 
 `stdio_adapt.h` は、たとえば `printf` を `win_printf` に対応付けています。
 
@@ -453,7 +453,7 @@ coroutine と同じ制御契約を保ちながら、stack/context の管理を W
 - `getchar()`：fd 0 が pipe なら `esh_read()`、なければ console
 - `fprintf(stderr, ...)`：pipe に送らず console
 
-このため、[cat.c](C:/usr/src/MCUFW/src/core/shell/cat.c) は単純な処理で済みます。
+このため、[cat.c](C:/usr/src/MCUFW/src/core/shell/cli/cat.c) は単純な処理で済みます。
 
 ```c
 while ((ch = getchar()) != EOF)

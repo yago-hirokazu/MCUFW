@@ -38,15 +38,15 @@ free-block管理、実I/Oを含めない。Windows上でbuffer cache単体と既
 
 | ファイル | 現在の役割 |
 |---|---|
-| `src/core/shell/include/pipe.h` | pipe inode、ring、I/O結果 |
+| `src/core/shell/cli/include/pipe.h` | pipe inode、ring、I/O結果 |
 | `src/core/shell/pipe.c` | pipe生成、read/write、EOF/EPIPE、待機 |
-| `src/core/shell/include/esh_file.h` | fd table、file object |
+| `src/core/shell/cli/include/esh_file.h` | fd table、file object |
 | `src/core/shell/file.c` | file pool、参照数、close |
-| `src/core/shell/include/esh_sched.h` | process、wait channel |
+| `src/core/shell/cli/include/esh_sched.h` | process、wait channel |
 | `src/core/shell/sched.c` | sleep/wakeupのportable契約 |
-| `src/core/shell/test/pipe/` | pipe単体・資源枯渇試験 |
-| `src/core/shell/test/sched/` | 待機・wakeup・競合試験 |
-| `src/core/shell/test/pipeline_exec/` | pipeline結合試験 |
+| `src/core/shell/cli/test/pipe/` | pipe単体・資源枯渇試験 |
+| `src/core/shell/cli/test/sched/` | 待機・wakeup・競合試験 |
+| `src/core/shell/cli/test/pipeline_exec/` | pipeline結合試験 |
 
 現在の所有関係:
 
@@ -256,7 +256,7 @@ src/core/sys/sys/     V7 usr/sys/sys相当のgeneric kernel処理
 src/core/sys/conf/    fixed tableとdevice configuration
 ```
 
-既存の`src/core/shell/pipe.c`と`src/core/shell/include/pipe.h`は最初の移行では
+既存の`src/core/shell/pipe.c`と`src/core/shell/cli/include/pipe.h`は最初の移行では
 移動しない。これらは`buf.h`を利用するconsumerとして変更する。source配置は
 V7を踏襲するが、historical sourceを無変更でcopyせず、PDP-11依存部を除いた
 modern Cとして実装する。
@@ -511,7 +511,7 @@ live process/file/pipeがある状態でpool全体を再初期化してはなら
 変更前に少なくとも次をMSYS2 MINGW64 shell経由で実行する。
 
 ```sh
-cd /c/usr/src/MCUFW/src/core/shell/test/pipe
+cd /c/usr/src/MCUFW/src/core/shell/cli/test/pipe
 bash ./run_test.sh
 cd ../sched
 bash ./run_test.sh
@@ -678,10 +678,10 @@ retryした後に`B_ERROR`と`b_error`を設定して完了する。
 
 - `src/core/sys/test/bio/run_test.sh`: O0、O2
 - `src/core/sys/test/bdev/run_test.sh`: O0、O2
-- `src/core/shell/test/pipe/run_test.sh`: coroutine/thread、O0/O2
-- `src/core/shell/test/sched/run_test.sh`: coroutine/thread、O0/O2
-- `src/core/shell/test/pipeline_exec/run_test.sh`: coroutine/thread、O0/O2
-- `src/core/shell/test/exe/run_test.sh`
+- `src/core/shell/cli/test/pipe/run_test.sh`: coroutine/thread、O0/O2
+- `src/core/shell/cli/test/sched/run_test.sh`: coroutine/thread、O0/O2
+- `src/core/shell/cli/test/pipeline_exec/run_test.sh`: coroutine/thread、O0/O2
+- `src/core/shell/cli/test/exe/run_test.sh`
 - `src/target/windows`: `make -B -j4`
 
 既存suiteで0、1、256、257、2089 byte転送、EOF、EPIPE、早期consumer終了、

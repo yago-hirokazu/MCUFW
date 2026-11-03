@@ -28,12 +28,12 @@ OUTDIR = _output
 # Search path
 vpath %.c .
 vpath %.c ../..
-vpath %.c ../../../usr/cmd
-vpath %.c ../../../lib
+vpath %.c ../../../../usr/cmd
+vpath %.c ../../../../lib
 ifeq ($(OS),Windows_NT)
-vpath %.c ../../target/windows/
+vpath %.c ../../dev/windows/
 else
-vpath %.c ../../target/cygwin/
+vpath %.c ../../dev/cygwin/
 endif
 vpath %.o _output
 
@@ -63,9 +63,9 @@ CFLAGS += -g $(OPT)
 
 INCLUDES := -I.
 INCLUDES += -I../../include
-INCLUDES += -I../../../lib
-INCLUDES += -I../../target/windows
-INCLUDES += -I../../../../target/windows/Adapt
+INCLUDES += -I../../../../lib
+INCLUDES += -I../../dev/windows
+INCLUDES += -I../../../../../target/windows/Adapt
 
 CFLAGS += $(INCLUDES)
 

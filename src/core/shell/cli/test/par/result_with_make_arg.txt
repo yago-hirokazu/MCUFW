@@ -1,26 +1,26 @@
 Microsoft Windows [Version 10.0.19044.2728]
 (c) Microsoft Corporation. All rights reserved.
 
-C:\Users\yagouhir\usr\code\MCUFW\core\shell\test\par>setpath.bat
+C:\Users\yagouhir\usr\code\MCUFW\core\shell\cli\test\par>setpath.bat
 Press any key to continue . . .
 
-C:\Users\yagouhir\usr\code\MCUFW\core\shell\test\par>make
+C:\Users\yagouhir\usr\code\MCUFW\core\shell\cli\test\par>make
 gcc -mno-ms-bitfields -g -O0 -I. -I../../include -I../../../lib -I../../target/windows -I../../../../target/windows/Adapt -c -MMD -MP test_par.c -o _output/test_par.o
 gcc -mno-ms-bitfields -g -O0 -I. -I../../include -I../../../lib -I../../target/windows -I../../../../target/windows/Adapt -c -MMD -MP ../../help.c -o _output/help.o
 gcc -mno-ms-bitfields -g -O0 -I. -I../../include -I../../../lib -I../../target/windows -I../../../../target/windows/Adapt -c -MMD -MP ../../par.c -o _output/par.o
 gcc -mno-ms-bitfields -g -O0 -I. -I../../include -I../../../lib -I../../target/windows -I../../../../target/windows/Adapt -c -MMD -MP ../../run.c -o _output/run.o
-gcc -mno-ms-bitfields -g -O0 -I. -I../../include -I../../../lib -I../../target/windows -I../../../../target/windows/Adapt -c -MMD -MP ../../slex.c -o _output/slex.o
+gcc -mno-ms-bitfields -g -O0 -I. -I../../include -I../../../lib -I../../target/windows -I../../../../target/windows/Adapt -c -MMD -MP ../../../slex.c -o _output/slex.o
 gcc -mno-ms-bitfields -g -O0 -I. -I../../include -I../../../lib -I../../target/windows -I../../../../target/windows/Adapt -c -MMD -MP ../../tty.c -o _output/tty.o
-gcc -mno-ms-bitfields -g -O0 -I. -I../../include -I../../../lib -I../../target/windows -I../../../../target/windows/Adapt -c -MMD -MP ../../target/windows/tty_adapt.c -o _output/tty_adapt.o
-gcc -mno-ms-bitfields -g -O0 -I. -I../../include -I../../../lib -I../../target/windows -I../../../../target/windows/Adapt -c -MMD -MP ../../../usr/cmd/sample.c -o _output/sample.o
-gcc -mno-ms-bitfields -g -O0 -I. -I../../include -I../../../lib -I../../target/windows -I../../../../target/windows/Adapt -c -MMD -MP ../../../lib/qbyte.c -o _output/qbyte.o
+gcc -mno-ms-bitfields -g -O0 -I. -I../../include -I../../../lib -I../../target/windows -I../../../../target/windows/Adapt -c -MMD -MP ../../dev/windows/tty_adapt.c -o _output/tty_adapt.o
+gcc -mno-ms-bitfields -g -O0 -I. -I../../include -I../../../lib -I../../target/windows -I../../../../target/windows/Adapt -c -MMD -MP ../../../../usr/cmd/sample.c -o _output/sample.o
+gcc -mno-ms-bitfields -g -O0 -I. -I../../include -I../../../lib -I../../target/windows -I../../../../target/windows/Adapt -c -MMD -MP ../../../../lib/qbyte.c -o _output/qbyte.o
 g++ -o test_par.exe _output/test_par.o _output/code.o _output/echo.o _output/expr.o _output/help.o _output/par.o _output/run.o _output/slex.o _output/test.o _output/tok.o _output/tty.o _output/stdio_adapt.o _output/tty_adapt.o _output/sample.o _output/qbyte.o _output/symchar.o -lwinmm
 
-C:\Users\yagouhir\usr\code\MCUFW\core\shell\test\par>./test_par.exe test1.sh
+C:\Users\yagouhir\usr\code\MCUFW\core\shell\cli\test\par>test_par.exe test1.sh
 '.' is not recognized as an internal or external command,
 operable program or batch file.
 
-C:\Users\yagouhir\usr\code\MCUFW\core\shell\test\par>test_par.exe test1.sh
+C:\Users\yagouhir\usr\code\MCUFW\core\shell\cli\test\par>test_par.exe test1.sh
 Lexically analyzing characters to make tokens
 ---------------------------------------------
 #scan(#, &aline)=0x0000
@@ -549,4 +549,4 @@ s_str[1] = 4
 s_str[2] = +
 s_str[3] = 1
 
-C:\Users\yagouhir\usr\code\MCUFW\core\shell\test\par>
+C:\Users\yagouhir\usr\code\MCUFW\core\shell\cli\test\par>

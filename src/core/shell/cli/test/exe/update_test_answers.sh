@@ -1,7 +1,7 @@
 #!/bin/sh
 
 if [ "$#" -eq 0 ]; then
-    echo "usage: bash ./update_test_answers.sh <# of tests>"
+    echo "usage: bash update_test_answers.sh <# of tests>"
     exit 1
 fi
 

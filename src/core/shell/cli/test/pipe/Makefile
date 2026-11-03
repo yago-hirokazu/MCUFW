@@ -2,11 +2,11 @@ TARGET = test_pipe.exe
 OUTDIR = _output
 CC = gcc
 OPT ?= -O0
-include ../../../sys/dev/windows/sched_adapt.mk
+include ../../../../sys/dev/windows/sched_adapt.mk
 
 CFLAGS = -mno-ms-bitfields -g $(OPT)
 CFLAGS += -Wall -Wextra -Werror -pedantic -std=c11
-CFLAGS += -I../../include -I../../../sys/dev/windows -I../../../sys/h
+CFLAGS += -I../../include -I../../../../sys/dev/windows -I../../../../sys/h
 CFLAGS += $(SCHED_CPPFLAGS)
 
 OBJS = $(OUTDIR)/test_pipe.o
@@ -37,52 +37,52 @@ $(OUTDIR):
 $(OUTDIR)/test_pipe.o: test_pipe.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OUTDIR)/cortn.o: ../../../sys/dev/windows/cortn.c
+$(OUTDIR)/cortn.o: ../../../../sys/dev/windows/cortn.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OUTDIR)/cortn_context.o: ../../../sys/dev/windows/cortn_context.c
+$(OUTDIR)/cortn_context.o: ../../../../sys/dev/windows/cortn_context.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OUTDIR)/cortn_switch.o: ../../../sys/dev/windows/cortn_switch.S
+$(OUTDIR)/cortn_switch.o: ../../../../sys/dev/windows/cortn_switch.S
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OUTDIR)/alloc.o: ../../../sys/sys/alloc.c
+$(OUTDIR)/alloc.o: ../../../../sys/sys/alloc.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OUTDIR)/fio.o: ../../../sys/sys/fio.c
+$(OUTDIR)/fio.o: ../../../../sys/sys/fio.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OUTDIR)/iget.o: ../../../sys/sys/iget.c
+$(OUTDIR)/iget.o: ../../../../sys/sys/iget.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OUTDIR)/pipe.o: ../../../sys/sys/pipe.c
+$(OUTDIR)/pipe.o: ../../../../sys/sys/pipe.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OUTDIR)/rdwri.o: ../../../sys/sys/rdwri.c
+$(OUTDIR)/rdwri.o: ../../../../sys/sys/rdwri.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OUTDIR)/sched.o: ../../../sys/sys/sched.c
+$(OUTDIR)/sched.o: ../../../../sys/sys/sched.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OUTDIR)/sys2.o: ../../../sys/sys/sys2.c
+$(OUTDIR)/sys2.o: ../../../../sys/sys/sys2.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OUTDIR)/bio.o: ../../../sys/dev/bio.c
+$(OUTDIR)/bio.o: ../../../../sys/dev/bio.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OUTDIR)/conf.o: ../../../sys/conf/conf.c
+$(OUTDIR)/conf.o: ../../../../sys/conf/conf.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OUTDIR)/sched_cortn.o: ../../../sys/dev/windows/sched_cortn.c
+$(OUTDIR)/sched_cortn.o: ../../../../sys/dev/windows/sched_cortn.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OUTDIR)/sched_thread.o: ../../../sys/dev/windows/sched_thread.c
+$(OUTDIR)/sched_thread.o: ../../../../sys/dev/windows/sched_thread.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OUTDIR)/bdev.o: ../../../sys/dev/bdev.c
+$(OUTDIR)/bdev.o: ../../../../sys/dev/bdev.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OUTDIR)/ramdisk.o: ../../../sys/dev/ramdisk.c
+$(OUTDIR)/ramdisk.o: ../../../../sys/dev/ramdisk.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

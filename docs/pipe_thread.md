@@ -73,7 +73,7 @@ releaseとjoinはkernel lock外で行う。workerがI/Oをunwindしてfdを閉�
 ```sh
 cd src/core/sys/test/sched
 bash ./run_test.sh
-cd ../../../shell/test/pipe
+cd ../../../shell/cli/test/pipe
 bash ./run_test.sh
 cd ../pipeline_exec
 bash ./run_test.sh

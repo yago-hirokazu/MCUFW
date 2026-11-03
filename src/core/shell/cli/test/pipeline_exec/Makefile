@@ -2,13 +2,13 @@ TARGET = test_pipeline_exec.exe
 OUTDIR = _output
 CC = gcc
 CXX = g++
-include ../../../sys/dev/windows/sched_adapt.mk
+include ../../../../sys/dev/windows/sched_adapt.mk
 
 CFLAGS = -mno-ms-bitfields -g
 CFLAGS += -Wall -Wextra
-CFLAGS += -I. -I../../include -I../../../lib -I../../../sys/h
-CFLAGS += -I../../target/windows -I../../../sys/dev/windows
-CFLAGS += -I../../../../target/windows/Adapt
+CFLAGS += -I. -I../../include -I../../../../lib -I../../../../sys/h
+CFLAGS += -I../../dev/windows -I../../../../sys/dev/windows
+CFLAGS += -I../../../../../target/windows/Adapt
 CFLAGS += -DUSE_STACKMACH
 CFLAGS += -DESH_STDIO_PIPE
 CFLAGS += -DESH_SCRIPT
@@ -29,11 +29,11 @@ ASOURCES = $(SCHED_ASOURCES)
 OBJS = $(addprefix $(OUTDIR)/,$(CSOURCES:.c=.o))
 OBJS += $(addprefix $(OUTDIR)/,$(ASOURCES:.S=.o))
 
-vpath %.c . ../.. ../../../usr/cmd ../../../lib ../../target/windows
-vpath %.c ../../../sys/dev ../../../sys/conf
-vpath %.c ../../../sys/sys
-vpath %.c ../../../sys/dev/windows
-vpath %.S ../../../sys/dev/windows
+vpath %.c . ../.. ../../../../usr/cmd ../../../../lib ../../dev/windows
+vpath %.c ../../../../sys/dev ../../../../sys/conf
+vpath %.c ../../../../sys/sys
+vpath %.c ../../../../sys/dev/windows
+vpath %.S ../../../../sys/dev/windows
 
 .PHONY: all clean
 

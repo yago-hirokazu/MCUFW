@@ -3,12 +3,12 @@
 /src/target/windows/TDM-GCC/make-3.81-dep
 
 # ESH test build and result files
-/src/core/shell/test/exe/_output/
-/src/core/shell/test/exe/*.exe
-/src/core/shell/test/exe/*.dll
-/src/core/shell/test/exe/result_test*_sh.txt
-/src/core/shell/test/par/_output/
-/src/core/shell/test/par/*.exe
-/src/core/shell/test/par/*.dll
-/src/core/shell/test/par/result_test*_sh.txt
+/src/core/shell/cli/test/exe/_output/
+/src/core/shell/cli/test/exe/*.exe
+/src/core/shell/cli/test/exe/*.dll
+/src/core/shell/cli/test/exe/result_test*_sh.txt
+/src/core/shell/cli/test/par/_output/
+/src/core/shell/cli/test/par/*.exe
+/src/core/shell/cli/test/par/*.dll
+/src/core/shell/cli/test/par/result_test*_sh.txt
 /.agents

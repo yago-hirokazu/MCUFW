@@ -17,16 +17,17 @@ core/						移植可能なレイヤ
 	lib/					ライブラリ。再利用可能そうなモジュールをここに集約する。
 		stm32/				STM32マイコンFW開発プロジェクトから抽出したモジュール。
 	shell/					コマンドシェル
-		include/			公開ヘッダファイル置き場
-		stub/				テストプログラム用のスタブ
-		target/				コマンドシェルのハードウェア依存レイヤ
-				cygwin/		Cygwin用 glue code
-				stm32/		STM32用 glue code
-				windows/	Windows用 glue code
-		test/				core/用テストプログラム置き場
-				cquote/		test for core/shell/cquote.c
-				exe/		test for core/shell/exe.c
-				par/		test for core/shell/par.c
+		cli/
+			include/			公開ヘッダファイル置き場
+			stub/				テストプログラム用のスタブ
+			dev/				コマンドシェルのハードウェア依存レイヤ
+					cygwin/		Cygwin用 glue code
+					stm32/		STM32用 glue code
+					windows/	Windows用 glue code
+			test/				core/用テストプログラム置き場
+					cquote/		test for core/shell/cli/cquote.c
+					exe/		test for core/shell/cli/exe.c
+					par/		test for core/shell/cli/par.c
 	support/				育成中のプログラム置き場
 				getopt/		組込み機器用のgetopt
 	usr/					STM32機種非依存プログラム置き場
@@ -115,17 +116,17 @@ PowerShell から `C:\msys64\mingw64\bin\gcc.exe` を直接起動したことで
 - sam3 -a -b string
 
 
-### src/core/shell/test/par
+### src/core/shell/cli/test/par
 
-mingw64 シェルで `src/core/shell/test/par` に移動し、下記を実行して `test pass` になることを確認
+mingw64 シェルで `src/core/shell/cli/test/par` に移動し、下記を実行して `test pass` になることを確認
 
 - bash ./run_test1.sh
 - bash ./run_test2.sh
 
 
-### src/core/shell/test/exe
+### src/core/shell/cli/test/exe
 
-mingw64 シェルで `src/core/shell/test/exe` に移動し、下記を実行して `all tests passed` になることを確認
+mingw64 シェルで `src/core/shell/cli/test/exe` に移動し、下記を実行して `all tests passed` になることを確認
 
 - bash ./run_test.sh
 
@@ -134,7 +135,7 @@ mingw64 シェルで `src/core/shell/test/exe` に移動し、下記を実行し
 
 1. typedef を使うと型が一目でわからなくなり、プログラムが読みにくくなるため、使わないものとする。
 
-2. ソースファイルは下記の構成とする。`/MCUFW/src/core/shell/tty.c`をモデルとする。
+2. ソースファイルは下記の構成とする。`/MCUFW/src/core/shell/cli/tty.c`をモデルとする。
 - standard include files
 - project-specific include files
 - (exported) global variable definitions

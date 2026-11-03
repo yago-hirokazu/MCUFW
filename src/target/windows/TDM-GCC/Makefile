@@ -20,8 +20,8 @@ vpath %.c ../Src
 vpath %.c ../Adapt
 vpath %.c ../../../core/usr/cmd
 vpath %.c ../../../core/lib
-vpath %.c ../../../core/shell
-vpath %.c ../../../core/shell/target/windows
+vpath %.c ../../../core/shell/cli
+vpath %.c ../../../core/shell/cli/dev/windows
 vpath %.c ../../../core/sys/dev
 vpath %.c ../../../core/sys/dev/windows
 vpath %.c ../../../core/sys/conf
@@ -47,7 +47,7 @@ CSOURCES += getopt.c
 CSOURCES += qbyte.c
 CSOURCES += symchar.c
 
-## ../../../core/shell
+## ../../../core/shell/cli
 CSOURCES += break.c cat.c code.c esh_debug.c exe.c lex.c par.c script.c tok.c
 CSOURCES += echo.c
 CSOURCES += esh.c
@@ -64,7 +64,7 @@ CSOURCES += bio.c
 CSOURCES += conf.c
 CSOURCES += bdev.c ramdisk.c
 
-## ../../../core/shell/target/windows
+## ../../../core/shell/cli/dev/windows
 CSOURCES += esh_adapt.c
 CSOURCES += stdio_adapt.c
 CSOURCES += tty_adapt.c
@@ -93,8 +93,8 @@ INCLUDES += -I../Adapt
 INCLUDES += -I../Drivers/adafruit_ft232h/include
 INCLUDES += -I../Drivers/adafruit_ft232h/include/windows
 INCLUDES += -I../../../core/lib
-INCLUDES += -I../../../core/shell/include
-INCLUDES += -I../../../core/shell/target/windows
+INCLUDES += -I../../../core/shell/cli/include
+INCLUDES += -I../../../core/shell/cli/dev/windows
 INCLUDES += -I../../../core/sys/h
 INCLUDES += -I../../../core/sys/dev/windows
 

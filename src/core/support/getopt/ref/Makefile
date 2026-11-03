@@ -22,7 +22,7 @@ OUTDIR = _output
 
 # Search path
 vpath %.c .
-vpath %.c ../../../shell/target/windows/
+vpath %.c ../../../shell/cli/dev/windows/
 vpath %.o _output
 
 # C sources
@@ -49,7 +49,7 @@ CFLAGS += -g -O0
 
 INCLUDES := -I.
 INCLUDES += -I../../../lib
-INCLUDES += -I../../../shell/target/windows
+INCLUDES += -I../../../shell/cli/dev/windows
 
 CFLAGS += $(INCLUDES)
 

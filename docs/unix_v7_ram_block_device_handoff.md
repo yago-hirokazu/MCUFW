@@ -311,7 +311,7 @@ Step 3完了時点で基本経路を評価し、その結果でStep 4以降の�
 
 - typedefを追加しない
 - header guardは`__NAME_H__`形式とする
-- sourceの節構成は`src/core/shell/tty.c`に合わせる
+- sourceの節構成は`src/core/shell/cli/tty.c`に合わせる
 - コメントとcommit messageは冠詞を可能な限り省く
 - 一文コメントは末尾periodなし、コメント記号とindent込み80 column以内
 - STM32、物理storage、filesystem全体への拡張を先取りしない
@@ -563,14 +563,14 @@ shellのsandbox内起動は出力なく失敗したため、承認されたsandb
 | src/core/sys/test/file | run_test.sh、O0/O2 | exit 0、all tests passed |
 | src/core/sys/test/pipe | run_test.sh、O0/O2 | exit 0、all tests passed |
 | src/core/sys/test/sched | run_test.sh、cortn/thread × O0/O2 | exit 0、all tests passed |
-| src/core/shell/test/pipe | run_test.sh、cortn/thread × O0/O2 | exit 0、all tests passed |
-| src/core/shell/test/sched | run_test.sh、cortn/thread × O0/O2 | exit 0、all tests passed |
-| src/core/shell/test/cortn | run_test.sh、O0/O2 | exit 0、all tests passed |
-| src/core/shell/test/pipeline | run_test.sh、O0/O2 | exit 0、all tests passed |
-| src/core/shell/test/pipeline_exec | run_test.sh、cortn/thread × O0/O2 | exit 0、all tests passed |
-| src/core/shell/test/exe | run_test.sh、既定build、test1〜10とgolden比較 | exit 0、all tests passed |
-| src/core/shell/test/par | run_test1.sh、既定buildとgolden比較 | exit 0、test pass |
-| src/core/shell/test/par | run_test2.sh、既定buildとgolden比較 | exit 0、test pass |
+| src/core/shell/cli/test/pipe | run_test.sh、cortn/thread × O0/O2 | exit 0、all tests passed |
+| src/core/shell/cli/test/sched | run_test.sh、cortn/thread × O0/O2 | exit 0、all tests passed |
+| src/core/shell/cli/test/cortn | run_test.sh、O0/O2 | exit 0、all tests passed |
+| src/core/shell/cli/test/pipeline | run_test.sh、O0/O2 | exit 0、all tests passed |
+| src/core/shell/cli/test/pipeline_exec | run_test.sh、cortn/thread × O0/O2 | exit 0、all tests passed |
+| src/core/shell/cli/test/exe | run_test.sh、既定build、test1〜10とgolden比較 | exit 0、all tests passed |
+| src/core/shell/cli/test/par | run_test1.sh、既定buildとgolden比較 | exit 0、test pass |
+| src/core/shell/cli/test/par | run_test2.sh、既定buildとgolden比較 | exit 0、test pass |
 
 全15項目が成功し、外側の一括実行もexit 0。
 script実装どおりの構成を実行しており、exe/parをO0/O2両構成実施とは数えない。
@@ -980,7 +980,7 @@ cache取得からpayloadの参照・更新、提出、解放までcallerが同�
 
 確認したproductionの呼出し経路:
 
-- shell/exe.cのpipe接続・owner解放・各process close_allはkernel lock区間内
+- shell/cli/exe.cのpipe接続・owner解放・各process close_allはkernel lock区間内
 - sys/pipe.cのsys_pipeはlockを取得してpipe_for_procへ接続
 - sys/sys2.cのsys_read/sys_write/sys_closeはlock区間内で低層file/pipe処理を呼ぶ
 - alloc.cのgetblk、iget.cのbrelseは上記callerのlockを継承する

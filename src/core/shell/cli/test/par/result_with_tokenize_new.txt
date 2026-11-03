@@ -1,17 +1,17 @@
 Microsoft Windows [Version 10.0.19044.2728]
 (c) Microsoft Corporation. All rights reserved.
 
-C:\Users\yagouhir\usr\code\MCUFW\core\shell\test\par>make
+C:\Users\yagouhir\usr\code\MCUFW\core\shell\cli\test\par>make
 'make' is not recognized as an internal or external command,
 operable program or batch file.
 
-C:\Users\yagouhir\usr\code\MCUFW\core\shell\test\par>setpath.bat
+C:\Users\yagouhir\usr\code\MCUFW\core\shell\cli\test\par>setpath.bat
 Press any key to continue . . .
 
-C:\Users\yagouhir\usr\code\MCUFW\core\shell\test\par>make
+C:\Users\yagouhir\usr\code\MCUFW\core\shell\cli\test\par>make
 make: `all' に対して行うべき事はありません.
 
-C:\Users\yagouhir\usr\code\MCUFW\core\shell\test\par>test_par.exe test1.sh
+C:\Users\yagouhir\usr\code\MCUFW\core\shell\cli\test\par>test_par.exe test1.sh
 Lexically analyzing characters to make tokens
 ---------------------------------------------
 #scan(#, &aline)=0x0000
@@ -451,4 +451,4 @@ s_str[1] = 4
 s_str[2] = +
 s_str[3] = 1
 
-C:\Users\yagouhir\usr\code\MCUFW\core\shell\test\par>
+C:\Users\yagouhir\usr\code\MCUFW\core\shell\cli\test\par>

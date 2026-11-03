@@ -65,23 +65,23 @@ GCCは必ずMSYS2 MINGW64 shell経由で実行する。PowerShellから
 
 直接の移行対象は次のファイルである。
 
-- `src/core/shell/include/esh_file.h`
-- `src/core/shell/include/pipe.h`
-- `src/core/shell/include/esh_sched.h`
-- `src/core/shell/include/esh_sched_backend.h`
+- `src/core/shell/cli/include/esh_file.h`
+- `src/core/shell/cli/include/pipe.h`
+- `src/core/shell/cli/include/esh_sched.h`
+- `src/core/shell/cli/include/esh_sched_backend.h`
 - `src/core/shell/file.c`
 - `src/core/shell/pipe.c`
 
 ただし、接頭辞除去と配置変更は次にも波及する。
 
 - `src/core/shell/sched.c`
-- `src/core/shell/exe.c`
-- `src/core/shell/include/exe.h`
-- `src/core/shell/target/windows/stdio_adapt.c`
-- `src/core/shell/test/pipe/`
-- `src/core/shell/test/sched/`
-- `src/core/shell/test/pipeline_exec/`
-- `src/core/shell/test/exe/`
+- `src/core/shell/cli/exe.c`
+- `src/core/shell/cli/include/exe.h`
+- `src/core/shell/cli/dev/windows/stdio_adapt.c`
+- `src/core/shell/cli/test/pipe/`
+- `src/core/shell/cli/test/sched/`
+- `src/core/shell/cli/test/pipeline_exec/`
+- `src/core/shell/cli/test/exe/`
 - `src/target/windows/Makefile`
 - `src/target/windows/TDM-GCC/Makefile`
 
@@ -207,7 +207,7 @@ Step 0で`sys2.c`、`param.h`、`sys_error.h`、汎用coroutine実装の配置�
 ### 7.3 コーディング規則
 
 - `typedef`を追加しない
-- source構成は`src/core/shell/tty.c`をモデルにする
+- source構成は`src/core/shell/cli/tty.c`をモデルにする
 - header guardは`__NAME_H__`形式
 - コメントは冠詞を可能な限り省略した電報style
 - 一文コメントは末尾periodなし
@@ -334,7 +334,7 @@ offsetとsizeは非負で`PIPSIZ`以下に制限されるため、host依存の`
 | `struct esh_file` | `struct file` | 公開定義、`h/file.h` |
 | `struct pipe_inode` | `struct inode` | sys内部型、`h/inode.h` |
 | `struct esh_proc` | `struct proc` | 公開型、`h/sched.h` |
-| executor `struct proc` | `struct exe_proc` | esh内部型、`shell/include/exe.h` |
+| executor `struct proc` | `struct exe_proc` | esh内部型、`shell/cli/include/exe.h` |
 | `struct esh_wait_chan` | `struct wait_channel` | sys内部型、`h/sched.h` |
 | `ESH_FD_STDIN/STDOUT/STDERR` | `FD_STDIN/STDOUT/STDERR` | `h/file.h` |
 | `ESH_OPEN_MAX` | `NOFILE` | `h/param.h`、値12 |
@@ -1181,12 +1181,12 @@ compatibility定義を削除して、汎用symbolを通常定義にする。旧e
 ### 移動対象
 
 ```text
-src/core/shell/target/windows/cortn_context.c
-src/core/shell/target/windows/cortn_context.h
-src/core/shell/target/windows/cortn_switch.S
-src/core/shell/target/windows/sched_adapt.mk
-src/core/shell/target/windows/sched_cortn.c
-src/core/shell/target/windows/sched_thread.c
+src/core/shell/cli/dev/windows/cortn_context.c
+src/core/shell/cli/dev/windows/cortn_context.h
+src/core/shell/cli/dev/windows/cortn_switch.S
+src/core/shell/cli/dev/windows/sched_adapt.mk
+src/core/shell/cli/dev/windows/sched_cortn.c
+src/core/shell/cli/dev/windows/sched_thread.c
 ```
 
 移動先はすべて`src/core/sys/dev/windows/`とする。
@@ -1255,17 +1255,17 @@ build変数は`SCHED_BACKEND`、`SCHED_CSOURCES`、`SCHED_ASOURCES`、
 `SCHED_CPPFLAGS`へ変更した。次のbuild fileを新pathへ追従させた。
 
 - `src/core/sys/test/sched/Makefile`
-- `src/core/shell/test/cortn/Makefile`
-- `src/core/shell/test/sched/Makefile`
-- `src/core/shell/test/pipe/Makefile`
-- `src/core/shell/test/pipeline_exec/Makefile`
-- `src/core/shell/test/exe/Makefile`
+- `src/core/shell/cli/test/cortn/Makefile`
+- `src/core/shell/cli/test/sched/Makefile`
+- `src/core/shell/cli/test/pipe/Makefile`
+- `src/core/shell/cli/test/pipeline_exec/Makefile`
+- `src/core/shell/cli/test/exe/Makefile`
 - `src/target/windows/Makefile`
 - `src/target/windows/TDM-GCC/Makefile`
 - scheduler、pipe、pipeline testの`run_test.sh`
 
 Step 7まで旧esh schedulerを動かすため、Windows依存の一時互換実装を
-`src/core/shell/target/windows/`へ分離した。
+`src/core/shell/cli/dev/windows/`へ分離した。
 
 - `sched_compat.mk`
 - `sched_cortn_compat.c`
@@ -1298,7 +1298,7 @@ offset定義は変更していない。pipelineの既存warningと意図され�
   `sched_cortn_compat.c`、`sched_thread_compat.c`を削除する
 - 旧esh buildの`SCHED_COMPAT_*`参照を`SCHED_CSOURCES`、
   `SCHED_CPPFLAGS`へ切り替える
-- `src/core/shell/target/windows/`にはesh adapterだけを残す
+- `src/core/shell/cli/dev/windows/`にはesh adapterだけを残す
 - `cortn.c`と`cortn.h`は今回移動していない
 - source treeのMakefile、mk、test scriptに旧6ファイルのpath参照はない
 - source treeのMakefile、mk、test scriptに`ESH_SCHED_*`変数はない
@@ -1317,9 +1317,9 @@ esh executorとstdioを新しいsys file/pipe/schedulerへ接続し、旧esh専�
 
 ### 対象
 
-- `src/core/shell/exe.c`
-- `src/core/shell/include/exe.h`
-- `src/core/shell/target/windows/stdio_adapt.c`
+- `src/core/shell/cli/exe.c`
+- `src/core/shell/cli/include/exe.h`
+- `src/core/shell/cli/dev/windows/stdio_adapt.c`
 - Windows target Makefile
 - 関連testとMakefile
 - 旧esh file/pipe/scheduler headerとsource
@@ -1335,10 +1335,10 @@ esh executorとstdioを新しいsys file/pipe/schedulerへ接続し、旧esh専�
 7. 次の旧ファイルを削除
 
 ```text
-src/core/shell/include/esh_file.h
-src/core/shell/include/pipe.h
-src/core/shell/include/esh_sched.h
-src/core/shell/include/esh_sched_backend.h
+src/core/shell/cli/include/esh_file.h
+src/core/shell/cli/include/pipe.h
+src/core/shell/cli/include/esh_sched.h
+src/core/shell/cli/include/esh_sched_backend.h
 src/core/shell/file.c
 src/core/shell/pipe.c
 src/core/shell/sched.c
@@ -1614,20 +1614,20 @@ UNIX V7との差分を記録してください。新機能追加やSTM32移植�
 cd /c/usr/src/MCUFW/src/core/sys/test/bio
 bash ./run_test.sh
 
-cd /c/usr/src/MCUFW/src/core/shell/test/pipe
+cd /c/usr/src/MCUFW/src/core/shell/cli/test/pipe
 bash ./run_test.sh
 
-cd /c/usr/src/MCUFW/src/core/shell/test/sched
+cd /c/usr/src/MCUFW/src/core/shell/cli/test/sched
 bash ./run_test.sh
 
-cd /c/usr/src/MCUFW/src/core/shell/test/pipeline_exec
+cd /c/usr/src/MCUFW/src/core/shell/cli/test/pipeline_exec
 bash ./run_test.sh
 
-cd /c/usr/src/MCUFW/src/core/shell/test/par
+cd /c/usr/src/MCUFW/src/core/shell/cli/test/par
 bash ./run_test1.sh
 bash ./run_test2.sh
 
-cd /c/usr/src/MCUFW/src/core/shell/test/exe
+cd /c/usr/src/MCUFW/src/core/shell/cli/test/exe
 bash ./run_test.sh
 ```
 
