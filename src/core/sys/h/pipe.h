@@ -38,7 +38,7 @@ struct inode;
 struct proc;
 
 int pipe_for_proc(struct proc *proc, int fd[2]);
-/* I/O and plock require sched_prepare() context and kernel lock held */
+/* I/O and plock require sched_prepare() context and sys lock held */
 ptrdiff_t readp(struct file *fp, void *buf, size_t count);
 ptrdiff_t writep(struct file *fp, const void *buf, size_t count);
 int plock(struct inode *ip);

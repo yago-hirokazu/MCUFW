@@ -89,9 +89,9 @@ static size_t buffer_in_use(void)
 
 static void close_all_locked(struct proc *proc)
 {
-	kernel_lock();
+	sys_lock();
 	close_all(proc);
-	kernel_unlock();
+	sys_unlock();
 }
 
 static int connect_pipe(struct proc *writer, struct proc *reader,
@@ -101,7 +101,7 @@ static int connect_pipe(struct proc *writer, struct proc *reader,
 	int fd[2];
 	int result;
 
-	kernel_lock();
+	sys_lock();
 	result = pipe_for_proc(writer, fd);
 	if (result < 0)
 		goto out;
@@ -116,7 +116,7 @@ static int connect_pipe(struct proc *writer, struct proc *reader,
 		goto out;
 	*write_fd = fd[1];
 out:
-	kernel_unlock();
+	sys_unlock();
 	return result;
 }
 
@@ -241,9 +241,9 @@ static void offset_read_entry(void *arg)
 
 	reader = arg;
 	CHECK(sys_read(reader->fd, reader->data, 1) == 1);
-	kernel_lock();
+	sys_lock();
 	CHECK(sched_sleep((char *)reader, WAIT_READ) == 0);
-	kernel_unlock();
+	sys_unlock();
 	CHECK(sys_read(reader->fd, reader->data + 1, PIPSIZ - 1) ==
 	      PIPSIZ - 1);
 	/* Empty pipe now blocks until writer supplies final byte */
@@ -295,9 +295,9 @@ static void test_v7_offset(void)
 	CHECK(ip->i_size == PIPSIZ);
 	CHECK(procs[0].p_state == PROC_WAIT_WRITE);
 	CHECK(procs[0].p_wchan == (char *)ip + 1);
-	kernel_lock();
+	sys_lock();
 	sched_wakeup((char *)&reader);
-	kernel_unlock();
+	sys_unlock();
 	CHECK(sched_resume(&procs[1]) == 0);
 	CHECK(rf->f_offset == 0);
 	CHECK(ip->i_size == 0);
@@ -396,9 +396,9 @@ static void test_reader_close_wakeup(void)
 	CHECK(sched_prepare(&procs[1], read_entry, &reader) == 0);
 	CHECK(sched_resume(&procs[1]) == 0);
 	CHECK(procs[1].p_state == PROC_WAIT_READ);
-	kernel_lock();
+	sys_lock();
 	CHECK(fd_close(&procs[0], write_fd) == 0);
-	kernel_unlock();
+	sys_unlock();
 	CHECK(run_scheduler(&procs[1], 1) == 0);
 	CHECK(reader.result == 0);
 	sched_release(&procs[1]);
@@ -427,9 +427,9 @@ static void test_writer_close_wakeup(void)
 	CHECK(sched_prepare(&procs[0], write_entry, &writer) == 0);
 	CHECK(sched_resume(&procs[0]) == 0);
 	CHECK(procs[0].p_state == PROC_WAIT_WRITE);
-	kernel_lock();
+	sys_lock();
 	CHECK(fd_close(&procs[1], read_fd) == 0);
-	kernel_unlock();
+	sys_unlock();
 	CHECK(run_scheduler(&procs[0], 1) == 0);
 	CHECK(writer.result == -SYS_EPIPE);
 	sched_release(&procs[0]);

@@ -44,7 +44,7 @@ parserが`PARINVLD`を返したcodeは実行せず、`par_init()`と`code_init()
 する。consoleはerror時も変数tableを保持する。
 
 sys層では`struct proc.p_ofile[]`が`struct file`を参照し、read/write endpointが
-共有`struct inode`とmemory-only `struct buf`を参照する。kernel lockはpipe条件、
+共有`struct inode`とmemory-only `struct buf`を参照する。sys lockはpipe条件、
 inode lock、参照数、wait listを保護する。process終了時はfdをcloseしてから
 lock外でbackendをreleaseまたはjoinする。
 

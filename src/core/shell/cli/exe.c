@@ -69,9 +69,9 @@ static int execute_commands(struct exe *exe)
 	previous = current_proc();
 	sched_set_current_proc(&proc->p_exec);
 	result = proc->p_cmd->main(proc->p_argc, proc->p_argv);
-	kernel_lock();
+	sys_lock();
 	close_all(&proc->p_exec);
-	kernel_unlock();
+	sys_unlock();
 	sched_set_current_proc(previous);
 	return result;
 }
@@ -473,19 +473,19 @@ static void proc_entry(void *arg)
 	proc = arg;
 	proc->p_exec.p_ret = proc->p_cmd->main(proc->p_argc,
 						    proc->p_argv);
-	kernel_lock();
+	sys_lock();
 	close_all(&proc->p_exec);
-	kernel_unlock();
+	sys_unlock();
 }
 
 static void close_proc_fds(struct exe_proc *proc, int count)
 {
 	int i;
 
-	kernel_lock();
+	sys_lock();
 	for (i = 0; i < count; i++)
 		close_all(&proc[i].p_exec);
-	kernel_unlock();
+	sys_unlock();
 }
 
 static void cleanup_pipeline(struct exe_proc *proc, int pipe_count,
@@ -507,7 +507,7 @@ static int connect_proc(struct exe_proc *writer, struct exe_proc *reader)
 	int result;
 
 	pinit(&owner);
-	kernel_lock();
+	sys_lock();
 	result = pipe_for_proc(&owner, fd);
 	if (result < 0)
 		goto out;
@@ -521,7 +521,7 @@ static int connect_proc(struct exe_proc *writer, struct exe_proc *reader)
 		fd_close(&writer->p_exec, FD_STDOUT);
 out:
 	close_all(&owner);
-	kernel_unlock();
+	sys_unlock();
 	return result < 0 ? result : 0;
 }
 

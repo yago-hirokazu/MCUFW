@@ -76,7 +76,7 @@ sys層内部とesh executorは、明示的な`struct proc *`を受け取る
 内部pipe処理は`PIPE_IO_*`で進行、read待ち、write待ち、EOF、broken pipe、
 errorを区別する。`sys_read()`と`sys_write()`が待機と再試行を隠す。
 内部の`readp(fp, buf, count)`、`writep(fp, buf, count)`、`plock(ip)`を直接呼ぶ
-場合も同じ実行コンテキストを必要とし、kernel lockを保持して呼び出す。
+場合も同じ実行コンテキストを必要とし、sys lockを保持して呼び出す。
 
 ## Pipe data位置
 
@@ -93,11 +93,11 @@ readerが`i_size`まで読み切った時点でread offsetと`i_size`を0へ戻�
 esh executor用processはこれを`p_exec`として埋め込み、command引数等のshell
 固有情報とportable scheduler状態を分離する。
 
-wait listはportable schedulerが管理し、backendはcontext切替とkernel lockを
+wait listはportable schedulerが管理し、backendはcontext切替とsys lockを
 実装する。channelはアドレスで識別し、pipeは`(char *)ip`でlock、
 `(char *)ip + 1`でwrite、`(char *)ip + 2`でreadを区別する。inode内に
 wait list格納領域は持たず、schedulerの`slpque[]`で管理する。状態検査、
-wait登録、backend待機をkernel lockの下で行い、再開後は条件を再検査する。
+wait登録、backend待機をsys lockの下で行い、再開後は条件を再検査する。
 
 pipeline全体の終了statusは最後のcommandのstatusとする。途中commandのerrorは
 資源回収には影響させるが、この規則を変更しない。

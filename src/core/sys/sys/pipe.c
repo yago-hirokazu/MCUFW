@@ -63,9 +63,9 @@ int sys_pipe(int fd[2])
 {
 	int result;
 
-	kernel_lock();
+	sys_lock();
 	result = pipe_for_proc(current_proc(), fd);
-	kernel_unlock();
+	sys_unlock();
 	return result;
 }
 

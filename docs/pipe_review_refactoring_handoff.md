@@ -83,7 +83,7 @@ esh adapterは`src/core/shell/cli/dev/windows/`に残る。
   Native thread 化は applet の自動並列実行を意味しない
 - Coroutine stack は Windows では現在 64 KiB × 4。
   16 KiB では CRT formatting の結合試験で問題が出たため拡大した
-- Kernel lock は非再帰。条件検査と wait 登録を lock 内で行い、復帰後に再検査
+- Sys lock は非再帰。条件検査と wait 登録を lock 内で行い、復帰後に再検査
 - Fd close の後、lock 外で backend release/join。全終了前に pool を初期化しない
 
 ## 5. 既知の制約と維持すべき挙動

@@ -71,7 +71,7 @@ commitは依頼の範囲に従い、未commitなら記録欄にその旨を書�
 | `src/core/sys/dev/bio.c` | cache取得・解放、bread/bwrite、遅延書込み、flush、iodone |
 | `src/core/sys/dev/bdev.c` | enqueue、start、complete、error/retry |
 | `src/core/sys/sys/alloc.c` | pipe inodeごとにgetblkで取得しbufferを保持 |
-| `src/core/sys/h/sched.h` | kernel lock、wait channel、sleep/wakeup API |
+| `src/core/sys/h/sched.h` | sys lock、wait channel、sleep/wakeup API |
 | `src/core/sys/h/sys_error.h` | host errnoから独立したerror定義 |
 
 `bread()`、`bwrite()`とRAM driverは実装済み。実際の非同期I/O待機は未実装。
@@ -216,7 +216,7 @@ Step 3は即時完了driverを対象とする。未完了要求をspinで待た�
 
 1. 最大pipe数と同時I/O数からNBUFを決め、設定箇所を統一する
 2. cacheとqueueのlock責務、caller側の前提を定める
-3. 既存kernel lockは非再帰であるため、二重lock経路を作らない
+3. 既存sys lockは非再帰であるため、二重lock経路を作らない
 4. busy hit、buffer枯渇の結果を明示し、無期限の再試行を避ける
 5. coroutine/threadでpipe併用と資源回収を確認する
 
@@ -405,7 +405,7 @@ bwriteは0または負のSYS errorを返す。解放前に結果を退避する�
 同期I/O提出失敗も、契約を満たすbufferなら消費して解放する。
 破棄対象bufferはB_ERRORを設定してcacheから無効化する。
 callerは失敗時もbwrite後のbufferを再解放・再参照しない。
-queue所属は同じkernel lock区間で全登録queueのpending/activeを検査する。
+queue所属は同じsys lock区間で全登録queueのpending/activeを検査する。
 B_BUSYだけでは提出可能性を判定しない。検査はNBUFで上限を設け、循環・破損を
 検出した場合は要求を変更せず-SYS_EINVALで拒否する。
 
@@ -488,7 +488,7 @@ STM32の最終配置・容量は移植時の別判断とする。
 
 ### 11.6 lockと実装順序
 
-cache、switch、queue操作はcallerが既存kernel lockで直列化する。
+cache、switch、queue操作はcallerが既存sys lockで直列化する。
 低層getblk/brelse/strategy/iodoneおよびbread/bwriteは内部で再lockしない。
 callerはlock取得から要求・payload操作・解放まで保護する。RAMコピーは256 byteで
 即時完了し、この区間でsleep/yieldしない。所有中payloadを別callerへ公開しない。
@@ -498,7 +498,7 @@ ISRからの提出・完了は今回の範囲外。
 
 Step 1〜3はこの前提を文書化し単一実行主体で検証する。
 Step 4でthread/coroutineのcallerが契約を守ることを試験する。
-非再帰kernel lockなので「必要なら内部でlockする」動的な判定は追加しない。
+非再帰sys lockなので「必要なら内部でlockする」動的な判定は追加しない。
 
 switchへRAM関数を登録するStep 2からconf.cがdriver symbolを参照するため、
 conf.cをlinkする各Makefileへramdisk.cと必要なbdev.cを同じStepで追加する。
@@ -809,7 +809,7 @@ Windows mainのbuild・対話試験、TDM-GCC toolchainのbuild、par、STM32実
 read成功のbufferはcaller所有、bwriteの同期完了は内部解放という契約を守る。
 共通I/O提出はbdev_strategy、dev検査はbdevsw_lookupを使用できる。
 raminitを通常のcache取得やbinitから呼ばない。保存内容が消えるためである。
-BSIZE=256、NBUF=3、既存pipeの寿命中保持、callerによるkernel lockは維持した。
+BSIZE=256、NBUF=3、既存pipeの寿命中保持、callerによるsys lockは維持した。
 共存時のNBUF変更はStep 4、遅延書込みはStep 5、起動接続と全回帰はStep 6。
 
 ## 15. Step 3実施記録
@@ -944,7 +944,7 @@ Windows mainのbuild・対話試験、TDM-GCC toolchain、par、STM32実機は�
 
 ### 次Stepへの注意事項
 
-次はStep 4の資源・排他・pipe共存。現在のAPIはcallerがkernel lockで直列化し、
+次はStep 4の資源・排他・pipe共存。現在のAPIはcallerがsys lockで直列化し、
 低層関数は内部でlockせず、sleep/yieldもしない。
 最大3本のpipeとI/O用buffer2個の構成に合わせてNBUFの既定値を5へ変更する。
 今回のbio試験はNBUFに追従するが、全既存試験の固定値前提も確認すること。
@@ -973,14 +973,14 @@ compile optionによるNBUF=3の上書きも維持し、同一buildでは全TU�
 poolは分割・予約せず、実際に空きがなければgetblkはNULL、breadはEAGAINとなる。
 
 lock境界は既存のcaller方式を維持し、buf.h、conf.h、sched.hで対象を明記した。
-kernel lockはcacheのb-list/av-list、B_BUSY、queue、pipe/file/inode、wait条件を保護する。
+sys lockはcacheのb-list/av-list、B_BUSY、queue、pipe/file/inode、wait条件を保護する。
 cache取得からpayloadの参照・更新、提出、解放までcallerが同じlockで保護する。
 低層APIは内部でlockしないので、すでにlockを持つcallerから再帰lockしない。
 初期化と他の実行主体がない単体試験だけはlock省略可とする。
 
 確認したproductionの呼出し経路:
 
-- shell/cli/exe.cのpipe接続・owner解放・各process close_allはkernel lock区間内
+- shell/cli/exe.cのpipe接続・owner解放・各process close_allはsys lock区間内
 - sys/pipe.cのsys_pipeはlockを取得してpipe_for_procへ接続
 - sys/sys2.cのsys_read/sys_write/sys_closeはlock区間内で低層file/pipe処理を呼ぶ
 - alloc.cのgetblk、iget.cのbrelseは上記callerのlockを継承する
@@ -994,14 +994,14 @@ busy hitや枯渇は即座にEAGAINとし、所有状態を変えず、内部で
 
 bundled V7 usr/sys/dev/bio.cのgetblkで、busy bufferとfree list枯渇時に
 sleepして再探索する経路と、splによるlist保護を確認した。
-MCUFWでは従来方針どおりcallerのkernel lockで保護し、取得不能を明示的に返す。
+MCUFWでは従来方針どおりcallerのsys lockで保護し、取得不能を明示的に返す。
 buffer/list/queueとpipeの実装本体は変更せず、資源上限と呼出し規約の確認に留めた。
 
 ### 共存試験
 
 sys/test/schedへ以下を追加した。
 
-1. process外のcallerがkernel lockを保持して3本のpipeへ異なるmarkerを書く
+1. process外のcallerがsys lockを保持して3本のpipeへ異なるmarkerを書く
 2. 既定構成では残り2 bufferをRAM I/Oで同時保持する
 3. busy hit・全buffer保持・追加pipe生成が失敗しても所有資源が変わらないことを確認
 4. RAMへの書込みとcache再利用、I/O失敗を経てもpipe markerを読み戻せることを確認
@@ -1017,7 +1017,7 @@ read-modify-write中にSwitchToThreadを呼び、lockで保護された区間の
 native threadを起動するコードはWindows thread試験だけにあり、portable coreへは
 追加していない。
 
-RAM strategyの試験wrapperでkernel_is_lockedを検査する。
+RAM strategyの試験wrapperでsys_lock_heldを検査する。
 cache取得・更新・提出・解放でcallerのlockが維持され、二重lockで停止しないことを
 実際のthread backendでも確認する。試験終了時にはfile/inode/busy bufferが0で、
 b-list/av-listの双方向link、全bufferの単一所属、queue空も確認する。
@@ -1159,7 +1159,7 @@ breadからは-SYS_EAGAINになる。呼出し側はbflushで保存errorを取�
 成功した書戻しbufferは通常の空きリスト末尾へ解放するため、全buffer dirty時は
 最大NBUF件を保存してから先頭を再利用する。V7の非同期B_AGE操作は採用しない。
 
-全APIとpayload操作は既存どおりcallerのkernel lock区間で行う。
+全APIとpayload操作は既存どおりcallerのsys lock区間で行う。
 flushのコピー量は最大NBUF*BSIZE、既定値では1280 byte。内部lock、sleep、
 heap確保、待機queue、永続ストレージ、構造体memberや固定領域の追加はない。
 
@@ -1254,7 +1254,7 @@ bdwriteし、flushする。binit単独の後は全byteが保持されること�
 ### API使用例
 
 minor 0のblock内1 byteを更新し、同じdevのdirtyを保存完了までflushする例。
-coreの呼出し側がkernel lockを取得し、payloadへのアクセスと解放まで保持する。
+coreの呼出し側がsys lockを取得し、payloadへのアクセスと解放まで保持する。
 部分更新ではgetblkでなくbreadを使い、残りのbyteを維持する。
 
 ```c
@@ -1271,7 +1271,7 @@ int ram_update_byte(unsigned long block, size_t offset, unsigned char value)
 
 	if (offset >= BSIZE)
 		return -SYS_EINVAL;
-	kernel_lock();
+	sys_lock();
 	bp = bread(dev, block, &error);
 	if (!bp)
 		goto out;
@@ -1282,7 +1282,7 @@ int ram_update_byte(unsigned long block, size_t offset, unsigned char value)
 	else
 		error = bflush(dev);
 out:
-	kernel_unlock();
+	sys_unlock();
 	return error;
 }
 ```

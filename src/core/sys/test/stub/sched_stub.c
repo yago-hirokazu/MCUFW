@@ -70,18 +70,18 @@ int sched_stub_wakeup_count(char *chan)
 	return 0;
 }
 
-void kernel_lock(void)
+void sys_lock(void)
 {
 	lock_count++;
 }
 
-void kernel_unlock(void)
+void sys_unlock(void)
 {
 	if (lock_count)
 		lock_count--;
 }
 
-int kernel_is_locked(void)
+int sys_lock_held(void)
 {
 	return lock_count != 0;
 }

@@ -11,19 +11,19 @@ context切替とlock実装をscheduler backendへ委譲する。Windows backend�
 `src/core/sys/dev/windows/sched_adapt.mk`の`SCHED_BACKEND`でbackendを選ぶ。
 defaultは`cortn`で、`thread`指定時はnative Windows threadを使用する。
 
-## Kernel lock
+## Sys lock
 
-pipe状態、inode lock、file/inode参照、wait listを単一の非再帰kernel lockで
+pipe状態、inode lock、file/inode参照、wait listを単一の非再帰sys lockで
 保護する。coroutine backendは所有状態を追跡し、yield時にlockを解放してcontext
 切替後に再取得する。thread backendはSRW lockとcondition variableを使う。
 
 ## Sleep
 
-`sched_sleep()`は`sched_prepare()`に成功した実行コンテキストから、kernel lockを
+`sched_sleep()`は`sched_prepare()`に成功した実行コンテキストから、sys lockを
 保持して呼び出す。schedulerがそのprocessをcurrent processとして実行中である
 ことを前提とし、`p_ctx`のNULL判定は行わない。
 
-current processの存在、kernel lockの保持、`p_wchan`が未登録であることは
+current processの存在、sys lockの保持、`p_wchan`が未登録であることは
 呼出し側の前提とし、実行時の検査は行わない。
 backendのyield失敗時は待機登録を除去し、エラーを返す。
 
@@ -40,7 +40,7 @@ wait登録前に実行権を返さないため、条件検査直後のwakeupを�
 
 ## Wakeup
 
-`sched_wakeup()`はkernel lock保持中に呼び出す。wait list上のprocessは、
+`sched_wakeup()`はsys lock保持中に呼び出す。wait list上のprocessは、
 `sched_prepare()`で準備した有効な実行コンテキストを保持していることを
 前提とし、起床対象の`p_ctx`のNULL判定は行わない。起床を通知する呼出し元は
 実行コンテキストを持たなくてもよい。
@@ -117,9 +117,9 @@ backendを再開し、戻った状態を次のportable状態へ写す。
 processを返す。runnable processがなく未完了processが残る場合、executorは
 idleまたはdeadlockとして扱う。
 
-`sched_release()`はkernel lock保持中にprocessをwait listから外してから
+`sched_release()`はsys lock保持中にprocessをwait listから外してから
 `p_ctx`をNULLにする。この順序により、起床処理が実行コンテキストを失った
-processをwait listから取り出すことを防ぐ。backend handleはkernel lock外で
+processをwait listから取り出すことを防ぐ。backend handleはsys lock外で
 解放する。thread join中にworkerがlockを必要とするため、lock内でjoinしない。
 
 ## V7との差分

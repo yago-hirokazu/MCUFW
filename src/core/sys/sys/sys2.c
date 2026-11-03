@@ -14,7 +14,7 @@ ptrdiff_t sys_read(int fd, void *buf, size_t count)
 	if (!count)
 		return 0;
 	proc = current_proc();
-	kernel_lock();
+	sys_lock();
 	fp = getf(proc, fd);
 	if (!fp || !(fp->f_flag & FREAD)) {
 		result = -SYS_EBADF;
@@ -22,7 +22,7 @@ ptrdiff_t sys_read(int fd, void *buf, size_t count)
 	}
 	result = readp(fp, buf, count);
 out:
-	kernel_unlock();
+	sys_unlock();
 	return result;
 }
 
@@ -35,7 +35,7 @@ ptrdiff_t sys_write(int fd, const void *buf, size_t count)
 	if (count == 0)
 		return 0;
 	proc = current_proc();
-	kernel_lock();
+	sys_lock();
 	fp = getf(proc, fd);
 	if (!fp || !(fp->f_flag & FWRITE)) {
 		result = -SYS_EBADF;
@@ -43,7 +43,7 @@ ptrdiff_t sys_write(int fd, const void *buf, size_t count)
 	}
 	result = writep(fp, buf, count);
 out:
-	kernel_unlock();
+	sys_unlock();
 	return result;
 }
 
@@ -53,8 +53,8 @@ int sys_close(int fd)
 	int result;
 
 	proc = current_proc();
-	kernel_lock();
+	sys_lock();
 	result = fd_close(proc, fd);
-	kernel_unlock();
+	sys_unlock();
 	return result;
 }

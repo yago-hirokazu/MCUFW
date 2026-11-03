@@ -34,22 +34,25 @@ void sched_test_fail_next_yield(void)
 }
 #endif
 
-void kernel_lock(void)
+/* Acquire shared sys lock */
+void sys_lock(void)
 {
 	sched_adapt_lock();
 }
 
-void kernel_unlock(void)
+/* Release shared sys lock */
+void sys_unlock(void)
 {
 	sched_adapt_unlock();
 }
 
-int kernel_is_locked(void)
+/* Report sys lock ownership in current execution context */
+int sys_lock_held(void)
 {
 	return sched_adapt_is_locked();
 }
 
-/* Register wait event before yielding with kernel lock held */
+/* Register wait event before yielding with sys lock held */
 int sched_sleep(char *chan, enum wait_reason reason)
 {
 	struct proc *proc;
@@ -98,7 +101,7 @@ void sched_wakeup(char *chan)
 	struct proc *next;
 	unsigned int h;
 
-	assert(kernel_is_locked());
+	assert(sys_lock_held());
 	h = wait_hash(chan);
 	previous = NULL;
 	proc = slpque[h];
@@ -155,17 +158,17 @@ int sched_prepare(struct proc *proc, void (*entry)(void *arg), void *arg)
 	return sched_bind_proc_to_coroutine(proc, backend);
 }
 
-/* Unlink prepared process and release backend outside kernel lock */
+/* Unlink prepared process and release backend outside sys lock */
 void sched_release(struct proc *proc)
 {
 	void *backend;
 
-	kernel_lock();
+	sys_lock();
 	if (proc->p_wchan)
 		remove_wait_proc(proc->p_wchan, proc);
 	backend = proc->p_ctx;
 	proc->p_ctx = NULL;
-	kernel_unlock();
+	sys_unlock();
 	sched_adapt_release(backend);
 }
 
@@ -174,24 +177,24 @@ int sched_resume(struct proc *proc)
 {
 	int result;
 
-	kernel_lock();
+	sys_lock();
 	sched_set_current_proc(proc);
 	proc->p_state = PROC_RUNNING;
-	kernel_unlock();
+	sys_unlock();
 	result = sched_adapt_resume(proc);
 	sched_set_current_proc(NULL);
 	if (result == PROC_ERROR) {
-		kernel_lock();
+		sys_lock();
 		proc->p_state = PROC_ERROR;
-		kernel_unlock();
+		sys_unlock();
 		return -SYS_EINVAL;
 	}
 	/* Keep wakeup published after backend reported wait state */
-	kernel_lock();
+	sys_lock();
 	if (result != PROC_WAIT_LOCK && result != PROC_WAIT_READ &&
 	    result != PROC_WAIT_WRITE)
 		proc->p_state = (enum proc_state)result;
-	kernel_unlock();
+	sys_unlock();
 	return 0;
 }
 
@@ -213,7 +216,7 @@ static void remove_wait_proc(char *chan, struct proc *proc)
 	struct proc *previous;
 	unsigned int h;
 
-	assert(kernel_is_locked());
+	assert(sys_lock_held());
 	h = wait_hash(chan);
 	previous = NULL;
 	current = slpque[h];

@@ -46,7 +46,7 @@ Baseline 試験は元の作業ツリーを変更しない独立スナップシ�
 - EOF、EPIPE、status、stdio の現行契約
 - pipe状態検査とwait登録の不可分性
 - 待機から復帰した後の条件再検査
-- fd close後、kernel lock外でbackend release/join
+- fd close後、sys lock外でbackend release/join
 - typedefを新規追加しない
 - コメントは電報スタイル、80カラム以内
 
@@ -126,7 +126,7 @@ Pipelineの準備、fd close、backend releaseは、現状でも順序を意識�
 
 1. 全process fdをclose
 2. closeによってEOF/EPIPEを通知し、waiterをwake
-3. kernel lock外でbackendをrelease/join
+3. sys lock外でbackendをrelease/join
 4. 全backend終了後に資源を再利用
 
 #### 4.2.3 Script成功・error経路

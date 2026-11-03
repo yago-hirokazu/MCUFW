@@ -978,9 +978,9 @@ inodeはlock、read、writeの三つのwait channelを所有する。`plock`は`
 このため`sched.h`へ`PROC_WAIT_LOCK`と`WAIT_LOCK`を追加した。Step 5の
 schedulerは次を守る。
 
-- callerはcondition検査からwait登録までkernel lockを保持する
+- callerはcondition検査からwait登録までsys lockを保持する
 - `sched_sleep`はwait list登録とbackend yieldを分離不能にする
-- backend yieldは再開時にkernel lockを保持した状態で戻る
+- backend yieldは再開時にsys lockを保持した状態で戻る
 - `sched_wakeup`は対象channelの全waiterをlistから外してrunnableにする
 - `WAIT_LOCK`、`WAIT_READ`、`WAIT_WRITE`を対応するprocess状態へ変換する
 - close中のwakeupはfile/inode解放完了後にwaiterが実行される順序を保つ
@@ -1033,9 +1033,9 @@ flagとinodeを設定し、組立中参照をendpoint二つの参照へ変換し
 
 - schedulerへ`PROC_WAIT_LOCK`と`WAIT_LOCK`を実装する
 - 三つのwait channelは各inodeが所有し、inode最終解放まで有効とする
-- sleepはkernel lock保持中に登録し、再開時もlock保持状態で戻る
+- sleepはsys lock保持中に登録し、再開時もlock保持状態で戻る
 - wakeup後は`readp`、`writep`、`plock`が必ず条件を再検査する
-- closeはkernel lock保持中に両peer channelを起床してから`iput`する
+- closeはsys lock保持中に両peer channelを起床してから`iput`する
 - Step 7で旧ring固有のwrap-around期待値をV7 offset方式へ変更する
 - `sys_read`、`sys_write`、`sys_close`を置く`sys2.c`はStep 7切替時に追加する
 
@@ -1074,7 +1074,7 @@ Windows backendの物理移動はStep 6で行う。このStepでは現配置のb
 
 ### 重要invariant
 
-- kernel lockは非再帰
+- sys lockは非再帰
 - condition検査とwait登録は同じlock区間
 - backend yieldはlock保持条件を破らない
 - wakeupはwait listから外してrunnableへ遷移
@@ -1116,12 +1116,12 @@ scheduler本体、型、APIをsys層へ汎用化し、既存callerを必要範�
 
 Step 4から引き継いだinode lock待機のため、`WAIT_LOCK`を
 `PROC_WAIT_LOCK`へ遷移させる経路をschedulerとcoroutine backendへ追加した。
-sleepはkernel lock保持中にwait listへ登録し、backend yieldからlock保持状態で
+sleepはsys lock保持中にwait listへ登録し、backend yieldからlock保持状態で
 戻る。resume結果がwait状態でも、並行wakeupが公開したrunnable状態を上書き
 しない。
 
-releaseはkernel lock保持中にwait listからprocessを切り離し、backend pointerを
-退避してからlock外でbackendを解放する。thread backendのjoinがkernel lock外に
+releaseはsys lock保持中にwait listからprocessを切り離し、backend pointerを
+退避してからlock外でbackendを解放する。thread backendのjoinがsys lock外に
 残るため、fd close後にreleaseするcaller契約を維持できる。
 
 executor側の既存`struct proc`は`struct exe_proc`へ変更した。Step 7までは旧
@@ -1158,7 +1158,7 @@ pipeline試験が従来から出力するparser error診断とcompiler warning�
 - `sched_adapt_yield`、`sched_adapt_wake`、
   `sched_adapt_resume`
 
-backendは非再帰kernel lockを提供する。`sched_adapt_yield`はlock保持状態で
+backendは非再帰sys lockを提供する。`sched_adapt_yield`はlock保持状態で
 呼ばれ、待機中だけlockを解放し、lockを再取得して戻る。
 `sched_adapt_current`は実行中processを各実行contextで返す。wakeは待機中の
 backendを再開可能にし、実際のrun token付与は`sched_resume`が行う。

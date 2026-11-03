@@ -413,7 +413,7 @@ Windows の coroutine slot は現在64 KiBを4個持ちます。stack 両端の 
 
 また、これは協調的な切替です。I/O 待機しない CPU-only の長いコマンドを、一定時間ごとに強制的に交代させる仕組みではありません。
 
-coroutine backend の kernel lock は、この単一実行・非プリエンプトという前提で、lock 状態を管理しています。複数 OS thread を排他する mutex ではありません。
+coroutine backend の sys lock は、この単一実行・非プリエンプトという前提で、lock 状態を管理しています。複数 OS thread を排他する mutex ではありません。
 
 ## 11. thread backend：実行場所だけを Windows に任せる
 
@@ -517,7 +517,7 @@ fd を閉じる
 - coroutine：slot を再利用可能にする
 - thread：worker の終了を待ち、handle を閉じ、slot を再利用可能にする
 
-thread の終了待ちは kernel lock の外で行います。lock を保持したまま join すると、worker が終了処理で同じ lock を必要として停止する危険があるためです。
+thread の終了待ちは sys lock の外で行います。lock を保持したまま join すると、worker が終了処理で同じ lock を必要として停止する危険があるためです。
 
 現在の executor は、作成済み pipe 数と準備済み backend 数を記録し、途中の準備失敗も共通 cleanup 経路で処理します。
 

@@ -27,8 +27,8 @@ struct sched_thread_slot {
 	int ts_stop;
 };
 
-static SRWLOCK kernel_mutex = SRWLOCK_INIT;
-static _Thread_local int kernel_lock_held;
+static SRWLOCK sys_mutex = SRWLOCK_INIT;
+static _Thread_local int sys_lock_owned;
 static _Thread_local struct proc *current;
 static struct sched_thread_slot thread_slots[PIPELINE_MAX];
 
@@ -47,19 +47,19 @@ void sched_adapt_set_current(struct proc *proc)
 
 void sched_adapt_lock(void)
 {
-	AcquireSRWLockExclusive(&kernel_mutex);
-	kernel_lock_held = 1;
+	AcquireSRWLockExclusive(&sys_mutex);
+	sys_lock_owned = 1;
 }
 
 void sched_adapt_unlock(void)
 {
-	kernel_lock_held = 0;
-	ReleaseSRWLockExclusive(&kernel_mutex);
+	sys_lock_owned = 0;
+	ReleaseSRWLockExclusive(&sys_mutex);
 }
 
 int sched_adapt_is_locked(void)
 {
-	return kernel_lock_held;
+	return sys_lock_owned;
 }
 
 /* Create worker awaiting execution token in available slot */
@@ -69,7 +69,7 @@ void *sched_adapt_prepare(void (*entry)(void *arg), void *arg)
 	uintptr_t thread;
 	int i;
 
-	kernel_lock();
+	sys_lock();
 	for (i = 0; i < PIPELINE_MAX; i++) {
 		slot = &thread_slots[i];
 		if (slot->ts_used != 0)
@@ -84,14 +84,14 @@ void *sched_adapt_prepare(void (*entry)(void *arg), void *arg)
 				       0, NULL);
 		if (thread == 0) {
 			memset(slot, 0, sizeof(*slot));
-			kernel_unlock();
+			sys_unlock();
 			return NULL;
 		}
 		slot->ts_thread = (HANDLE)thread;
-		kernel_unlock();
+		sys_unlock();
 		return slot;
 	}
-	kernel_unlock();
+	sys_unlock();
 	return NULL;
 }
 
@@ -101,16 +101,16 @@ void sched_adapt_release(void *backend)
 	struct sched_thread_slot *slot;
 
 	slot = backend;
-	kernel_lock();
+	sys_lock();
 	slot->ts_stop = 1;
 	WakeAllConditionVariable(&slot->ts_run_cv);
-	kernel_unlock();
+	sys_unlock();
 	/* Wait for cooperative unwind before reclaiming slot */
 	WaitForSingleObject(slot->ts_thread, INFINITE);
 	CloseHandle(slot->ts_thread);
-	kernel_lock();
+	sys_lock();
 	memset(slot, 0, sizeof(*slot));
-	kernel_unlock();
+	sys_unlock();
 }
 
 int sched_adapt_yield(struct proc *proc, enum wait_reason reason)
@@ -144,10 +144,10 @@ enum proc_state sched_adapt_resume(struct proc *proc)
 	struct sched_thread_slot *slot = proc->p_ctx;
 	enum proc_state state;
 
-	kernel_lock();
+	sys_lock();
 	/* Initial native wait may fail before first execution token */
 	if (slot->ts_done != 0) {
-		kernel_unlock();
+		sys_unlock();
 		return PROC_ERROR;
 	}
 	slot->ts_proc = proc;
@@ -155,12 +155,12 @@ enum proc_state sched_adapt_resume(struct proc *proc)
 	WakeAllConditionVariable(&slot->ts_run_cv);
 	while (slot->ts_run && !slot->ts_done) {
 		if (sched_thread_wait(&slot->ts_report_cv) < 0) {
-			kernel_unlock();
+			sys_unlock();
 			return PROC_ERROR;
 		}
 	}
 	state = proc->p_state;
-	kernel_unlock();
+	sys_unlock();
 	return state;
 }
 
@@ -168,10 +168,10 @@ static int sched_thread_wait(CONDITION_VARIABLE *cv)
 {
 	BOOL result;
 
-	kernel_lock_held = 0;
-	result = SleepConditionVariableSRW(cv, &kernel_mutex,
+	sys_lock_owned = 0;
+	result = SleepConditionVariableSRW(cv, &sys_mutex,
 					  INFINITE, 0);
-	kernel_lock_held = 1;
+	sys_lock_owned = 1;
 	return result ? 0 : -SYS_EINVAL;
 }
 
@@ -179,22 +179,22 @@ static unsigned __stdcall sched_thread_entry(void *arg)
 {
 	struct sched_thread_slot *slot = arg;
 
-	kernel_lock();
+	sys_lock();
 	while (!slot->ts_run && !slot->ts_stop) {
 		if (sched_thread_wait(&slot->ts_run_cv) < 0)
 			slot->ts_stop = 1;
 	}
 	if (!slot->ts_stop) {
 		sched_set_current_proc(slot->ts_proc);
-		kernel_unlock();
+		sys_unlock();
 		slot->ts_entry(slot->ts_arg);
-		kernel_lock();
+		sys_lock();
 		slot->ts_proc->p_state = PROC_FINISHED;
 	}
 	slot->ts_done = 1;
 	slot->ts_run = 0;
 	WakeAllConditionVariable(&slot->ts_report_cv);
-	kernel_unlock();
+	sys_unlock();
 	sched_set_current_proc(NULL);
 	return 0;
 }

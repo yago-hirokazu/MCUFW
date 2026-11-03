@@ -170,10 +170,10 @@ static ptrdiff_t proc_read(int fd, void *buf, size_t count)
 	struct proc *proc;
 	ptrdiff_t result;
 
-	kernel_lock();
+	sys_lock();
 	proc = current_proc();
 	result = readp(getf(proc, fd), buf, count);
-	kernel_unlock();
+	sys_unlock();
 	return result;
 }
 
@@ -182,10 +182,10 @@ static ptrdiff_t proc_write(int fd, const void *buf, size_t count)
 	struct proc *proc;
 	ptrdiff_t result;
 
-	kernel_lock();
+	sys_lock();
 	proc = current_proc();
 	result = writep(getf(proc, fd), buf, count);
-	kernel_unlock();
+	sys_unlock();
 	return result;
 }
 
@@ -194,18 +194,18 @@ static int proc_close(int fd)
 	struct proc *proc;
 	int result;
 
-	kernel_lock();
+	sys_lock();
 	proc = current_proc();
 	result = fd_close(proc, fd);
-	kernel_unlock();
+	sys_unlock();
 	return result;
 }
 
 static void close_all_locked(struct proc *proc)
 {
-	kernel_lock();
+	sys_lock();
 	close_all(proc);
-	kernel_unlock();
+	sys_unlock();
 }
 
 static int connect_pipe(struct proc *writer, struct proc *reader,
@@ -215,7 +215,7 @@ static int connect_pipe(struct proc *writer, struct proc *reader,
 	int fd[2];
 	int result;
 
-	kernel_lock();
+	sys_lock();
 	result = pipe_for_proc(writer, fd);
 	if (result < 0)
 		goto out;
@@ -230,7 +230,7 @@ static int connect_pipe(struct proc *writer, struct proc *reader,
 		goto out;
 	*write_fd = fd[1];
 out:
-	kernel_unlock();
+	sys_unlock();
 	return result;
 }
 
@@ -296,10 +296,10 @@ static void wait_entry(void *arg)
 	struct wait_arg *wait;
 
 	wait = arg;
-	kernel_lock();
+	sys_lock();
 	wait->result = sched_sleep(wait->chan, wait->reason);
-	wait->lock_held = kernel_is_locked();
-	kernel_unlock();
+	wait->lock_held = sys_lock_held();
+	sys_unlock();
 }
 
 static void unused_entry(void *arg)
@@ -371,11 +371,11 @@ static void test_wait_lock(void)
 	pinit(&sleeper);
 	CHECK(connect_pipe(&owner, &sleeper, &write_fd, &read_fd) == 0);
 	ip = getf(&sleeper, read_fd)->f_inode;
-	kernel_lock();
+	sys_lock();
 	ip->i_flag |= ILOCK;
 	offset = 0;
 	CHECK(writei(ip, &offset, &input, 1) == 1);
-	kernel_unlock();
+	sys_unlock();
 	reader.data = &output;
 	reader.capacity = 1;
 	reader.count = 0;
@@ -384,9 +384,9 @@ static void test_wait_lock(void)
 	CHECK(sched_prepare(&sleeper, reader_entry, &reader) == 0);
 	CHECK(sched_resume(&sleeper) == 0);
 	CHECK(sleeper.p_state == PROC_WAIT_LOCK);
-	kernel_lock();
+	sys_lock();
 	prele(ip);
-	kernel_unlock();
+	sys_unlock();
 	CHECK(run_scheduler(&sleeper, 1) == 0);
 	CHECK(reader.count == 1);
 	CHECK(output == input);
@@ -411,9 +411,9 @@ static void test_multiple_waiters(void)
 		CHECK(sched_resume(&procs[i]) == 0);
 		CHECK(procs[i].p_state == PROC_WAIT_READ);
 	}
-	kernel_lock();
+	sys_lock();
 	sched_wakeup(&chan);
-	kernel_unlock();
+	sys_unlock();
 	CHECK(run_scheduler(procs, 2) == 0);
 	for (i = 0; i < 2; i++) {
 		CHECK(procs[i].p_wchan == NULL);
@@ -450,9 +450,9 @@ static void test_inode_channels(void)
 			CHECK(procs[i].p_wchan == (char *)&node + i);
 		}
 		for (i = 0; i < 3; i++) {
-			kernel_lock();
+			sys_lock();
 			sched_wakeup((char *)&node + i);
-			kernel_unlock();
+			sys_unlock();
 			CHECK(procs[i].p_state == PROC_RUNNABLE);
 			CHECK(procs[i].p_wchan == NULL);
 			CHECK(procs[i].p_link == NULL);
@@ -483,17 +483,17 @@ static void test_hash_collision(void)
 		CHECK(sched_prepare(&procs[i], wait_entry, &wait[i]) == 0);
 		CHECK(sched_resume(&procs[i]) == 0);
 	}
-	kernel_lock();
+	sys_lock();
 	sched_wakeup(channels);
-	kernel_unlock();
+	sys_unlock();
 	CHECK(procs[0].p_state == PROC_RUNNABLE);
 	CHECK(procs[2].p_state == PROC_RUNNABLE);
 	CHECK(procs[1].p_state == PROC_WAIT_READ);
 	CHECK(procs[1].p_wchan == channels + 1);
 	CHECK(procs[1].p_link == NULL);
-	kernel_lock();
+	sys_lock();
 	sched_wakeup(channels + 1);
-	kernel_unlock();
+	sys_unlock();
 	CHECK(run_scheduler(procs, 3) == 0);
 	for (i = 0; i < 3; i++) {
 		CHECK(wait[i].result == 0 && wait[i].lock_held);
@@ -524,9 +524,9 @@ static void test_release_collision(void)
 		CHECK(procs[removed].p_wchan == NULL);
 		CHECK(procs[removed].p_link == NULL);
 		for (i = 0; i < 3; i++) {
-			kernel_lock();
+			sys_lock();
 			sched_wakeup(channels + i);
-			kernel_unlock();
+			sys_unlock();
 			if (i == removed)
 				continue;
 			CHECK(procs[i].p_state == PROC_RUNNABLE);
@@ -568,9 +568,9 @@ static void test_wake_then_release(void)
 	wait.reason = WAIT_READ;
 	CHECK(sched_prepare(&proc, wait_entry, &wait) == 0);
 	CHECK(sched_resume(&proc) == 0);
-	kernel_lock();
+	sys_lock();
 	sched_wakeup(&chan);
-	kernel_unlock();
+	sys_unlock();
 	CHECK(proc.p_state == PROC_RUNNABLE);
 	sched_release(&proc);
 	CHECK(proc.p_ctx == NULL);
@@ -687,7 +687,7 @@ static void check_buffer_lists(void)
 static void ram_test_begin(void)
 {
 	CHECK(current_proc() == NULL);
-	CHECK(!kernel_is_locked());
+	CHECK(!sys_lock_held());
 
 	raminit();
 	binit();
@@ -699,7 +699,7 @@ static void ram_test_begin(void)
 
 static void ram_test_end(void)
 {
-	CHECK(!kernel_is_locked());
+	CHECK(!sys_lock_held());
 	CHECK(current_proc() == NULL);
 	bdevsw[RAM_MAJOR].d_strategy = saved_ram_strategy;
 	check_resources();
@@ -707,7 +707,7 @@ static void ram_test_end(void)
 
 static void locked_ram_strategy(struct buf *bp)
 {
-	CHECK(kernel_is_locked());
+	CHECK(sys_lock_held());
 	if (pipe_in_use() == NINODE)
 		max_pipe_io++;
 	ramstrategy(bp);
@@ -760,14 +760,14 @@ static void test_ram_capacity(void)
 
 	ram_test_begin();
 	pinit(&owner);
-	kernel_lock();
+	sys_lock();
 	make_full_pipes(&owner, pipes);
 	extra = NBUF - NINODE;
 	for (i = 0; i < extra; i++) {
 		held[i] = bread(makedev(RAM_MAJOR, 0), (unsigned long)i);
 		CHECK(held[i] != NULL && held[i]->b_error == 0);
 		held[i]->b_addr[0] = (unsigned char)(0x70 + i);
-		CHECK(kernel_is_locked());
+		CHECK(sys_lock_held());
 	}
 	CHECK(bread(makedev(RAM_MAJOR, 0), NBUF) == NULL);
 
@@ -800,7 +800,7 @@ static void test_ram_capacity(void)
 	}
 	bflush(NODEV);
 	drain_full_pipes(&owner, pipes);
-	CHECK(kernel_is_locked());
+	CHECK(sys_lock_held());
 	for (i = 0; i < NBUF; i++) {
 		held[i] = getblk(makedev(RAM_MAJOR, 0), (unsigned long)i);
 		CHECK(held[i] != NULL);
@@ -811,7 +811,7 @@ static void test_ram_capacity(void)
 		brelse(held[i]);
 	CHECK(pipe_for_proc(&owner, fd) == 0);
 	close_all(&owner);
-	kernel_unlock();
+	sys_unlock();
 	ram_test_end();
 }
 
@@ -822,7 +822,7 @@ static int ram_increment(void)
 	unsigned int value;
 	int error;
 
-	kernel_lock();
+	sys_lock();
 
 	bp = bread(makedev(RAM_MAJOR, 0), 0);
 	if (bp) {
@@ -837,7 +837,7 @@ static int ram_increment(void)
 		bwrite(bp);
 	}
 	error = bp ? -bp->b_error : -SYS_EAGAIN;
-	kernel_unlock();
+	sys_unlock();
 	return error;
 }
 
@@ -847,7 +847,7 @@ static unsigned int ram_counter(void)
 	unsigned int value;
 
 	value = 0;
-	kernel_lock();
+	sys_lock();
 
 	bp = bread(makedev(RAM_MAJOR, 0), 0);
 	CHECK(bp != NULL && bp->b_error == 0);
@@ -855,7 +855,7 @@ static unsigned int ram_counter(void)
 		value = bp->b_addr[0] | ((unsigned int)bp->b_addr[1] << 8);
 		brelse(bp);
 	}
-	kernel_unlock();
+	sys_unlock();
 	return value;
 }
 
@@ -1002,9 +1002,9 @@ static void test_parallel_ram(void)
 
 	ram_test_begin();
 	pinit(&owner);
-	kernel_lock();
+	sys_lock();
 	make_full_pipes(&owner, pipes);
-	kernel_unlock();
+	sys_unlock();
 	start = CreateEvent(NULL, TRUE, FALSE, NULL);
 	CHECK(start != NULL);
 	created = 0;
@@ -1035,9 +1035,9 @@ static void test_parallel_ram(void)
 	CHECK(created == 2);
 	CHECK(ram_counter() == (unsigned int)(created * 500));
 	CHECK(max_pipe_io > 0);
-	kernel_lock();
+	sys_lock();
 	drain_full_pipes(&owner, pipes);
-	kernel_unlock();
+	sys_unlock();
 	ram_test_end();
 }
 #endif
@@ -1049,7 +1049,7 @@ static void buffer_wait_entry(void *arg)
 	struct buffer_wait_arg *waiter = arg;
 	struct buf *bp;
 
-	kernel_lock();
+	sys_lock();
 	bp = bread(makedev(RAM_MAJOR, 0), RAM_NBLK);
 	CHECK(bp != NULL);
 	if (bp) {
@@ -1058,7 +1058,7 @@ static void buffer_wait_entry(void *arg)
 		waiter->after = bp->b_error;
 		brelse(bp);
 	}
-	kernel_unlock();
+	sys_unlock();
 }
 
 /* Successful peer I/O leaves sleeping caller's buffer error intact */
@@ -1067,13 +1067,13 @@ static void buffer_peer_entry(void *arg)
 	char *chan = arg;
 	struct buf *bp;
 
-	kernel_lock();
+	sys_lock();
 	bp = bread(makedev(RAM_MAJOR, 0), 0);
 	CHECK(bp != NULL && bp->b_error == 0);
 	if (bp)
 		brelse(bp);
 	sched_wakeup(chan);
-	kernel_unlock();
+	sys_unlock();
 }
 
 /* Buffers retain independent errors through wait and resume */

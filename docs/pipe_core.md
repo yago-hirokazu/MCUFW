@@ -87,7 +87,7 @@ reader不在時のwriteは`-SYS_EPIPE`を返し、signalは発生させない。
 
 ## 排他制御
 
-公開API経由のpool、参照数、inode、buffer操作は非再帰kernel lockで保護する。
+公開API経由のpool、参照数、inode、buffer操作は非再帰sys lockで保護する。
 inodeの`ILOCK`と`IWANT`はV7の`plock()`、`prele()`に対応し、lock競合時は専用
 wait channelで待つ。再開後はlockとpipe条件を必ず再検査する。
 

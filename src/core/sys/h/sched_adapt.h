@@ -17,7 +17,7 @@ void sched_adapt_set_current(struct proc *proc);
 void *sched_adapt_prepare(void (*entry)(void *arg), void *arg);
 /* Release requires live handle returned by prepare */
 void sched_adapt_release(void *backend);
-/* Yield enters and returns with kernel lock held */
+/* Yield enters and returns with sys lock held */
 /* Yield requires running process; wake requires live waiting context */
 int sched_adapt_yield(struct proc *proc, enum wait_reason reason);
 int sched_adapt_wake(struct proc *proc);

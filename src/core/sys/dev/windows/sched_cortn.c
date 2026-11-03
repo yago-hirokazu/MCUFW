@@ -17,7 +17,7 @@ struct sched_cortn_slot {
 	unsigned char cs_used;
 };
 
-static unsigned char kernel_lock_held;
+static unsigned char sys_lock_owned;
 static struct proc *current;
 static struct sched_cortn_slot cortn_slots[PIPELINE_MAX];
 
@@ -36,17 +36,17 @@ void sched_adapt_set_current(struct proc *proc)
 void sched_adapt_lock(void)
 {
 	/* Coroutine cannot be preempted while scheduler is not running */
-	kernel_lock_held = 1;
+	sys_lock_owned = 1;
 }
 
 void sched_adapt_unlock(void)
 {
-	kernel_lock_held = 0;
+	sys_lock_owned = 0;
 }
 
 int sched_adapt_is_locked(void)
 {
-	return kernel_lock_held != 0;
+	return sys_lock_owned != 0;
 }
 
 /* Prepare coroutine in available slot */
@@ -80,7 +80,7 @@ void sched_adapt_release(void *backend)
 	memset(slot, 0, sizeof(*slot));
 }
 
-/* Yield running coroutine and restore kernel lock on resume */
+/* Yield running coroutine and restore sys lock on resume */
 int sched_adapt_yield(struct proc *proc, enum wait_reason reason)
 {
 	struct cortn *cortn;
@@ -93,9 +93,9 @@ int sched_adapt_yield(struct proc *proc, enum wait_reason reason)
 		yield_reason = CORTN_YIELD_WAIT_READ;
 	else
 		yield_reason = CORTN_YIELD_WAIT_WRITE;
-	kernel_unlock();
+	sys_unlock();
 	cortn_yield(cortn, yield_reason);
-	kernel_lock();
+	sys_lock();
 	return 0;
 }
 

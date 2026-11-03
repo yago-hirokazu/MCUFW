@@ -60,7 +60,7 @@ extern unsigned char buffers[NBUF][BSIZE];
 extern struct buf buf[NBUF];
 extern struct buf bfreelist;
 
-/* Caller holds kernel lock for cache, I/O and owned payload access */
+/* Caller holds sys lock for cache, I/O and owned payload access */
 /* Quiescent initialization and single-execution tests may omit lock */
 void binit(void);
 struct buf *getblk(unsigned int dev, unsigned long blkno);

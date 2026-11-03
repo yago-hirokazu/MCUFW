@@ -30,7 +30,7 @@ coroutine/threadをO0/O2の別directoryへbuildする。
 - executorは一度に1 processへ実行tokenを与える
 - resumeは選択processがI/O待ちになるかreturnするまで待つ
 - wakeupはprocessをrunnableにし、executorが次のtokenを与える
-- TLSがthreadごとのcurrent processとkernel lock所有状態を保持する
+- TLSがthreadごとのcurrent processとsys lock所有状態を保持する
 - workerはapplet呼出し前に自身をcurrent processへ設定する
 - entry returnは`PROC_FINISHED`を通知する
 - releaseはthreadをjoinし、handleを閉じ、slotを再利用可能にする
@@ -55,7 +55,7 @@ coroutine backendのinitは常に成功する。yieldとwakeはschedulerが保�
 1個のWindows SRW exclusive lockがpipe state、inode lock、参照数、wait listを
 保護する。lockは非再帰で、所有診断はTLSに保持する。
 
-`sched_sleep()`はkernel lock保持中にwaiterを登録し、backend yieldを呼ぶ。
+`sched_sleep()`はsys lock保持中にwaiterを登録し、backend yieldを呼ぶ。
 backend yieldはlock保持状態で呼ばれ、lock保持状態で戻る。native waitは
 `SleepConditionVariableSRW`でlock解放とwait開始を不可分にし、wake後にlockを
 再取得する。coroutine yieldは明示的にunlock、context switch、relockする。
@@ -64,7 +64,7 @@ condition notificationはpredicateの代わりではない。workerは実行toke
 stop requestをloopで待つ。native wait直前のwakeupもrunnable stateとして残る。
 pipeとinode lockはwake後に条件を再検査する。
 
-releaseとjoinはkernel lock外で行う。workerがI/Oをunwindしてfdを閉じるために
+releaseとjoinはsys lock外で行う。workerがI/Oをunwindしてfdを閉じるために
 同じlockを必要とするからである。file/inode/buffer tableを初期化する前に全thread
 を終了させる。
 

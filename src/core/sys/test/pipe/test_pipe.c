@@ -81,9 +81,9 @@ static ptrdiff_t call_read(struct proc *proc, int fd, void *buf,
 {
 	ptrdiff_t result;
 
-	kernel_lock();
+	sys_lock();
 	result = readp(getf(proc, fd), buf, count);
-	kernel_unlock();
+	sys_unlock();
 	return result;
 }
 
@@ -92,9 +92,9 @@ static ptrdiff_t call_write(struct proc *proc, int fd, const void *buf,
 {
 	ptrdiff_t result;
 
-	kernel_lock();
+	sys_lock();
 	result = writep(getf(proc, fd), buf, count);
-	kernel_unlock();
+	sys_unlock();
 	return result;
 }
 
@@ -102,17 +102,17 @@ static int call_close(struct proc *proc, int fd)
 {
 	int result;
 
-	kernel_lock();
+	sys_lock();
 	result = fd_close(proc, fd);
-	kernel_unlock();
+	sys_unlock();
 	return result;
 }
 
 static void call_close_all(struct proc *proc)
 {
-	kernel_lock();
+	sys_lock();
 	close_all(proc);
-	kernel_unlock();
+	sys_unlock();
 }
 
 static void supply_read_hook(char *chan, enum wait_reason reason)
@@ -333,13 +333,13 @@ static void test_pipe_lock(void)
 	hook_inode = ip;
 	ip->i_flag |= ILOCK;
 	sched_stub_set_sleep_hook(unlock_hook);
-	kernel_lock();
+	sys_lock();
 	CHECK(plock(ip) == 0);
 	CHECK(ip->i_flag & ILOCK);
 	CHECK(!(ip->i_flag & IWANT));
 	CHECK(sched_stub_last_reason() == WAIT_LOCK);
 	prele(ip);
-	kernel_unlock();
+	sys_unlock();
 	call_close_all(&proc);
 }
 

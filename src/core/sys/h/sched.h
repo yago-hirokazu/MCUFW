@@ -38,13 +38,14 @@ struct proc {
 	int p_ret;
 };
 
-/* Non-recursive kernel lock protects pipes, cache, queues and wait lists */
+/* Non-recursive sys lock protects pipes, cache, queues and wait lists */
 /* Release joins backend outside lock; close fds before releasing process */
-void kernel_lock(void);
-void kernel_unlock(void);
-int kernel_is_locked(void);
+void sys_lock(void);
+void sys_unlock(void);
+/* Report ownership by current execution context */
+int sys_lock_held(void);
 /* Channel identifies event by address; storage must outlive wait */
-/* Sleep and wakeup require kernel lock held */
+/* Sleep and wakeup require sys lock held */
 /* Sleep requires current process running after sched_prepare() */
 /* Current process must not already belong to wait list */
 int sched_sleep(char *chan, enum wait_reason reason);

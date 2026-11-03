@@ -18,7 +18,7 @@ extern struct bdev_io_queue ramqueue;
 
 /* Clear storage only in quiescent state; follow with binit */
 void raminit(void);
-/* Caller holds kernel lock; owned, unqueued request completes on return */
+/* Caller holds sys lock; owned, unqueued request completes on return */
 void ramstrategy(struct buf *bp);
 
 #ifdef __cplusplus
