@@ -30,10 +30,9 @@ src/core/shell/log/
 ```c
 #define NERRLOG 64
 
-struct log_error_t {
+struct log_error {
     uint32_t time;
     uint32_t wrap;
-    uint16_t err;
     uint16_t line;
     uint8_t file;
 };
@@ -42,7 +41,7 @@ struct log_error_t {
 - timeはWindowsでは32bit、Cortex-Mでは24bitを使用する。
 - wrapはtimeの周回数。32bitとして運用し、上限で周回する。
 - errの上位8bitはファイル番号、下位8bitはファイル内のエラー種類。
-- fileはerrの上位8bitと一致させる。
+- fileにはエラーコードの上位8bitを保存する。エラー種類は保存しない。
 - lineは検知したソース行番号。65535以下の行番号を対象とする。
 - ファイル番号とエラー種類の0は予約する。
 - 番号はcode_file.h/code_error.hで管理し、呼び出し箇所追加時に割り当てる。
@@ -55,9 +54,9 @@ struct log_error_t {
 
 ```c
 int error_init(void);
-void error_write(const struct log_error_t *log);
+void error_write(const struct log_error *log);
 void error_record(uint16_t err, uint16_t line);
-int error_read(uint32_t index, struct log_error_t *log);
+int error_read(uint32_t index, struct log_error *log);
 uint32_t error_count(void);
 void error_dump(void);
 ```
@@ -66,8 +65,7 @@ void error_dump(void);
   成功は0、失敗は-1。利用開始前、他スレッドの呼び出しがない状態で1回呼ぶ。
   初期化失敗時は他のAPIを呼ばない。
 - error_write(): 完成済みのログをコピーする。
-  呼び出し側がerrとfileを一致させる。
-- error_record(): 現在のtime/wrapを取得し、err/lineとともに保存する。
+- error_record(): 現在のtime/wrapを取得し、file/lineとともに保存する。
   fileはerrの上位8bitから設定する。
 - error_read(): 保存中の最古をindex 0としてコピーする。
   成功は0、未記録は-1。未記録の場合、出力先を変更しない。
@@ -85,13 +83,13 @@ error_recordの時刻取得と保存は別操作であり、スレッド間の�
 
 ### dump形式
 
-ヘッダに続き、index/time/wrapを10進数、errを4桁、fileを2桁の16進数、
+ヘッダに続き、index/time/wrapを10進数、fileを2桁の16進数、
 lineを10進数で表示する。
 
 ```text
-index time wrap err file line
-0 4294967295 7 1201 12 42
-1 0 8 1202 12 43
+index time wrap file line
+0 4294967295 7 12 42
+1 0 8 12 43
 ```
 
 ## assert_warm

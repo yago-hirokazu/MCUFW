@@ -11,7 +11,7 @@
 #include "log_adapt.h"
 #include "log_error.h"
 
-static struct log_error_t errlog[NERRLOG];
+static struct log_error errlog[NERRLOG];
 static uint32_t next;
 static uint32_t count;
 
@@ -31,7 +31,7 @@ int error_init(void)
 /*
  * Copy record into ring, replacing oldest record when full
  */
-void error_write(const struct log_error_t *log)
+void error_write(const struct log_error *log)
 {
 	log_adapt_lock(LOG_ERROR_LOCK);
 	errlog[next] = *log;
@@ -46,10 +46,9 @@ void error_write(const struct log_error_t *log)
  */
 void error_record(uint16_t err, uint16_t line)
 {
-	struct log_error_t log = {0};
+	struct log_error log = {0};
 
 	log_adapt_get_time(&log.time, &log.wrap);
-	log.err = err;
 	log.line = line;
 	log.file = err >> 8;
 	error_write(&log);
@@ -58,7 +57,7 @@ void error_record(uint16_t err, uint16_t line)
 /*
  * Read record by age, leaving destination unchanged when absent
  */
-int error_read(uint32_t index, struct log_error_t *log)
+int error_read(uint32_t index, struct log_error *log)
 {
 	log_adapt_lock(LOG_ERROR_LOCK);
 	if (index >= count) {
@@ -88,7 +87,7 @@ uint32_t error_count(void)
  */
 void error_dump(void)
 {
-	struct log_error_t snapshot[NERRLOG];
+	struct log_error snapshot[NERRLOG];
 	uint32_t i, n;
 
 	log_adapt_lock(LOG_ERROR_LOCK);
@@ -97,13 +96,13 @@ void error_dump(void)
 		snapshot[i] = errlog[(next + NERRLOG - n + i) % NERRLOG];
 	log_adapt_unlock(LOG_ERROR_LOCK);
 
-	printf("index time wrap err file line\n");
+	printf("index time wrap file line\n");
 	for (i = 0; i < n; i++) {
-		const struct log_error_t *log = &snapshot[i];
+		const struct log_error *log = &snapshot[i];
 
 		printf("%" PRIu32 " %" PRIu32 " %" PRIu32
-		       " %04x %02x %u\n", i, log->time, log->wrap,
-		       (unsigned int)log->err, (unsigned int)log->file,
+		       " %02x %u\n", i, log->time, log->wrap,
+		       (unsigned int)log->file,
 		       (unsigned int)log->line);
 	}
 }

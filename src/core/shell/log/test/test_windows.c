@@ -20,13 +20,13 @@
 static DWORD WINAPI worker(void *arg)
 {
 	uint16_t code = (uint16_t)(uintptr_t)arg;
-	struct log_error_t log;
+	struct log_error log;
 	unsigned int i;
 
 	for (i = 0; i < NWRITES; i++) {
 		error_record(code, code);
 		CHECK(error_read(0, &log) == 0);
-		CHECK(log.err == log.line && log.file == (log.err >> 8));
+		CHECK(log.file == (log.line >> 8) && (log.line & 0xff) == 1);
 		CHECK(error_count() <= NERRLOG);
 	}
 	return 0;
@@ -38,7 +38,7 @@ static DWORD WINAPI worker(void *arg)
 int main(void)
 {
 	HANDLE threads[NWORKERS];
-	struct log_error_t log;
+	struct log_error log;
 	uint32_t t1, w1, t2, w2;
 	unsigned int i;
 	DWORD result;
@@ -68,7 +68,7 @@ int main(void)
 	CHECK(error_count() == NERRLOG);
 	for (i = 0; i < NERRLOG; i++) {
 		CHECK(error_read(i, &log) == 0);
-		CHECK(log.err == log.line && log.file == (log.err >> 8));
+		CHECK(log.file == (log.line >> 8) && (log.line & 0xff) == 1);
 	}
 	puts("all logging tests passed");
 	return 0;

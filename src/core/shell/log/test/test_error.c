@@ -80,7 +80,7 @@ static void warm_void(int valid)
  */
 int main(void)
 {
-	struct log_error_t log = {0}, out = {0};
+	struct log_error log = {0}, out = {0};
 	uint32_t i;
 
 	init_failure = -1;
@@ -88,12 +88,11 @@ int main(void)
 	init_failure = 0;
 	CHECK(error_init() == 0);
 	CHECK(error_count() == 0);
-	out.err = 0xabcd;
-	CHECK(error_read(0, &out) == -1 && out.err == 0xabcd);
+	out.file = 0xab;
+	CHECK(error_read(0, &out) == -1 && out.file == 0xab);
 	CHECK(error_read(UINT32_MAX, &out) == -1);
 	for (i = 0; i < NERRLOG * 3 + 5; i++) {
 		log.time = i;
-		log.err = 0x1201;
 		log.file = 0x12;
 		error_write(&log);
 		CHECK(error_count() == (i < NERRLOG ? i + 1 : NERRLOG));
@@ -109,7 +108,7 @@ int main(void)
 	CHECK(conditions == 2 && errors == 1 && returns == 1);
 	CHECK(continued == 1);
 	CHECK(error_read(NERRLOG - 1, &out) == 0);
-	CHECK(out.err == 0x1203 && out.file == 0x12);
+	CHECK(out.file == 0x12);
 	CHECK(out.line == failure_line);
 	warm_void(0);
 	CHECK(continued == 1);
