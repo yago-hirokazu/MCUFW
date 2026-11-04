@@ -34,6 +34,8 @@ vpath %.c ./Adapt
 vpath %.c ../../core/usr/cmd
 vpath %.c ../../core/lib
 vpath %.c ../../core/shell/cli
+vpath %.c ../../core/shell/log
+vpath %.c ../../core/shell/log/dev/windows
 vpath %.c ../../core/shell/cli/dev/windows
 vpath %.c ../../core/sys/dev
 vpath %.c ../../core/sys/dev/windows
@@ -51,6 +53,7 @@ CSOURCES := main.c
 ## ./Adapt
 CSOURCES += delay_adapt.c
 CSOURCES += tick_adapt.c
+CSOURCES += log_error.c log_adapt.c
 
 ## ../../core/usr/cmd
 CSOURCES += cmd_sample.c
@@ -107,6 +110,7 @@ INCLUDES += -I./Adapt
 INCLUDES += -I./Drivers/adafruit_ft232h/include
 INCLUDES += -I./Drivers/adafruit_ft232h/include/windows
 INCLUDES += -I../../core/lib
+INCLUDES += -I../../core/shell/log/include
 INCLUDES += -I../../core/shell/cli/include
 INCLUDES += -I../../core/shell/cli/dev/windows
 INCLUDES += -I../../core/sys/h
