@@ -1,6 +1,8 @@
 
 /* run.c */
 
+#include "custom_assert.h"
+#include "code_file.h"
 #include "esh.h"
 #include "tty.h"
 
@@ -30,8 +32,7 @@ struct applet *find_applet(char *name, const struct applet *applet, int *k)
 {
 	struct applet *ap = (struct applet *)applet;
 
-	if (ap == NULL)
-		return NULL;
+	assert_warm(ap != NULL, FILE_CLI_RUN, NULL);
 
 	for (; ap->name != NULL; ap++) {
 		DP("%s", ap->name);
@@ -54,7 +55,8 @@ int run_applet(int argc, char **argv)
 {
 	struct applet *ap;
 
-	if (argv[0] == NULL || argv[0][0] == '\0' || argv[0][0] == '\n')
+	assert_warm(argv[0] != NULL, FILE_CLI_RUN, 0);
+	if (argv[0][0] == '\0' || argv[0][0] == '\n')
 		return 0;
 
 	ap = find_applet(argv[0], usercmds, NULL);

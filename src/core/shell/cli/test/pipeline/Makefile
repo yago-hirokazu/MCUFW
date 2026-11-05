@@ -16,6 +16,9 @@ CSOURCES += break.c code.c echo.c esh_debug.c expr.c help.c
 CSOURCES += par.c run.c lex.c test.c tok.c tty.c
 CSOURCES += stdio_adapt.c tty_adapt.c cmd_sample.c qbyte.c symchar.c
 
+CSOURCES += log_error.c log_adapt.c
+vpath %.c ../../../log ../../../log/dev/windows
+
 OBJS = $(addprefix $(OUTDIR)/,$(CSOURCES:.c=.o))
 
 vpath %.c . ../.. ../../../../usr/cmd ../../../../lib ../../dev/windows
@@ -37,3 +40,5 @@ $(OUTDIR)/%.o: %.c
 
 clean:
 	rm -rf $(OUTDIR) $(TARGET)
+
+CFLAGS += -I../../../log/include

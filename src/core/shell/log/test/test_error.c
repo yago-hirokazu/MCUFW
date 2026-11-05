@@ -57,7 +57,7 @@ void log_adapt_unlock(enum log_lock_id id)
 static int warm(int valid)
 {
 	failure_line = __LINE__ + 1;
-	assert_warm((conditions++, valid), (errors++, 0x1203),
+	assert_warm((conditions++, valid), (errors++, 0x12),
 		    (returns++, -7));
 	continued++;
 	return 1;
@@ -69,7 +69,7 @@ static int warm(int valid)
 static void warm_void(int valid)
 {
 	if (valid != 2)
-		assert_warm_void(valid, 0x1204);
+		assert_void(valid, 0x12);
 	else
 		continued += 2;
 	continued++;
@@ -119,10 +119,10 @@ int main(void)
 	CHECK(error_init() == 0);
 	clock_time = UINT32_MAX;
 	clock_wrap = 7;
-	error_record(0x1201, 42);
+	error_record(0x12, 42);
 	clock_time = 0;
 	clock_wrap = 8;
-	error_record(0x1202, 43);
+	error_record(0x12, 43);
 	CHECK(error_read(0, &out) == 0);
 	CHECK(out.time == UINT32_MAX && out.wrap == 7);
 	CHECK(error_read(1, &out) == 0);

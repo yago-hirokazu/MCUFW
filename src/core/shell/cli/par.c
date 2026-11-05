@@ -5,6 +5,8 @@
  * Capacity failure => parse_error => PARINVLD => caller resets parser
  */
 
+#include "custom_assert.h"
+#include "code_file.h"
 #include "esh.h"
 #include "esh_debug.h"
 #include "par.h"
@@ -190,14 +192,21 @@ static char make_label(struct code *code)
 	return label_p;
 }
 
+/*
+ * Mark parser failure for invalid label
+ */
+static int invalid_label(void)
+{
+	par_mark_error();
+	return PARINVLD;
+}
+
 /* Store code address unless label allocation failed */
 static char set_code_addr_to_label(char label_p, int code_addr,
 				   struct code *code)
 {
-	if (label_p < 0 || label_p >= LABELS) {
-		par_mark_error();
-		return PARINVLD;
-	}
+	assert_warm(label_p >= 0, FILE_CLI_PAR, invalid_label());
+	assert_warm(label_p < LABELS, FILE_CLI_PAR, invalid_label());
 	DP("l_addr[%d] = %3d", label_p, code_addr);
 	code->c_ltab.l_addr[label_p] = code_addr;
 	return PARDONE;

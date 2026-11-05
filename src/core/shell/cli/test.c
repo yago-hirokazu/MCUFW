@@ -1,6 +1,8 @@
 
 /* test.c */
 
+#include "custom_assert.h"
+#include "code_file.h"
 #include "machdep.h"
 #include "esh.h"
 #include "test.h"
@@ -63,8 +65,8 @@ static int equal(char *a, char *b)
 {
 	DP("a = %s, b = %s",a,b);
 
-	if (a == NULL || b == NULL)
-		return 0;
+	assert_warm(a != NULL, FILE_CLI_TEST, 0);
+	assert_warm(b != NULL, FILE_CLI_TEST, 0);
 	if (strcmp(a, b) == 0)
 		return 1;
 	return 0;

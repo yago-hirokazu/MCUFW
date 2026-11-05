@@ -1,5 +1,6 @@
 /* test_pipeline.c */
 
+#include "log_error.h"
 #include "tty_config.h"
 
 #include "code.h"
@@ -37,6 +38,7 @@ static void test_invalid_pipeline(void);
 
 int main(void)
 {
+	CHECK(error_init() == 0);
 	test_tokenizer();
 	test_two_stage();
 	test_three_stage_without_spaces();

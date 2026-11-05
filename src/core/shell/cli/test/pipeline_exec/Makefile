@@ -26,6 +26,9 @@ CSOURCES += alloc.c bio.c conf.c fio.c iget.c pipe.c rdwri.c sched.c sys2.c
 CSOURCES += bdev.c ramdisk.c
 ASOURCES = $(SCHED_ASOURCES)
 
+CSOURCES += log_error.c log_adapt.c
+vpath %.c ../../../log ../../../log/dev/windows
+
 OBJS = $(addprefix $(OUTDIR)/,$(CSOURCES:.c=.o))
 OBJS += $(addprefix $(OUTDIR)/,$(ASOURCES:.S=.o))
 
@@ -55,3 +58,5 @@ $(OUTDIR)/%.o: %.S
 
 clean:
 	rm -rf $(OUTDIR) $(TARGET)
+
+CFLAGS += -I../../../log/include

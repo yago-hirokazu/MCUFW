@@ -1,5 +1,7 @@
 /* test_pipeline_exec.c */
 
+#include "log_error.h"
+#include "code_file.h"
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -35,6 +37,7 @@ static unsigned char output[TEST_DATA_SIZE + 2];
 static size_t output_count;
 static size_t source_count = TEST_DATA_SIZE;
 
+static void test_argument_logs(void);
 static size_t busy_buffer_count(void);
 static void check_resources(void);
 static void test_startup_ram(void);
@@ -68,6 +71,8 @@ extern int echo(int argc, char **argv);
 
 int main(void)
 {
+	CHECK(error_init() == 0);
+	test_argument_logs();
 	test_startup_ram();
 	test_single_context();
 	check_resources();
@@ -689,4 +694,24 @@ static void test_single_context(void)
 		CHECK(executor.e_status == 37);
 		CHECK(current_proc() == previous);
 	}
+}
+
+/*
+ * Verify each lexer guard records distinct caller line and returns unchanged
+ */
+static void test_argument_logs(void)
+{
+	struct token token;
+	struct log_error first, second;
+	uint32_t n = error_count();
+
+	CHECK(lex_analyze_token(NULL, &token) == LEXERROR);
+	CHECK(error_count() == n + 1);
+	CHECK(error_read(n, &first) == 0);
+	CHECK(first.file == FILE_CLI_LEX);
+	CHECK(lex_analyze_token("echo", NULL) == LEXERROR);
+	CHECK(error_count() == n + 2);
+	CHECK(error_read(n + 1, &second) == 0);
+	CHECK(second.file == FILE_CLI_LEX);
+	CHECK(first.line != second.line);
 }

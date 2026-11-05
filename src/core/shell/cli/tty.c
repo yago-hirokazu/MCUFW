@@ -16,6 +16,8 @@
 /**************************************************************************
  * PROJECT-SPECIFIC INCLUDE FILES
  **************************************************************************/
+#include "custom_assert.h"
+#include "code_file.h"
 #include "esh.h"
 #include "keymap.h"
 #include "prompt.h"
@@ -195,11 +197,10 @@ struct tty_arg *tokenize(char *line, struct tty_arg *arg)
 	int k = 0;
 	const char *eobaddr;
 
-	if (!line || !arg)
-		return NULL;
+	assert_warm(line != NULL, FILE_CLI_TTY, NULL);
+	assert_warm(arg != NULL, FILE_CLI_TTY, NULL);
 	eobaddr = line + TTY_BBUF;
-	if (!memchr(line, 0, TTY_NBUF))
-		return NULL;
+	assert_warm(memchr(line, 0, TTY_NBUF) != NULL, FILE_CLI_TTY, NULL);
 	if (tokenize_meta(line) < 0)
 		return NULL;
 
@@ -451,8 +452,7 @@ static void echo_del(void)
 
 char *find_keyc(char *cp, int (*delim)(char c), const char *endaddr)
 {
-	if (cp == NULL)
-		return NULL;
+	assert_warm(cp != NULL, FILE_CLI_TTY, NULL);
 	while (!delim(*cp)) {
 #if DEBUG_TTY
 		DP("cp=%p endaddr=%p\n", (void *)cp, (const void *)endaddr);
@@ -473,9 +473,8 @@ char *find_keyc(char *cp, int (*delim)(char c), const char *endaddr)
 
 char count_arg(char *cp, int (*delim)(char c))
 {
+	assert_warm(cp != NULL, FILE_CLI_TTY, 0);
 	DP("*cp=%02X\n", *cp);
-	if (cp == NULL)
-		return 0;
 	if (delim(*cp))
 		return 0;
 	return 1;
@@ -669,8 +668,7 @@ void proc_left(void)
 
 char *find_space(char *cp, const char *endaddr)
 {
-	if (cp == NULL)
-		return NULL;
+	assert_warm(cp != NULL, FILE_CLI_TTY, NULL);
 	while (*cp != ' ') {
 #if DEBUG_TTY
 		DP("cp=%p endaddr=%p\n", (void *)cp, (const void *)endaddr);
@@ -706,8 +704,7 @@ int is_before_space(struct qbyte *line_p)
 void nul_to_space(char *cp)
 {
 	int k=0;
-	if (cp == NULL)
-		return;
+	assert_void(cp != NULL, FILE_CLI_TTY);
 	while (k < TTY_BBUF) {
 		if (*cp == '\0') {
 			*cp = ' ';

@@ -4,6 +4,8 @@
  *   => variable table / string table => expanded command arguments
  */
 
+#include "custom_assert.h"
+#include "code_file.h"
 #include "esh.h"
 #include "esh_debug.h"
 #include "exe.h"
@@ -57,11 +59,14 @@ static int execute_commands(struct exe *exe)
 	int result;
 	int i;
 
-	if (exe->e_procs <= 0 || exe->e_procs > PROCS)
-		return -SYS_EINVAL;
-	for (i = 0; i < exe->e_procs; i++)
-		if (!exe->e_proc[i].p_cmd || !exe->e_proc[i].p_cmd->main)
-			return -SYS_EINVAL;
+	assert_warm(exe->e_procs > 0, FILE_CLI_EXE, -SYS_EINVAL);
+	assert_warm(exe->e_procs <= PROCS, FILE_CLI_EXE, -SYS_EINVAL);
+	for (i = 0; i < exe->e_procs; i++) {
+		assert_warm(exe->e_proc[i].p_cmd != NULL,
+			    FILE_CLI_EXE, -SYS_EINVAL);
+		assert_warm(exe->e_proc[i].p_cmd->main != NULL,
+			    FILE_CLI_EXE, -SYS_EINVAL);
+	}
 	if (exe->e_procs > 1)
 		return exe_run_pipeline(exe->e_proc, exe->e_procs);
 	proc = &exe->e_proc[0];
@@ -308,13 +313,20 @@ int exe_run_pipeline(struct exe_proc *proc, int count)
 	int result;
 	int i;
 
-	if (!proc || count < 2 || count > PROCS)
-		return -SYS_EINVAL;
+	assert_warm(proc != NULL, FILE_CLI_EXE, -SYS_EINVAL);
+	assert_warm(count >= 2, FILE_CLI_EXE, -SYS_EINVAL);
+	assert_warm(count <= PROCS, FILE_CLI_EXE, -SYS_EINVAL);
 	for (i = 0; i < count; i++) {
-		if (!proc[i].p_cmd || !proc[i].p_cmd->main ||
-		    !proc[i].p_cmd->name || proc[i].p_argc < 1 ||
-		    proc[i].p_argc > TTY_NARG || !proc[i].p_argv[0])
-			return -SYS_EINVAL;
+		assert_warm(proc[i].p_cmd != NULL, FILE_CLI_EXE, -SYS_EINVAL);
+		assert_warm(proc[i].p_cmd->main != NULL, FILE_CLI_EXE,
+			    -SYS_EINVAL);
+		assert_warm(proc[i].p_cmd->name != NULL, FILE_CLI_EXE,
+			    -SYS_EINVAL);
+		assert_warm(proc[i].p_argc >= 1, FILE_CLI_EXE, -SYS_EINVAL);
+		assert_warm(proc[i].p_argc <= TTY_NARG, FILE_CLI_EXE,
+			    -SYS_EINVAL);
+		assert_warm(proc[i].p_argv[0] != NULL, FILE_CLI_EXE,
+			    -SYS_EINVAL);
 	}
 	for (i = 0; i < count; i++) {
 		pinit(&proc[i].p_exec);
@@ -366,16 +378,25 @@ out:
 }
 
 /*
+ * Report invalid assignment and select log file code
+ */
+static uint8_t invalid_assignment(void)
+{
+	EP("Invalid variable assignment");
+	return FILE_CLI_EXE;
+}
+
+/*
  * Store symbol in variable table
  */
 static void set_symbol_to_variable(char var_p, char *sym, struct code *code)
 {
 	struct variable_table *v;
 
-	if (!code || !sym || var_p < 0 || var_p >= SYMBOLS) {
-		EP("Invalid variable assignment");
-		return;
-	}
+	assert_void(code != NULL, invalid_assignment());
+	assert_void(sym != NULL, invalid_assignment());
+	assert_void(var_p >= 0, invalid_assignment());
+	assert_void(var_p < SYMBOLS, invalid_assignment());
 	v = &code->c_vtab;
 	strncpy(&v->v_val[var_p * SYMCHARS], sym, SYMCHARS - 1);
 	v->v_val[var_p * SYMCHARS + SYMCHARS - 1] = 0;
@@ -388,8 +409,9 @@ static char *get_symbol_from_variable(char var_p, struct code *code)
 {
 	struct variable_table *v;
 
-	if (!code || var_p < 0 || var_p >= SYMBOLS)
-		return NULL;
+	assert_warm(code != NULL, FILE_CLI_EXE, NULL);
+	assert_warm(var_p >= 0, FILE_CLI_EXE, NULL);
+	assert_warm(var_p < SYMBOLS, FILE_CLI_EXE, NULL);
 	v = &code->c_vtab;
 	return (char *)&v->v_val[var_p * SYMCHARS];
 }
@@ -400,8 +422,9 @@ static char *get_symbol_from_variable(char var_p, struct code *code)
  */
 static char *get_string(char id, struct code *code)
 {
-	if (!code || id < 0 || id >= SYMBOLS)
-		return NULL;
+	assert_warm(code != NULL, FILE_CLI_EXE, NULL);
+	assert_warm(id >= 0, FILE_CLI_EXE, NULL);
+	assert_warm(id < SYMBOLS, FILE_CLI_EXE, NULL);
 	return (char *)&code->c_stab.s_str[id * SYMCHARS];
 }
 

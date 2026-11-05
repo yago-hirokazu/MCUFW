@@ -40,8 +40,7 @@ struct log_error {
 
 - timeはWindowsでは32bit、Cortex-Mでは24bitを使用する。
 - wrapはtimeの周回数。32bitとして運用し、上限で周回する。
-- errの上位8bitはファイル番号、下位8bitはファイル内のエラー種類。
-- fileにはエラーコードの上位8bitを保存する。エラー種類は保存しない。
+- fileには8bitのファイル番号を保存する。
 - lineは検知したソース行番号。65535以下の行番号を対象とする。
 - ファイル番号とエラー種類の0は予約する。
 - 番号はcode_file.h/code_error.hで管理し、呼び出し箇所追加時に割り当てる。
@@ -55,7 +54,7 @@ struct log_error {
 ```c
 int error_init(void);
 void error_write(const struct log_error *log);
-void error_record(uint16_t err, uint16_t line);
+void error_record(uint8_t file, uint16_t line);
 int error_read(uint32_t index, struct log_error *log);
 uint32_t error_count(void);
 void error_dump(void);
@@ -66,7 +65,7 @@ void error_dump(void);
   初期化失敗時は他のAPIを呼ばない。
 - error_write(): 完成済みのログをコピーする。
 - error_record(): 現在のtime/wrapを取得し、file/lineとともに保存する。
-  fileはerrの上位8bitから設定する。
+  fileには呼び出し側がファイル番号を指定する。
 - error_read(): 保存中の最古をindex 0としてコピーする。
   成功は0、未記録は-1。未記録の場合、出力先を変更しない。
 - error_count(): 保存件数0～64を返す。
@@ -95,27 +94,29 @@ index time wrap file line
 ## assert_warm
 
 ```c
-assert_warm(_cond_, _err_, _ret_)
-assert_warm_void(_cond_, _err_)
+assert_warm(_cond_, _file_, _ret_)
+assert_void(_cond_, _file_)
 ```
 
 - 条件が真なら継続する。
 - 条件が偽ならerror_record()で記録し、指定値でreturnする。
-- void版は記録後にreturnする。
-- 条件は1回だけ評価し、err/retの式は失敗時だけ評価する。
+- void版は記録後にreturnする。assert_warm_voidは互換名として使用できる。
+- CLIの引数チェックは1つのassertで1つの条件式を検査する。
+  複合条件は、参照するポインタを先に確認する順で分割する。
+- 条件は1回だけ評価し、file/retの式は失敗時だけ評価する。
 - 呼び出し元の__LINE__を記録する。
 - do/while形式として、if/else内でも安全に使えるようにする。
 - 既存チェックのreturnを維持するため、NDEBUGでも無効化しない。
 - マクロ内に呼び出し側と衝突するローカル変数を設けない。
-- 新規の引数チェックは追加せず、既存チェックの置換は別途進める。
+- CLIの既存引数チェックをassert_warm/assert_voidへ置き換える。
 
 ```c
-assert_warm(ap != NULL && ap->name != NULL,
-            ERR_PAR_ARGUMENT, -1);
-assert_warm_void(ap != NULL, ERR_PAR_ARGUMENT);
+assert_warm(ap != NULL, FILE_CLI_RUN, -1);
+assert_warm(ap->name != NULL, FILE_CLI_RUN, -1);
+assert_void(ap != NULL, FILE_CLI_RUN);
 ```
 
-ERR_PAR_ARGUMENTは使用例。実際の呼び出し箇所追加時に番号を定義する。
+ファイル番号はcode_file.hのFILE_CLI_*を使用する。
 
 ## 移植API
 

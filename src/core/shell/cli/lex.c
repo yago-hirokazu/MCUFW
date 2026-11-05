@@ -1,6 +1,8 @@
 
 /* lex.c */
 
+#include "custom_assert.h"
+#include "code_file.h"
 #include "machdep.h"
 #include "esh.h"
 #include "esh_debug.h"
@@ -101,8 +103,9 @@ int lex_analyze_token(char *str, struct token *token)
 	char c = 0;
 	char scat[SYMCHARS];
 
-	if (!str || !token || strlen(str) >= SYMCHARS)
-		return LEXERROR;
+	assert_warm(str != NULL, FILE_CLI_LEX, LEXERROR);
+	assert_warm(token != NULL, FILE_CLI_LEX, LEXERROR);
+	assert_warm(strlen(str) < SYMCHARS, FILE_CLI_LEX, LEXERROR);
 	type = &token->t_type;
 	sym = &token->t_symbol[0];
 

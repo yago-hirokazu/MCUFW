@@ -1,6 +1,8 @@
 
 /* break.c */
 
+#include "custom_assert.h"
+#include "code_file.h"
 #include "machdep.h"
 #include "esh.h"
 #include "par.h"
@@ -33,6 +35,15 @@ extern int loop_at[MAXNESTS];
 
 static int break_label(struct parse *par, int *loop_at, int loop_p);
 
+/*
+ * Report invalid numeric argument
+ */
+static int invalid_argument(void)
+{
+	EP("break: numeric argument required");
+	return -1;
+}
+
 int break_command(int argc, char *argv[])
 {
 	char *end;
@@ -61,19 +72,26 @@ int break_command(int argc, char *argv[])
 	  argc    = 1 => invalid
 	*/
 
-	if (argc < 2 || argc > 3 || !argv || !argv[argc - 1] ||
-	    (argc == 3 && !argv[1]))
-		goto invalid_argument;
+	assert_warm(argc >= 2, FILE_CLI_BREAK, invalid_argument());
+	assert_warm(argc <= 3, FILE_CLI_BREAK, invalid_argument());
+	assert_warm(argv != NULL, FILE_CLI_BREAK, invalid_argument());
+	assert_warm(argv[argc - 1] != NULL, FILE_CLI_BREAK, invalid_argument());
 
 	loop_p = strtol(argv[argc - 1], &end, 10);
-	if (*argv[argc - 1] == '\0' || *end != '\0' ||
-	    loop_p < 0 || loop_p >= MAXNESTS)
-		goto invalid_argument;
+	assert_warm(*argv[argc - 1] != '\0', FILE_CLI_BREAK,
+		    invalid_argument());
+	assert_warm(*end == '\0', FILE_CLI_BREAK, invalid_argument());
+	assert_warm(loop_p >= 0, FILE_CLI_BREAK, invalid_argument());
+	assert_warm(loop_p < MAXNESTS, FILE_CLI_BREAK, invalid_argument());
 
 	if (argc == 3) {
+		assert_warm(argv[1] != NULL, FILE_CLI_BREAK,
+			    invalid_argument());
 		depth = strtol(argv[1], &end, 10);
-		if (*argv[1] == '\0' || *end != '\0' || depth <= 0)
-			goto invalid_argument;
+		assert_warm(*argv[1] != '\0', FILE_CLI_BREAK,
+			    invalid_argument());
+		assert_warm(*end == '\0', FILE_CLI_BREAK, invalid_argument());
+		assert_warm(depth > 0, FILE_CLI_BREAK, invalid_argument());
 	}
 
 	if (depth > loop_p + 1)
@@ -83,9 +101,6 @@ int break_command(int argc, char *argv[])
 
 	return break_label(parse, loop_at, loop_p);
 
-invalid_argument:
-	EP("break: numeric argument required");
-	return -1;
 }
 
 static int break_label(struct parse *par, int *loop_at, int loop_p)
@@ -94,8 +109,8 @@ static int break_label(struct parse *par, int *loop_at, int loop_p)
 	int label;
 
 	loopat = loop_at[loop_p];
-	if (loopat < 0 || loopat >= MAXNESTS)
-		return -1;
+	assert_warm(loopat >= 0, FILE_CLI_BREAK, -1);
+	assert_warm(loopat < MAXNESTS, FILE_CLI_BREAK, -1);
 	label = par[loopat].p_label.l_end;
 	DP("label = parse[loop_at[loop_p=%d]=%d].p_label.l_end = %d",
 	   loop_p, loop_at[loop_p], label);

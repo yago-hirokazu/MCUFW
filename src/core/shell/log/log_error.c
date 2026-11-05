@@ -42,15 +42,15 @@ void error_write(const struct log_error *log)
 }
 
 /*
- * Capture timestamp and derive file code from error code
+ * Capture timestamp and record file code and line
  */
-void error_record(uint16_t err, uint16_t line)
+void error_record(uint8_t file, uint16_t line)
 {
 	struct log_error log = {0};
 
 	log_adapt_get_time(&log.time, &log.wrap);
 	log.line = line;
-	log.file = err >> 8;
+	log.file = file;
 	error_write(&log);
 }
 

@@ -71,6 +71,9 @@ CSOURCES += symchar.c
 ## reserved for future use
 
 # Make object file lit from source file list
+CSOURCES += log_error.c log_adapt.c
+vpath %.c ../../../log ../../../log/dev/windows
+
 _OBJS = $(CSOURCES:.c=.o)
 _OBJS += $(CPPSOURCES:.cpp=.o)
 OBJS = $(addprefix $(OUTDIR)/, $(_OBJS))
@@ -126,3 +129,5 @@ CPPFLAGS=$(CFLAGS)
 check-syntax:
 	$(CC) -o nul $(CPPFLAGS) -S $(CHK_SOURCES)
 
+
+CFLAGS += -I../../../log/include

@@ -14,7 +14,7 @@ struct log_error {
 
 int error_init(void);
 void error_write(const struct log_error *log);
-void error_record(uint16_t err, uint16_t line);
+void error_record(uint8_t file, uint16_t line);
 int error_read(uint32_t index, struct log_error *log);
 uint32_t error_count(void);
 void error_dump(void);

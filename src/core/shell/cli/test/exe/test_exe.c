@@ -1,6 +1,7 @@
 
 /* test_par.c */
 
+#include "log_error.h"
 #include "machdep.h"
 #include "tty_config.h"
 #include "code.h"
@@ -67,6 +68,9 @@ int main(int argc, void *argv[])
 	char ret=0, c=0, k=0, l=0, chars=0, tokens=0;
 	char c_var=0, c_val=0, c_str=0;
 	char s_var[SYMCHARS], s_val[SYMCHARS], s_str[SYMCHARS];
+
+	if (error_init() != 0)
+		return EXIT_FAILURE;
 
 	if (argc < 2) {
 		EP("few arguments\n");

@@ -24,7 +24,7 @@ static DWORD WINAPI worker(void *arg)
 	unsigned int i;
 
 	for (i = 0; i < NWRITES; i++) {
-		error_record(code, code);
+		error_record(code >> 8, code);
 		CHECK(error_read(0, &log) == 0);
 		CHECK(log.file == (log.line >> 8) && (log.line & 0xff) == 1);
 		CHECK(error_count() <= NERRLOG);
