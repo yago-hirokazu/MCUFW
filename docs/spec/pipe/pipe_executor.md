@@ -1,53 +1,53 @@
-# pipeline executor
+# Pipeline executor
 
-## Scope
+## Bytecode and process setup
 
-Milestone 6 connects `OP_PIPE_NEXT` bytecode to process allocation, anonymous
-pipe setup, coroutine scheduling, command completion, and resource cleanup.
-Console stdio routing remains Milestone 7 work. Pipeline test applets use
-`esh_read()` and `esh_write()` directly.
+`exe_run_codes()` collects commands and arguments in `e_proc[]` in bytecode
+order. Each command opcode takes the next slot. `OP_PIPE_NEXT` marks a
+stage boundary, and `OP_CMD_EXE` executes the collected commands. `PROCS` must match `PIPELINE_MAX` (four stages). A single
+command runs directly with its process set as current. Two to four commands
+run through `exe_run_pipeline()`.
 
-## Process and descriptor mapping
-
-Executor assigns commands to `e_proc[]` in bytecode order. `PROCS` and
-`ESH_PIPELINE_MAX` both limit pipeline to four commands. For each adjacent
-pair, executor creates one anonymous pipe and installs endpoints at fixed
-descriptor numbers.
+For each adjacent pair, the executor creates one anonymous pipe using a
+temporary process and installs the endpoints at fixed descriptor numbers.
 
 ```text
 process N stdout fd 1 -> pipe N write endpoint
 process N+1 stdin fd 0 -> pipe N read endpoint
 ```
 
-Temporary construction descriptors are closed after endpoint installation.
-Each process owns only descriptors needed by its position in pipeline.
+The temporary descriptors are closed after installation. If the read
+endpoint cannot be installed, the executor also closes the write descriptor
+it installed for that pair.
 
-## Scheduling
+## Scheduling and cleanup
 
-Portable scheduler prepares one execution backend for each process and resumes
-runnable processes in round-robin order. Windows coroutine backend owns fixed
-four-slot coroutine and stack pool. No core allocation is dynamic.
+The executor initializes each process with `init_proc()` and prepares it with
+`sched_prepare()`. It scans the stages in order, resuming runnable processes
+until all stages finish. A pass with unfinished processes and no runnable
+stage returns `-SYS_EINVAL`.
 
-Command return stores status in `ep_status`. Command wrapper then closes every
-remaining process descriptor before coroutine finishes. Endpoint close wakes
-blocked peers, producing EOF after final writer close or broken pipe after
-final reader close.
+Windows supports `SCHED_BACKEND=cortn` (the default) and
+`SCHED_BACKEND=thread`. The coroutine backend switches stacks on the calling
+thread. The thread backend prepares Windows worker threads and runs them
+under scheduler control. See [Windows coroutine](../coroutine/coroutine_windows.md).
 
-Scheduler reports error when processes remain unfinished and no process is
-runnable. Cleanup closes all descriptors and releases every prepared backend
-slot on both success and failure paths.
+Each command wrapper stores its return value in `p_exec.p_ret` and closes
+its descriptors before finishing. Closing an endpoint wakes waiting peers.
+Readers drain buffered data before EOF, and writers return `-SYS_EPIPE` when
+the last reader closes. On success or failure, the executor closes remaining
+connected descriptors and releases prepared backend slots.
 
-## Pipeline status
+The status of a completed pipeline is the final command's return value.
+`OP_CMD_EXE` stores the result in `e_status`.
 
-Pipeline status is final command status. Earlier command errors remain in each
-process `ep_status` and do not replace final status. Executor stores resulting
-status in `e_status`.
+## Windows standard I/O
 
-## Deliberate omissions
+With `ESH_STDIO_PIPE`, the Windows stdio adapter routes mapped input and
+output through the current process's fd 0 and fd 1. A stage without the
+corresponding descriptor uses host I/O. Stderr remains on the host, and
+`scanf()` returns EOF for pipe input. See [Windows stdio](../stdio.md).
 
-- console stdin and stdout routing
-- redirection and background jobs
-- signal delivery for broken pipe
-- thread backend process creation
-
-These do not alter current anonymous pipe ownership and EOF rules.
+The pipeline executor does not implement redirection, background jobs or
+signal delivery for broken pipes. The `pipeline_exec` tests exercise both
+Windows backends with `-O0` and `-O2`.

@@ -1,11 +1,11 @@
 # Windows stackful coroutine
 
-更新日: 2026-11-01
+更新日: 2026-11-08
 
 ## 役割
 
 Windows coroutine backendでappletのC call stackを保ったまま実行権をschedulerへ
-返す。pipeが空、満杯、またはinode lock待ちの間だけcommandを待機させる。
+返す。pipeが空または満杯のときや、inode lock待ちで実行を中断できる。
 
 coroutineはOS threadではない。同じthread上で`sched_resume()`がbackendを再開
 した場合だけ実行される。portable schedulerは`src/core/sys/sys/sched.c`、Windows
@@ -21,9 +21,11 @@ coroutine engine本体と公開headerはWindows固有context実装と同じdirec
 - `src/core/sys/dev/windows/cortn_context.h`
 - `src/core/sys/dev/windows/cortn_switch.S`
 
-- `cortn_init()`：利用者所有stackとentry関数を登録する
+- `init_cortn()`：利用者所有stackを初期化し、entry関数と引数を登録する。
+  coroutineを`CORTN_RUNNABLE`にする
 - `cortn_resume()`：RUNNABLE coroutineを再開する
-- `cortn_yield()`：理由付きで中断する
+- `cortn_yield()`：待機理由を設定して中断する。自発的なyieldでは
+  `CORTN_RUNNABLE`に戻る
 - `cortn_wake()`：lock/read/write待ちをRUNNABLEへ移す
 - `cortn_stack_check()`：上下guard patternを検査する
 - `cortn_stack_used()`：stack watermarkから最大使用量を返す
@@ -72,7 +74,9 @@ Windows stack容量は64 KiBとする。上下16 byteをguard patternに使用�
 watermark patternで初期化する。guard検査はresume前後に行う。guardは事後検出
 であり、Windows guard pageのような発生時停止機構ではない。
 
-stack領域はbackend slotが所有し、coroutineの実行中と待機中は解放しない。
+scheduler backendは`PIPELINE_MAX`個（4個）のslotを静的に確保し、各slotに
+16 byte境界へ整列したstackを持つ。stack領域は実行中と待機中に保持し、
+`sched_release()`でslotを再利用できる状態に戻す。
 MCU stack容量と配置はSTM32移植時に決定する。
 
 ## 制約
@@ -97,5 +101,6 @@ MCU stack容量と配置はSTM32移植時に決定する。
 - resume前後のstack guard破損検出とwatermark
 - XMM6、x87 control word、MXCSRの復元
 
-`src/core/sys/test/sched`とpipe/pipeline suiteがscheduler backendとの結合を
-coroutine/thread双方で確認する。
+`src/core/sys/test/sched`と`src/core/shell/cli/test/pipeline_exec`は、
+`cortn`と`thread`の両backendをO0/O2で確認する。scheduler試験では既定の
+`NBUF=5`に加え、`NBUF=3`でも実行する。

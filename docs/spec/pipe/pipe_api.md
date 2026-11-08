@@ -1,6 +1,6 @@
 # sys pipe API・データモデル
 
-更新日: 2026-11-01
+更新日: 2026-11-08
 
 ## 対象範囲
 
@@ -9,7 +9,7 @@
 含めない。
 
 UNIX V7の`file`、pipe inode、processごとのfd tableという関係を保つ。pipe
-dataはmemory-only buffer cache上の1 blockへ格納し、物理deviceへは送らない。
+dataは共通buffer cacheの1 blockに保持し、pipeの転送では物理deviceへ送らない。
 
 ## 資源上限
 
@@ -19,12 +19,13 @@ dataはmemory-only buffer cache上の1 blockへ格納し、物理deviceへは送
 | process当たりfd | 12 | `NOFILE` |
 | global file entry | 12 | `NFILE` |
 | pipe inode | 3 | `NINODE` |
-| buffer cache entry | 3 | `NBUF` |
+| buffer cache entry | 既定値 5 | `NBUF` |
 | pipe data | 256 byte/pipe | `PIPSIZ` = `BSIZE` |
 
 4段pipelineに必要なpipeは最大3本である。全tableとpoolは固定長配列とし、
 portable sys層では動的memory確保を使用しない。`NBUF < NINODE`はcompile
-errorにする。
+errorにする。pipeは共通buffer cacheを使うため、空きinodeがあっても
+対応bufferを確保できなければ作成に失敗する。
 
 ## 所有権
 
@@ -107,8 +108,11 @@ pipeline全体の終了statusは最後のcommandのstatusとする。途中comma
 - fd 0、1、2をstdin、stdout、stderrとする
 - pipelineはstdoutと次段stdinだけを接続する
 - stderrとdebug logはconsoleへ出し、pipe dataへ混入させない
-- pipe対応commandは`sys_read()`またはmapped `getchar()`を使用する
-- `scanf`はconsole入力だけを互換範囲とし、pipe stdinには使用しない
+- Windowsの`ESH_STDIO_PIPE`付きbuildでは、current processにfd 0があれば
+  `getchar()`を`sys_read()`へ、fd 1があれば`putchar()`、`printf()`、
+  `fprintf(stdout, ...)`を`sys_write()`へ接続する
+- 対象fdがなければhost I/Oへ渡す。pipe stdinでの`scanf()`は入力を消費せず
+  `EOF`を返す
 
 ## V7との差分
 

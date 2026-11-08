@@ -1,12 +1,12 @@
 # sys file・fd・pipeコア
 
-更新日: 2026-11-01
+更新日: 2026-11-08
 
 ## 役割
 
 `src/core/sys`はanonymous pipeに必要なfile、inode、buffer cache、read/write、
-schedulerをeshから独立して提供する。通常ファイル、path、disk I/O、signalは
-扱わない。
+schedulerをeshから独立して提供する。pipe APIの範囲はanonymous pipeであり、
+通常ファイル、path探索、signalは扱わない。
 
 UNIX V7の次の関係を最小構成で維持する。
 
@@ -14,7 +14,7 @@ UNIX V7の次の関係を最小構成で維持する。
 struct proc p_ofile[]
   -> global struct file table
        -> shared struct inode table
-            -> memory-only struct buf table
+            -> buffer from shared struct buf table
 ```
 
 `fio.c`はfdとfile lifecycle、`alloc.c`と`iget.c`はinode lifecycle、`pipe.c`は
@@ -26,19 +26,20 @@ process向けread/write/close入口を担当する。`bio.c`は固定長buffer c
 - process当たりfd: `NOFILE` = 12
 - global file entry: `NFILE` = 12
 - pipe inode: `NINODE` = 3
-- buffer cache entry: `NBUF` = 3
+- buffer cache entry: `NBUF` の既定値は5。最小値は `NINODE` = 3
 - pipe data: `PIPSIZ` = `BSIZE` = 256 byte
 
-`binit()`はbuffer cache、`finit()`はfile tableとinode tableを初期化する。
-完全初期化は次の順で明示的に呼び出す。
+`init_bufc()`はbuffer cache、`init_fsys()`はfile tableとinode tableを初期化する。
+pipeの共有資源は次の順で明示的に初期化する。
 
 ```c
-binit();
-finit();
+init_bufc();
+init_fsys();
 ```
 
-`finit()`は`binit()`を内部で呼ばない。所有中のfile、inode、buffer、実行中
-processがある状態では完全初期化しない。
+共有資源の初期化は、所有中のfile、inode、bufferや実行中processがない状態で
+行う。各processのfd tableと実行状態は`init_proc()`で初期化する。Windowsの
+`eshinit()`は先に`init_ramdisk()`を呼び、共有資源の初期化後に`init_tty()`を呼ぶ。
 
 ## 所有権
 
@@ -52,7 +53,9 @@ wait listはinode外のscheduler hashが所有する。最後の
 readまたはwrite endpointが閉じた状態は`i_count < 2`で判定する。両endpointが
 閉じると`iput()`がbufferを返し、inodeを空き状態へ戻す。
 
-`pipe_for_proc()`はinode、read file、write fileの順に確保する。途中で失敗した
+`pipe_for_proc()`はinodeと対応buffer、read file、write fileの順に確保する。
+`ialloc()`は`getblk(PIPEDEV, inodeの添字)`で共通cacheからbufferを取得し、
+`iput()`まで保持する。途中で失敗した
 場合は確保済みfd/file/inodeを逆順に戻す。process終了時は`close_all()`が全fdを
 閉じる。
 
@@ -60,12 +63,15 @@ readまたはwrite endpointが閉じた状態は`i_count < 2`で判定する。�
 
 内部結果は次を区別する。
 
-- `PIPE_IO_PROGRESS`: 1 byte以上転送、またはzero-length操作
+- `PIPE_IO_PROGRESS`: 1 byte以上転送
 - `PIPE_IO_WAIT_READ`: dataが空でwriterが存在する
 - `PIPE_IO_WAIT_WRITE`: `i_size == PIPSIZ`でreaderが存在する
 - `PIPE_IO_EOF`: dataが空でwriterが存在しない
 - `PIPE_IO_BROKEN`: readerが存在しない
-- `PIPE_IO_ERROR`: 不正fd、方向違反、不正引数
+- `PIPE_IO_ERROR`: 内部data転送のエラー
+
+`sys_read()`と`sys_write()`は未割当fdまたは方向違反を`-SYS_EBADF`で返す。
+0 byte要求はfdを参照する前に0を返す。
 
 `readi()`はread fileの`f_offset`から`i_size`までを読み取る。全dataを読み切ると
 read offsetと`i_size`を0へ戻す。`writei()`は`i_size`から`PIPSIZ`までへ追記する。
@@ -97,6 +103,7 @@ wait channelで待つ。再開後はlockとpipe条件を必ず再検査する。
 file offset、`FREAD/FWRITE/FPIPE`、`falloc/getf/closef`、`readp/writep`、
 `readi/writei`、inode lock、sleep/wakeupである。
 
-省略した要素はdisk inode、directory、mount、block mapping、physical device I/O、
-user address space copy、trap dispatch、signal deliveryである。buffer cache APIは
-残すが、pipe bufferはmemory-only anonymous blockとして使用する。
+pipe経路で省略した要素はdisk inode、directory、mount、block mapping、
+user address space copy、trap dispatch、signal deliveryである。buffer cacheは
+RAM diskなどのblock deviceと共用する。pipe dataは取得したbufferへ直接読み書きし、
+pipeの転送ではdevice strategyへI/Oを発行しない。
