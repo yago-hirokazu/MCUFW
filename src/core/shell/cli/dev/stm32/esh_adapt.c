@@ -9,7 +9,7 @@
 
 void eshinit(void)
 {
-	ttyinit();
+	init_tty();
 	stdio_uart_open();
 	prompt();
 }

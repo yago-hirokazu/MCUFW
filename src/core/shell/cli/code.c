@@ -3,7 +3,7 @@
 
 #include "code.h"
 
-void code_init(struct code *code)
+void init_code(struct code *code)
 {
 	int k;
 

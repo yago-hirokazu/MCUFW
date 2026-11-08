@@ -133,7 +133,7 @@ struct proc *current_proc(void)
 }
 
 /* Initialize process before descriptors or backend setup */
-void pinit(struct proc *proc)
+void init_proc(struct proc *proc)
 {
 	memset(proc, 0, sizeof(*proc));
 	proc->p_state = PROC_NEW;

@@ -53,7 +53,7 @@ struct log_error {
 ## 公開API
 
 ```c
-int error_init(void);
+int init_error(void);
 void error_write(const struct log_error *log);
 void error_record(uint8_t file, uint16_t line);
 int error_read(uint32_t index, struct log_error *log);
@@ -61,7 +61,7 @@ uint32_t error_count(void);
 void error_dump(void);
 ```
 
-- error_init(): 時刻源・排他・保存領域を初期化する。
+- init_error(): 時刻源・排他・保存領域を初期化する。
   成功は0、失敗は-1。利用開始前、他スレッドの呼び出しがない状態で1回呼ぶ。
   初期化失敗時は他のAPIを呼ばない。
 - error_write(): 完成済みのログをコピーする。
@@ -151,7 +151,7 @@ void log_adapt_unlock(enum log_lock_id id);
 - ハードウェア周回割り込みを再現せず、取得値から周回数を求める。
 - frequency APIの範囲に合わせ、周波数が0以下またはUINT32_MAX超なら
   初期化失敗とする。
-- Windows本体はmain()のeshinit()より前にerror_init()を呼ぶ。
+- Windows本体はmain()のeshinit()より前にinit_error()を呼ぶ。
 
 ### Cortex-M（今後実装）
 

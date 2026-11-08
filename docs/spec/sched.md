@@ -61,7 +61,7 @@ processだけを取り外す。channelの対象は待機終了まで有効でな
 inode解放・再利用までに関係する待機登録を除去する。
 
 起床後は`p_wchan`と`p_link`をNULLにする。runqは導入せず、executorによる
-runnable processの選択を維持する。`pinit()`で共通wait hashを初期化しない。
+runnable processの選択を維持する。`init_proc()`で共通wait hashを初期化しない。
 
 各channelの起床契機は次のとおり。
 
@@ -92,7 +92,7 @@ backend未設定process向けの`-SYS_EAGAIN`や部分byte数の返却はサポ�
 
 ## Scheduler状態
 
-`sched_prepare()`と`sched_bind_proc_to_coroutine()`は、`pinit()`で初期化した
+`sched_prepare()`と`sched_bind_proc_to_coroutine()`は、`init_proc()`で初期化した
 backend未設定のprocessを対象とし、`PROC_NEW`の検査は行わない。
 backend準備時の資源不足は`-SYS_ENOMEM`で返す。
 

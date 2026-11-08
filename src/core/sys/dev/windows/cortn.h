@@ -56,7 +56,7 @@ struct cortn {
 	enum cortn_yield_reason c_reason;
 };
 
-int cortn_init(struct cortn *self, void *stack, size_t stack_size,
+int init_cortn(struct cortn *self, void *stack, size_t stack_size,
 	       void (*entry)(struct cortn *self, void *arg), void *arg);
 int cortn_resume(struct cortn *self);
 /* Yield requires self running on caller thread */

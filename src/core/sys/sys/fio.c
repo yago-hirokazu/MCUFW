@@ -9,7 +9,7 @@
 #include "sched.h"
 #include "sys_error.h"
 
-void finit(void)
+void init_fsys(void)
 {
 	memset(file, 0, NFILE * sizeof(file[0]));
 	memset(inode, 0, NINODE * sizeof(inode[0]));

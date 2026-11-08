@@ -36,7 +36,7 @@ ptrdiff_t sys_read(int fd, void *buf, size_t count);
 ptrdiff_t sys_write(int fd, const void *buf, size_t count);
 int sys_close(int fd);
 
-void finit(void);
+void init_fsys(void);
 struct file *getf(struct proc *proc, int fd);
 int ufalloc(struct proc *proc);
 /* Success installs fd-owned reference; failure stores negative error in fd */

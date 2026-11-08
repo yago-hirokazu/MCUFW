@@ -155,7 +155,7 @@ static void test_basic(void)
 
 	data.step = 0;
 	data.value = 0;
-	CHECK(cortn_init(&cortn, basic_stack, sizeof(basic_stack),
+	CHECK(init_cortn(&cortn, basic_stack, sizeof(basic_stack),
 			 basic_entry, &data) == CORTN_SUCCESS);
 	CHECK(cortn.c_state == CORTN_RUNNABLE);
 	CHECK(cortn_resume(&cortn) == CORTN_SUCCESS);
@@ -179,7 +179,7 @@ static void test_wait_reason(enum cortn_yield_reason reason,
 
 	data.reason = reason;
 	data.resumed = 0;
-	CHECK(cortn_init(&cortn, wait_stack, sizeof(wait_stack),
+	CHECK(init_cortn(&cortn, wait_stack, sizeof(wait_stack),
 			 wait_entry, &data) == CORTN_SUCCESS);
 	CHECK(cortn_resume(&cortn) == CORTN_SUCCESS);
 	CHECK(cortn.c_state == state);
@@ -207,7 +207,7 @@ static void test_round_robin(void)
 	order_count = 0;
 	for (i = 0; i < TEST_COROUTINES; i++) {
 		data[i].id = i + 1;
-		CHECK(cortn_init(&cortn[i], round_stack[i],
+		CHECK(init_cortn(&cortn[i], round_stack[i],
 				 sizeof(round_stack[i]), round_entry,
 				 &data[i]) == CORTN_SUCCESS);
 	}
@@ -234,21 +234,21 @@ static void test_stack_boundary_guard(void)
 	struct cortn cortn;
 	struct basic_data data;
 
-	CHECK(cortn_init(&cortn, basic_stack, sizeof(basic_stack),
+	CHECK(init_cortn(&cortn, basic_stack, sizeof(basic_stack),
 			 basic_entry, &data) == CORTN_SUCCESS);
 	basic_stack[0] = 0;
 	CHECK(cortn_stack_check(&cortn) == CORTN_ERR_STACK);
 	CHECK(cortn_resume(&cortn) == CORTN_ERR_STACK);
 	CHECK(cortn.c_state == CORTN_ERROR);
 
-	CHECK(cortn_init(&cortn, basic_stack, sizeof(basic_stack),
+	CHECK(init_cortn(&cortn, basic_stack, sizeof(basic_stack),
 			 basic_entry, &data) == CORTN_SUCCESS);
 	basic_stack[sizeof(basic_stack) - 1] = 0;
 	CHECK(cortn_stack_check(&cortn) == CORTN_ERR_STACK);
 	CHECK(cortn_resume(&cortn) == CORTN_ERR_STACK);
 	CHECK(cortn_stack_used(&cortn) == 0);
 
-	CHECK(cortn_init(&cortn, basic_stack, sizeof(basic_stack),
+	CHECK(init_cortn(&cortn, basic_stack, sizeof(basic_stack),
 			 corrupt_stack_boundary_guard_entry, NULL) ==
 	      CORTN_SUCCESS);
 	CHECK(cortn_resume(&cortn) == CORTN_ERR_STACK);
@@ -263,7 +263,7 @@ static void test_simd_and_fpu(void)
 
 	result.low = 0;
 	result.high = 0;
-	CHECK(cortn_init(&cortn, simd_stack, sizeof(simd_stack),
+	CHECK(init_cortn(&cortn, simd_stack, sizeof(simd_stack),
 			 simd_entry, &result) == CORTN_SUCCESS);
 	CHECK(cortn_resume(&cortn) == CORTN_SUCCESS);
 	CHECK(cortn_resume(&cortn) == CORTN_SUCCESS);

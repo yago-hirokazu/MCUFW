@@ -65,7 +65,7 @@ struct code {
 	struct string_table c_stab;	/* Table of strings */
 };
 
-void code_init(struct code *code);
+void init_code(struct code *code);
 
 /* TODO: make debugger */
 

@@ -63,7 +63,7 @@ void *sched_adapt_prepare(void (*entry)(void *arg), void *arg)
 		slot->cs_used = 1;
 		slot->cs_entry = entry;
 		slot->cs_arg = arg;
-		cortn_init(&slot->cs_cortn, slot->cs_stack,
+		init_cortn(&slot->cs_cortn, slot->cs_stack,
 			   sizeof(slot->cs_stack), sched_cortn_entry, slot);
 		return &slot->cs_cortn;
 	}

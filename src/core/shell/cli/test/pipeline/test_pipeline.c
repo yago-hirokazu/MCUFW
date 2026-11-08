@@ -38,7 +38,7 @@ static void test_invalid_pipeline(void);
 
 int main(void)
 {
-	CHECK(error_init() == 0);
+	CHECK(init_error() == 0);
 	test_tokenizer();
 	test_two_stage();
 	test_three_stage_without_spaces();
@@ -67,7 +67,7 @@ static int parse_line(char *line, struct code *code)
 	memset(&token, 0, sizeof(token));
 	if (!tokenize(line, &arg))
 		return 0;
-	lex_init();
+	init_lex();
 	for (i = 0; i < arg.c; i++) {
 		lex_result = lex_analyze_token(arg.v[i], &token);
 		if (lex_result == LEXERROR)
@@ -86,7 +86,7 @@ static int parse_script(const char *script, struct code *code)
 	size_t i;
 
 	parser_reset();
-	code_init(code);
+	init_code(code);
 	memset(input_buffer, 0, sizeof(input_buffer));
 	qbinit(&input_line, (uint8_t *)input_buffer,
 	       sizeof(input_buffer));

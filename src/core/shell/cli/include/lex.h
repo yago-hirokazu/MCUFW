@@ -17,7 +17,7 @@ extern "C" {
 #define LEXDONE		2	/* lexical analysis done */
 #define LEXQUOTE	3	/* lexical analysis processing quote */
 
-void	lex_init(void);
+void	init_lex(void);
 int	lex_analyze_token(char *str, struct token *token);
 
 

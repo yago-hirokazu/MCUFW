@@ -88,7 +88,7 @@ static char is_comparison(char *str);
 static char is_cmdarg(char *str);
 static enum token_type get_token_type(char *s,const struct reserved_token *rsvtab, char ntab);
 
-void lex_init(void)
+void init_lex(void)
 {
 	memset(&lex, 0, sizeof(lex));
 	lex.l_state = LEX_IDLE;

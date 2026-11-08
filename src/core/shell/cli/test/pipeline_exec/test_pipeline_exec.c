@@ -71,7 +71,7 @@ extern int echo(int argc, char **argv);
 
 int main(void)
 {
-	CHECK(error_init() == 0);
+	CHECK(init_error() == 0);
 	test_argument_logs();
 	test_startup_ram();
 	test_single_context();
@@ -141,7 +141,7 @@ static void test_startup_ram(void)
 	bflush(NODEV);
 	sys_unlock();
 	/* Quiescent cache reset preserves stored RAM contents */
-	binit();
+	init_bufc();
 	sys_lock();
 	for (unit = 0; unit < RAM_NDEV; unit++) {
 		bp = bread(makedev(RAM_MAJOR, unit), RAM_NBLK - 1);
@@ -286,7 +286,7 @@ static void init_command(struct exe_proc *proc, struct applet *applet)
 static void init_executor_instruction(struct code *code, struct exe *executor,
 				      int opcode, int operand)
 {
-	code_init(code);
+	init_code(code);
 	memset(executor, 0, sizeof(*executor));
 	code->c_code[0] = opcode;
 	code->c_code[1] = operand;
@@ -427,7 +427,7 @@ static void test_executor_dispatch(void)
 	struct exe executor;
 	int i;
 
-	code_init(&code);
+	init_code(&code);
 	memset(&executor, 0, sizeof(executor));
 	code.c_codes = CODES;
 	for (i = 0; i < CODES; i++)
@@ -498,8 +498,8 @@ static void test_parser_bounds(void)
 	char long_symbol[SYMCHARS + 1];
 	int i;
 
-	code_init(&code);
-	par_init();
+	init_code(&code);
+	init_par();
 	memset(&token, 0, sizeof(token));
 	token.t_type = T_BLTN_CMD;
 	strcpy(token.t_symbol, "echo");
@@ -508,30 +508,30 @@ static void test_parser_bounds(void)
 	CHECK(code.c_codes == CODES);
 	for (i = 0; i < CODES; i++)
 		CHECK(code.c_code[i] == 0);
-	code_init(&code);
-	par_init();
+	init_code(&code);
+	init_par();
 	CHECK(par_make_code(&token, &code) == PARONGO);
 	token.t_type = T_CMD_ARG;
 	strcpy(token.t_symbol, "overflow");
 	code.c_stab.s_num = SYMBOLS;
 	CHECK(par_make_code(&token, &code) == PARINVLD);
 	CHECK(code.c_stab.s_num == SYMBOLS);
-	code_init(&code);
-	par_init();
+	init_code(&code);
+	init_par();
 	token.t_type = T_VARIABLE;
 	code.c_vtab.v_num = SYMBOLS;
 	CHECK(par_make_code(&token, &code) == PARINVLD);
 	CHECK(code.c_vtab.v_num == SYMBOLS);
-	code_init(&code);
-	par_init();
+	init_code(&code);
+	init_par();
 	token.t_type = T_IF;
 	strcpy(token.t_symbol, "if");
 	code.c_ltab.l_num = LABELS;
 	CHECK(par_make_code(&token, &code) == PARINVLD);
 	CHECK(code.c_ltab.l_num == LABELS);
 	/* Failed while label allocation must not index label table */
-	code_init(&code);
-	par_init();
+	init_code(&code);
+	init_par();
 	token.t_type = T_WHILE;
 	strcpy(token.t_symbol, "while");
 	CHECK(par_make_code(&token, &code) == PARONGO);
@@ -574,7 +574,7 @@ static void test_pipe_exhaustion_cleanup(void)
 	/* Fixture setup and close follow shared sys lock contract */
 	sys_lock();
 	for (i = 0; i < NINODE - 1; i++) {
-		pinit(&blockers[i]);
+		init_proc(&blockers[i]);
 		CHECK(pipe_for_proc(&blockers[i], fd) == 0);
 	}
 	sys_unlock();
@@ -613,7 +613,7 @@ static void test_backend_exhaustion_cleanup(void)
 	int i;
 
 	for (i = 0; i < PIPELINE_MAX - 1; i++) {
-		pinit(&blockers[i]);
+		init_proc(&blockers[i]);
 		CHECK(sched_prepare(&blockers[i], blocker_entry, NULL) == 0);
 	}
 	init_command(&proc[0], &producer);
@@ -637,7 +637,7 @@ static void test_pipeline_bytecode(void)
 	struct code code;
 	struct exe executor;
 
-	code_init(&code);
+	init_code(&code);
 	memset(&executor, 0, sizeof(executor));
 	strcpy(code.c_stab.s_str, "left");
 	strcpy(code.c_stab.s_str + SYMCHARS, "right");

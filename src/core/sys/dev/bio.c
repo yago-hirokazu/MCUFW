@@ -25,7 +25,7 @@ static void assign_buffer_to_block(struct buf *bp, struct buf *head,
 				   unsigned int dev, unsigned long blkno);
 
 /* Initialize buffer cache */
-void binit(void)
+void init_bufc(void)
 {
 	struct buf *dp;
 	int i;

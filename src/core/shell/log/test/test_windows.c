@@ -43,7 +43,7 @@ int main(void)
 	unsigned int i;
 	DWORD result;
 
-	CHECK(error_init() == 0);
+	CHECK(init_error() == 0);
 	CHECK(log_adapt_frequency() != 0);
 	CHECK(log_adapt_time_bits() == 32);
 	log_adapt_get_time(&t1, &w1);

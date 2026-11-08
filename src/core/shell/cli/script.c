@@ -29,10 +29,10 @@ static void script_reset_preserving_variables(void);
  **************************************************************************/
 void esh_script_init(void)
 {
-	code_init(&script_code);
+	init_code(&script_code);
 	memset(&script_exe, 0, sizeof(script_exe));
-	par_init();
-	lex_init();
+	init_par();
+	init_lex();
 }
 
 int esh_script_line(char *line)
@@ -48,7 +48,7 @@ int esh_script_line(char *line)
 		goto error;
 	if (!args.c || !is_endofline(args.v[args.c - 1][0]))
 		goto error;
-	lex_init();
+	init_lex();
 	lex_status = LEXDONE;
 	for (i = 0; i < args.c; i++) {
 		lex_status = lex_analyze_token(args.v[i], &token);

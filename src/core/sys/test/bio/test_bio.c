@@ -173,7 +173,7 @@ static void test_binit(void)
 {
 	int i;
 
-	binit();
+	init_bufc();
 	CHECK(nblkdev == 2);
 	CHECK(bdevsw[1].d_tab != bdevsw[0].d_tab);
 	CHECK(bdevsw[RAM_MAJOR].d_strategy == ramstrategy);
@@ -197,7 +197,7 @@ static void test_cache_hit(void)
 	struct buf *bp;
 	struct buf *hit;
 
-	binit();
+	init_bufc();
 	bp = getblk(PIPEDEV, 7);
 	CHECK(bp != NULL);
 	CHECK(bp->b_flags & B_BUSY);
@@ -222,7 +222,7 @@ static void test_exhaustion(void)
 	struct buf *held[NBUF];
 	int i;
 
-	binit();
+	init_bufc();
 	for (i = 0; i < NBUF; i++) {
 		held[i] = getblk(PIPEDEV, (unsigned long)i);
 		CHECK(held[i] != NULL);
@@ -242,7 +242,7 @@ static void test_lru(void)
 	struct buf *bp;
 	int i;
 
-	binit();
+	init_bufc();
 	for (i = 0; i < NBUF; i++)
 		held[i] = getblk(PIPEDEV, (unsigned long)i);
 	for (i = 0; i < NBUF; i++)
@@ -260,7 +260,7 @@ static void test_age(void)
 	struct buf *bp;
 	int i;
 
-	binit();
+	init_bufc();
 	for (i = 0; i < NBUF; i++)
 		held[i] = getblk(PIPEDEV, (unsigned long)i);
 	for (i = 0; i < NBUF; i++)
@@ -280,7 +280,7 @@ static void test_geteblk_and_clrbuf(void)
 {
 	struct buf *bp;
 
-	binit();
+	init_bufc();
 	bp = geteblk();
 	CHECK(bp != NULL);
 	CHECK(bp->b_dev == NODEV);
@@ -298,7 +298,7 @@ static void test_error_release(void)
 {
 	struct buf *bp;
 
-	binit();
+	init_bufc();
 	bp = getblk(PIPEDEV, 91);
 	CHECK(bp != NULL);
 	bp->b_flags |= B_ERROR;
@@ -337,7 +337,7 @@ static void test_devices(void)
 				   0xffffU, 0x0200U };
 	size_t i;
 
-	binit();
+	init_bufc();
 	for (i = 0; i < sizeof(invalid) / sizeof(invalid[0]); i++) {
 		CHECK(bdevsw_lookup(invalid[i]) == NULL);
 	}
@@ -365,8 +365,8 @@ static void test_devices(void)
 static void begin_io_test(void)
 {
 
-	raminit();
-	binit();
+	init_ramdisk();
+	init_bufc();
 	saved_ram = bdevsw[RAM_MAJOR];
 	bdevsw[RAM_MAJOR].d_strategy = io_strategy;
 	io_reads = 0;
@@ -429,7 +429,7 @@ static void test_block_io(void)
 	}
 	CHECK(io_writes == (int)(RAM_NDEV * RAM_NBLK));
 	CHECK(count_av_list() == NBUF);
-	binit();
+	init_bufc();
 	for (unit = 0; unit < RAM_NDEV; unit++) {
 		for (block = 0; block < RAM_NBLK; block++) {
 
@@ -469,7 +469,7 @@ static void test_read_cache(void)
 	CHECK(bp != NULL && bp->b_error == 0);
 	CHECK(io_reads == 1);
 	brelse(bp);
-	binit();
+	init_bufc();
 	bp = bread(makedev(RAM_MAJOR, 0), 0);
 	CHECK(bp != NULL && bp->b_error == 0);
 	CHECK(io_reads == 2);
@@ -558,7 +558,7 @@ static void test_io_exhaustion(void)
 
 	for (i = 0; i < NBUF; i++)
 		brelse(held[i]);
-	binit();
+	init_bufc();
 	bp = getblk(makedev(RAM_MAJOR, 0), 0);
 	bp->b_flags |= B_DONE | B_DELWRI;
 	brelse(bp);
@@ -603,7 +603,7 @@ static void test_delayed_write(void)
 	bflush(NODEV);
 	CHECK(io_writes == 2);
 	bflush(PIPEDEV);
-	binit();
+	init_bufc();
 	bp = bread(dev, 0);
 	CHECK(bp != NULL && bp->b_error == 0 && bp->b_addr[0] == 0x71);
 	brelse(bp);
@@ -672,7 +672,7 @@ static void test_dirty_reuse(void)
 	bflush(NODEV);
 	CHECK(io_writes == NBUF * 2);
 	brelse(bp);
-	binit();
+	init_bufc();
 	for (i = 0; i < NBUF; i++) {
 		bp = bread(dev, (unsigned long)i);
 		CHECK(bp != NULL && bp->b_error == 0);

@@ -1,7 +1,7 @@
 
 /*
  * Lexer token => par_make_code() => parser state => bytecode and tables
- * code_init() / par_init() => valid storage before token processing
+ * init_code() / init_par() => valid storage before token processing
  * Capacity failure => parse_error => PARINVLD => caller resets parser
  */
 
@@ -99,7 +99,7 @@ char par_make_code(struct token *tok, struct code *code)
 	return parse_error ? PARINVLD : status;
 }
 
-void par_init(void)
+void init_par(void)
 {
 	memset(parse, 0, sizeof(parse));
 	memset(loop_at, 0, sizeof(loop_at));

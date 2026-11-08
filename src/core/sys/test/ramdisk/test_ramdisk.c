@@ -113,8 +113,8 @@ static void test_initial(void)
 	unsigned int unit;
 	size_t i;
 
-	raminit();
-	binit();
+	init_ramdisk();
+	init_bufc();
 	CHECK(bdevsw[RAM_MAJOR].d_strategy == ramstrategy);
 	CHECK(bdevsw[RAM_MAJOR].d_queue == &ramqueue);
 	for (unit = 0; unit < RAM_NDEV; unit++) {
@@ -135,8 +135,8 @@ static void test_storage(void)
 	unsigned int unit;
 	size_t i;
 
-	raminit();
-	binit();
+	init_ramdisk();
+	init_bufc();
 	for (unit = 0; unit < RAM_NDEV; unit++) {
 		for (block = 0; block < RAM_NBLK; block++) {
 			bp = request(unit, block, 0);
@@ -150,7 +150,7 @@ static void test_storage(void)
 		}
 	}
 	check_idle();
-	binit();
+	init_bufc();
 	for (unit = 0; unit < RAM_NDEV; unit++) {
 		for (block = 0; block < RAM_NBLK; block++) {
 			bp = request(unit, block, 1);
@@ -173,8 +173,8 @@ static void test_errors(void)
 	size_t i;
 	int read;
 
-	raminit();
-	binit();
+	init_ramdisk();
+	init_bufc();
 	for (read = 0; read <= 1; read++) {
 		bp = request(2, 0, read);
 		complete(bp, SYS_ENODEV);
@@ -216,8 +216,8 @@ static void test_async(void)
 	int index;
 	size_t i;
 
-	raminit();
-	binit();
+	init_ramdisk();
+	init_bufc();
 	bp = request(1, 2, 0);
 	memset(bp->b_addr, 0x96, BSIZE);
 	index = (int)(bp - buf);
@@ -227,7 +227,7 @@ static void test_async(void)
 	CHECK(buf[index].b_flags & B_DONE);
 	CHECK(!(buf[index].b_flags & (B_BUSY | B_ASYNC | B_ERROR)));
 	check_idle();
-	binit();
+	init_bufc();
 	bp = request(1, 2, 1);
 	complete(bp, 0);
 	for (i = 0; i < BSIZE; i++)
@@ -253,8 +253,8 @@ static void test_rejection(void)
 	struct buf *blocked;
 	struct buf saved;
 
-	raminit();
-	binit();
+	init_ramdisk();
+	init_bufc();
 	bp = request(0, 0, 1);
 	bp->b_dev = PIPEDEV;
 	ramstrategy(bp);
@@ -314,18 +314,18 @@ static void test_reset(void)
 	unsigned char saved_data[NBUF][BSIZE];
 	size_t i;
 
-	raminit();
-	binit();
+	init_ramdisk();
+	init_bufc();
 	bp = request(0, 0, 0);
 	memset(bp->b_addr, 0x56, BSIZE);
 	complete(bp, 0);
 	brelse(bp);
 	memcpy(saved_buf, buf, sizeof(saved_buf));
 	memcpy(saved_data, buffers, sizeof(saved_data));
-	raminit();
+	init_ramdisk();
 	CHECK(memcmp(saved_buf, buf, sizeof(saved_buf)) == 0);
 	CHECK(memcmp(saved_data, buffers, sizeof(saved_data)) == 0);
-	binit();
+	init_bufc();
 	bp = request(0, 0, 1);
 	complete(bp, 0);
 	for (i = 0; i < BSIZE; i++)

@@ -53,7 +53,7 @@ int sched_sleep(char *chan, enum wait_reason reason);
 void sched_wakeup(char *chan);
 struct proc *current_proc(void);
 /* Initialize process before descriptors or backend setup */
-void pinit(struct proc *proc);
+void init_proc(struct proc *proc);
 /* Bind and prepare require initialized process without backend */
 int sched_bind_proc_to_coroutine(struct proc *proc, void *backend);
 int sched_prepare(struct proc *proc, void (*entry)(void *arg), void *arg);

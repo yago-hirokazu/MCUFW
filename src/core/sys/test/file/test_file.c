@@ -22,7 +22,7 @@
 
 static int failures;
 
-static void init_proc(struct proc *proc);
+static void init_test_proc(struct proc *proc);
 static void test_file_allocation(void);
 static void test_descriptor_helpers(void);
 static void test_fd_exhaustion(void);
@@ -50,7 +50,7 @@ int main(void)
 	return 0;
 }
 
-static void init_proc(struct proc *proc)
+static void init_test_proc(struct proc *proc)
 {
 	memset(proc, 0, sizeof(*proc));
 }
@@ -61,9 +61,9 @@ static void test_file_allocation(void)
 	struct file *fp;
 	int fd;
 
-	binit();
-	finit();
-	init_proc(&proc);
+	init_bufc();
+	init_fsys();
+	init_test_proc(&proc);
 	CHECK(file_in_use() == 0);
 	fp = falloc(&proc, &fd);
 	CHECK(fp == &file[0]);
@@ -87,9 +87,9 @@ static void test_descriptor_helpers(void)
 	int fd;
 	int copy;
 
-	binit();
-	finit();
-	init_proc(&proc);
+	init_bufc();
+	init_fsys();
+	init_test_proc(&proc);
 	fp = falloc(&proc, &fd);
 	CHECK(fp != NULL);
 	copy = fd_install(&proc, fp);
@@ -120,9 +120,9 @@ static void test_fd_exhaustion(void)
 	int fd;
 	int i;
 
-	binit();
-	finit();
-	init_proc(&proc);
+	init_bufc();
+	init_fsys();
+	init_test_proc(&proc);
 	for (i = 0; i < NOFILE; i++) {
 		fp = falloc(&proc, &fd);
 		CHECK(fp != NULL);
@@ -143,10 +143,10 @@ static void test_file_exhaustion(void)
 	int fd;
 	int i;
 
-	binit();
-	finit();
-	init_proc(&owner);
-	init_proc(&waiter);
+	init_bufc();
+	init_fsys();
+	init_test_proc(&owner);
+	init_test_proc(&waiter);
 	for (i = 0; i < NFILE; i++)
 		CHECK(falloc(&owner, &fd) != NULL);
 	CHECK(ufalloc(&waiter) == 0);
@@ -167,9 +167,9 @@ static void test_inode_lifecycle(void)
 	int fd;
 	int copy;
 
-	binit();
-	finit();
-	init_proc(&proc);
+	init_bufc();
+	init_fsys();
+	init_test_proc(&proc);
 	ip = ialloc();
 	CHECK(ip == &inode[0]);
 	CHECK(ip->i_count == 1);
@@ -195,8 +195,8 @@ static void test_inode_exhaustion(void)
 	struct inode *ips[NINODE];
 	int i;
 
-	binit();
-	finit();
+	init_bufc();
+	init_fsys();
 	for (i = 0; i < NINODE; i++) {
 		ips[i] = ialloc();
 		CHECK(ips[i] != NULL);
@@ -216,8 +216,8 @@ static void test_buffer_failure(void)
 	struct buf *held[NBUF];
 	int i;
 
-	binit();
-	finit();
+	init_bufc();
+	init_fsys();
 	for (i = 0; i < NBUF; i++) {
 		held[i] = getblk(PIPEDEV, (unsigned long)i);
 		CHECK(held[i] != NULL);
@@ -238,9 +238,9 @@ static void test_reuse_after_close_all(void)
 	struct buf *bp;
 	int fd;
 
-	binit();
-	finit();
-	init_proc(&proc);
+	init_bufc();
+	init_fsys();
+	init_test_proc(&proc);
 	ip = ialloc();
 	fp = falloc(&proc, &fd);
 	CHECK(ip != NULL);

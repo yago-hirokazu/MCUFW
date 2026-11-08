@@ -70,7 +70,7 @@ static int execute_commands(struct exe *exe)
 	if (exe->e_procs > 1)
 		return exe_run_pipeline(exe->e_proc, exe->e_procs);
 	proc = &exe->e_proc[0];
-	pinit(&proc->p_exec);
+	init_proc(&proc->p_exec);
 	previous = current_proc();
 	sched_set_current_proc(&proc->p_exec);
 	result = proc->p_cmd->main(proc->p_argc, proc->p_argv);
@@ -329,7 +329,7 @@ int exe_run_pipeline(struct exe_proc *proc, int count)
 			    -SYS_EINVAL);
 	}
 	for (i = 0; i < count; i++) {
-		pinit(&proc[i].p_exec);
+		init_proc(&proc[i].p_exec);
 	}
 	pipe_count = 0;
 	prepared = 0;
@@ -529,7 +529,7 @@ static int connect_proc(struct exe_proc *writer, struct exe_proc *reader)
 	int fd[2];
 	int result;
 
-	pinit(&owner);
+	init_proc(&owner);
 	sys_lock();
 	result = pipe_for_proc(&owner, fd);
 	if (result < 0)

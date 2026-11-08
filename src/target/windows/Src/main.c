@@ -8,7 +8,7 @@
 
 int main(int argc, char *argv[])
 {
-	if (error_init() != 0)
+	if (init_error() != 0)
 		return EXIT_FAILURE;
 	eshinit();
 

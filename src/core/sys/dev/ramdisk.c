@@ -14,7 +14,7 @@ static unsigned char ramblocks[RAM_NDEV][RAM_NBLK][BSIZE];
 
 static int ramtransfer(struct buf *bp);
 
-void raminit(void)
+void init_ramdisk(void)
 {
 	memset(ramblocks, 0, sizeof(ramblocks));
 }

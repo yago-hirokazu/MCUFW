@@ -11,10 +11,10 @@
 void eshinit(void)
 {
 	/* Cold start only; no live users or unsaved dirty buffers */
-	raminit();
-	binit();
-	finit();
-	ttyinit();
+	init_ramdisk();
+	init_bufc();
+	init_fsys();
+	init_tty();
 	prompt();
 }
 

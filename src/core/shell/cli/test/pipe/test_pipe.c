@@ -182,9 +182,9 @@ static void run_prepared(void (*entry)(void *arg))
 {
 	struct proc proc;
 
-	binit();
-	finit();
-	pinit(&proc);
+	init_bufc();
+	init_fsys();
+	init_proc(&proc);
 	CHECK(sched_prepare(&proc, entry, NULL) == 0);
 	CHECK(sched_resume(&proc) == 0);
 	CHECK(proc.p_state == PROC_FINISHED);
@@ -269,10 +269,10 @@ static void test_v7_offset(void)
 	for (i = 0; i < PIPSIZ + 1; i++)
 		source[i] = (unsigned char)(i * 37 + 11);
 	memset(output, 0, sizeof(output));
-	binit();
-	finit();
-	pinit(&procs[0]);
-	pinit(&procs[1]);
+	init_bufc();
+	init_fsys();
+	init_proc(&procs[0]);
+	init_proc(&procs[1]);
 	CHECK(connect_pipe(&procs[0], &procs[1], &write_fd, &read_fd) == 0);
 	rf = getf(&procs[1], read_fd);
 	ip = rf->f_inode;
@@ -346,10 +346,10 @@ static void test_blocking_transfer(void)
 	for (i = 0; i < TEST_DATA_SIZE; i++)
 		source[i] = (unsigned char)(i * 37);
 	memset(result, 0, sizeof(result));
-	binit();
-	finit();
-	pinit(&procs[0]);
-	pinit(&procs[1]);
+	init_bufc();
+	init_fsys();
+	init_proc(&procs[0]);
+	init_proc(&procs[1]);
 	CHECK(connect_pipe(&procs[0], &procs[1], &write_fd, &read_fd) == 0);
 	writer.data = source;
 	writer.count = sizeof(source);
@@ -383,10 +383,10 @@ static void test_reader_close_wakeup(void)
 	int write_fd;
 	int read_fd;
 
-	binit();
-	finit();
-	pinit(&procs[0]);
-	pinit(&procs[1]);
+	init_bufc();
+	init_fsys();
+	init_proc(&procs[0]);
+	init_proc(&procs[1]);
 	CHECK(connect_pipe(&procs[0], &procs[1], &write_fd, &read_fd) == 0);
 	reader.data = &byte;
 	reader.capacity = 1;
@@ -415,10 +415,10 @@ static void test_writer_close_wakeup(void)
 	int read_fd;
 
 	memset(data, 0x3c, sizeof(data));
-	binit();
-	finit();
-	pinit(&procs[0]);
-	pinit(&procs[1]);
+	init_bufc();
+	init_fsys();
+	init_proc(&procs[0]);
+	init_proc(&procs[1]);
 	CHECK(connect_pipe(&procs[0], &procs[1], &write_fd, &read_fd) == 0);
 	writer.data = data;
 	writer.count = sizeof(data);

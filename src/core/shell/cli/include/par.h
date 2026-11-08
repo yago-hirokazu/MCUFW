@@ -63,7 +63,7 @@ struct parse {
 
 /* Requires valid lexer token and initialized code storage */
 char par_make_code(struct token *tok, struct code *code);
-void par_init(void);
+void init_par(void);
 
 
 #ifdef __cplusplus

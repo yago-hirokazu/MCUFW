@@ -66,7 +66,7 @@ int main(int argc, void *argv[])
 	char c_var=0, c_val=0, c_str=0;
 	char s_var[SYMCHARS], s_val[SYMCHARS], s_str[SYMCHARS];
 
-	if (error_init() != 0)
+	if (init_error() != 0)
 		return EXIT_FAILURE;
 
 	if (argc < 2) {
@@ -135,7 +135,7 @@ int main(int argc, void *argv[])
 		/*
 		 * Make cooked tokens from raw tokens with lexical analysis
 		 */
-		lex_init();
+		init_lex();
 		for (k=0; k<arg.c; k++) {
 			ret = lex_analyze_token(arg.v[k], &token[tokens]);
 			DP("%d (%s) = lex_analyze_token(%s, &token)\n",
@@ -168,7 +168,7 @@ parse:
 	DP("Parsing tokens to make byte codes\n");
 	DP("---------------------------------\n");
 
-	code_init(&code);
+	init_code(&code);
 
 	k=0;
 	while (k < tokens || token[k].t_type != T_UNDEF) {

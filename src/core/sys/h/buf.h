@@ -62,7 +62,7 @@ extern struct buf bfreelist;
 
 /* Caller holds sys lock for cache, I/O and owned payload access */
 /* Quiescent initialization and single-execution tests may omit lock */
-void binit(void);
+void init_bufc(void);
 struct buf *getblk(unsigned int dev, unsigned long blkno);
 struct buf *geteblk(void);
 /* Require valid device table and synchronous strategy for block I/O */

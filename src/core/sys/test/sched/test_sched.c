@@ -324,10 +324,10 @@ static void test_blocking_transfer(void)
 	for (i = 0; i < TEST_DATA_SIZE; i++)
 		source[i] = (unsigned char)(i * 37);
 	memset(result, 0, sizeof(result));
-	binit();
-	finit();
-	pinit(&procs[0]);
-	pinit(&procs[1]);
+	init_bufc();
+	init_fsys();
+	init_proc(&procs[0]);
+	init_proc(&procs[1]);
 	CHECK(connect_pipe(&procs[0], &procs[1], &write_fd, &read_fd) == 0);
 	writer.data = source;
 	writer.count = sizeof(source);
@@ -365,10 +365,10 @@ static void test_wait_lock(void)
 
 	input = 0x6d;
 	output = 0;
-	binit();
-	finit();
-	pinit(&owner);
-	pinit(&sleeper);
+	init_bufc();
+	init_fsys();
+	init_proc(&owner);
+	init_proc(&sleeper);
 	CHECK(connect_pipe(&owner, &sleeper, &write_fd, &read_fd) == 0);
 	ip = getf(&sleeper, read_fd)->f_inode;
 	sys_lock();
@@ -402,7 +402,7 @@ static void test_multiple_waiters(void)
 	int i;
 
 	for (i = 0; i < 2; i++) {
-		pinit(&procs[i]);
+		init_proc(&procs[i]);
 		wait[i].chan = &chan;
 		wait[i].reason = WAIT_READ;
 		wait[i].result = -1;
@@ -440,7 +440,7 @@ static void test_inode_channels(void)
 
 	for (cycle = 0; cycle < 2; cycle++) {
 		for (i = 0; i < 3; i++) {
-			pinit(&procs[i]);
+			init_proc(&procs[i]);
 			wait[i].chan = (char *)&node + i;
 			wait[i].reason = reasons[i];
 			CHECK(sched_prepare(&procs[i], wait_entry,
@@ -477,7 +477,7 @@ static void test_hash_collision(void)
 
 	/* Aligned first bytes share V7 hash after five-bit shift */
 	for (i = 0; i < 3; i++) {
-		pinit(&procs[i]);
+		init_proc(&procs[i]);
 		wait[i].chan = channels + (i == 1);
 		wait[i].reason = WAIT_READ;
 		CHECK(sched_prepare(&procs[i], wait_entry, &wait[i]) == 0);
@@ -513,7 +513,7 @@ static void test_release_collision(void)
 
 	for (removed = 0; removed < 3; removed++) {
 		for (i = 0; i < 3; i++) {
-			pinit(&procs[i]);
+			init_proc(&procs[i]);
 			wait[i].chan = channels + i;
 			wait[i].reason = WAIT_READ;
 			CHECK(sched_prepare(&procs[i], wait_entry,
@@ -545,7 +545,7 @@ static void test_release_waiter(void)
 	char chan = 0;
 	struct proc proc;
 
-	pinit(&proc);
+	init_proc(&proc);
 	wait.chan = &chan;
 	wait.reason = WAIT_WRITE;
 	CHECK(sched_prepare(&proc, wait_entry, &wait) == 0);
@@ -563,7 +563,7 @@ static void test_wake_then_release(void)
 	char chan = 0;
 	struct proc proc;
 
-	pinit(&proc);
+	init_proc(&proc);
 	wait.chan = &chan;
 	wait.reason = WAIT_READ;
 	CHECK(sched_prepare(&proc, wait_entry, &wait) == 0);
@@ -584,7 +584,7 @@ static void test_yield_failure_cleanup(void)
 	char chan = 0;
 	struct proc proc;
 
-	pinit(&proc);
+	init_proc(&proc);
 	wait.chan = &chan;
 	wait.reason = WAIT_READ;
 	wait.result = 0;
@@ -608,7 +608,7 @@ static void test_prepare_exhaustion(void)
 
 	called = 0;
 	for (i = 0; i < PIPELINE_MAX + 1; i++)
-		pinit(&procs[i]);
+		init_proc(&procs[i]);
 	for (i = 0; i < PIPELINE_MAX; i++)
 		CHECK(sched_prepare(&procs[i], unused_entry, &called) == 0);
 	CHECK(sched_prepare(&procs[i], unused_entry, &called) ==
@@ -689,9 +689,9 @@ static void ram_test_begin(void)
 	CHECK(current_proc() == NULL);
 	CHECK(!sys_lock_held());
 
-	raminit();
-	binit();
-	finit();
+	init_ramdisk();
+	init_bufc();
+	init_fsys();
 	saved_ram_strategy = bdevsw[RAM_MAJOR].d_strategy;
 	bdevsw[RAM_MAJOR].d_strategy = locked_ram_strategy;
 	max_pipe_io = 0;
@@ -759,7 +759,7 @@ static void test_ram_capacity(void)
 	int i;
 
 	ram_test_begin();
-	pinit(&owner);
+	init_proc(&owner);
 	sys_lock();
 	make_full_pipes(&owner, pipes);
 	extra = NBUF - NINODE;
@@ -928,7 +928,7 @@ static void test_pipeline_ram(void)
 	for (i = 0; i < TEST_DATA_SIZE; i++)
 		source[i] = (unsigned char)(i * 37);
 	for (i = 0; i < PIPELINE_MAX; i++) {
-		pinit(&procs[i]);
+		init_proc(&procs[i]);
 		stages[i].source = source;
 		stages[i].output = output;
 		stages[i].total = sizeof(source);
@@ -1001,7 +1001,7 @@ static void test_parallel_ram(void)
 	int i;
 
 	ram_test_begin();
-	pinit(&owner);
+	init_proc(&owner);
 	sys_lock();
 	make_full_pipes(&owner, pipes);
 	sys_unlock();
@@ -1084,10 +1084,10 @@ static void test_buffer_error_isolation(void)
 	struct buffer_wait_arg waiter = { &chan, 0, 0 };
 	int i;
 
-	raminit();
-	binit();
+	init_ramdisk();
+	init_bufc();
 	for (i = 0; i < 2; i++)
-		pinit(&procs[i]);
+		init_proc(&procs[i]);
 	CHECK(sched_prepare(&procs[0], buffer_wait_entry, &waiter) == 0);
 	CHECK(sched_prepare(&procs[1], buffer_peer_entry, &chan) == 0);
 	CHECK(run_scheduler(procs, 2) == 0);

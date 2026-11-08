@@ -18,7 +18,7 @@ static uint32_t count;
 /*
  * Initialize logger before starting concurrent callers
  */
-int error_init(void)
+int init_error(void)
 {
 	if (log_adapt_init() != 0)
 		return -1;

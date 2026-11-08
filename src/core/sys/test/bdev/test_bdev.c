@@ -131,7 +131,7 @@ static void setup(void)
 	bdevsw[RAM_MAJOR].d_queue = NULL;
 	bdevsw[major(PIPEDEV)].d_strategy = mock_strategy;
 	bdevsw[major(PIPEDEV)].d_queue = &mock_queue;
-	binit();
+	init_bufc();
 	mock_started_count = 0;
 	mock_completed_count = 0;
 	mock_calls = 0;

@@ -15,7 +15,7 @@
 static int cortn_stack_boundary_guard_is_valid(const unsigned char *guard);
 static unsigned char *cortn_stack_top(const struct cortn *self);
 
-int cortn_init(struct cortn *self, void *stack, size_t stack_size,
+int init_cortn(struct cortn *self, void *stack, size_t stack_size,
 	       void (*entry)(struct cortn *self, void *arg), void *arg)
 {
 	unsigned char *bytes;

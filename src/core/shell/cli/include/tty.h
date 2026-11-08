@@ -69,7 +69,7 @@ struct tty_arg {
 /**************************************************************************
  * EXPORTED FUNCTIONS
  **************************************************************************/
-extern void ttyinit(void);
+extern void init_tty(void);
 extern void ttytask(int c);
 extern int scan(int c, struct qbyte *line_p);
 extern struct tty_arg *tokenize(char *line, struct tty_arg *arg);

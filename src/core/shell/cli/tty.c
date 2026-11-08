@@ -131,7 +131,7 @@ extern void echo_left(void);
 /**************************************************************************
  * FUNCTION DEFINITIONS
  **************************************************************************/
-void ttyinit(void)
+void init_tty(void)
 {
 	qbinit(&line, (uint8_t *)&linebuf[0], TTY_NBUF);
 #ifdef ESH_SCRIPT

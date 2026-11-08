@@ -84,9 +84,9 @@ int main(void)
 	uint32_t i;
 
 	init_failure = -1;
-	CHECK(error_init() == -1);
+	CHECK(init_error() == -1);
 	init_failure = 0;
-	CHECK(error_init() == 0);
+	CHECK(init_error() == 0);
 	CHECK(error_count() == 0);
 	out.file = 0xab;
 	CHECK(error_read(0, &out) == -1 && out.file == 0xab);
@@ -116,7 +116,7 @@ int main(void)
 	warm_void(2);
 	CHECK(continued == 5);
 
-	CHECK(error_init() == 0);
+	CHECK(init_error() == 0);
 	clock_time = UINT32_MAX;
 	clock_wrap = 7;
 	error_record(0x12, 42);
