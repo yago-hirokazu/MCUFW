@@ -1,4 +1,10 @@
-#!/bin/sh
+#!/usr/bin/env bash
+
+if [[ ${BASH_SOURCE[0]} != "$0" ]]; then
+	echo 'Run this script with: bash ./run_test.sh' >&2
+	# Keep caller running even with set -e
+	return 0
+fi
 
 set -u
 
@@ -19,9 +25,9 @@ while [ "$k" -le 10 ]; do
 		exit 1
 	fi
 
-	if ! diff -q "result_test${k}_sh.txt" "answer_test${k}_sh.txt" >/dev/null; then
-		echo "error @ test${k}" >&2
-		echo "error detected!!!" >&2
+	if ! diff --strip-trailing-cr -u "answer_test${k}_sh.txt" \
+		"result_test${k}_sh.txt"; then
+		echo "error: test${k}.sh output comparison failed" >&2
 		exit 1
 	fi
 

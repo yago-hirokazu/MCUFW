@@ -1,4 +1,10 @@
-#!/bin/sh
+#!/usr/bin/env bash
+
+if [[ ${BASH_SOURCE[0]} != "$0" ]]; then
+	echo 'Run this script with: bash ./run_test2.sh' >&2
+	# Keep caller running even with set -e
+	return 0
+fi
 
 RZ_FNAME=result_test2_sh.txt
 AN_FNAME=answer_test2_sh.txt
