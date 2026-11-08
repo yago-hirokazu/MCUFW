@@ -64,9 +64,6 @@ static const struct reserved_token kwtab[] = {
 	{T_ELIF , "elif" },
 	{T_ELSE , "else" },
 	{T_FI   , "fi"   },
-#if !TODO_BREAK_WITH_ARGUMENT
-	{T_BREAK, "break"}
-#endif
 };
 
 static const struct reserved_token optab[] = {

@@ -51,9 +51,7 @@ const struct applet builtins[] = {
 
 #if !defined(PROTOTYPES)
 #if USE_STACKMACH
-#if TODO_BREAK_WITH_ARGUMENT
 	{"break", break_command},
-#endif // #if TODO_BREAK_WITH_ARGUMENT
 #endif // #if USE_STACKMACH
 #ifdef ESH_SCRIPT
 	{"cat", cat},

@@ -36,9 +36,7 @@ enum	token_type {
 	T_ELIF,		/* elif */
 	T_ELSE,		/* else */
 	T_FI,		/* fi */
-#if TODO_BREAK_WITH_ARGUMENT
 	T_BREAK,        /* break */
-#endif
 	T_PIPE,		/* | */
 	T_EOL,		/* End of line */
 	T_COMMENT,	/* Comment */

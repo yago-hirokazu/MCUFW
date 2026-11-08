@@ -9,7 +9,6 @@ extern "C" {
 #endif /* __cplusplus */
 
 
-#define TODO_BREAK_WITH_ARGUMENT	1
 
 
 

@@ -74,10 +74,6 @@ static void nest_enter(int *nest_p, int *maxnests);
 static void nest_leave(int *nest_p, int *maxnests);
 static void nest_restore_if_needed(int *nest_p, int maxnests);
 
-#if !TODO_BREAK_WITH_ARGUMENT
-static int break_label(struct parse *par, int *loop_at, int loop_p);
-#endif
-
 #if DEBUG_PAR
 static void dump_context(const char *s, struct token *tok);
 #endif
@@ -436,15 +432,6 @@ parse_idle(struct parse *par, struct token *tok, struct code *code)
 		par->p_state1 = PAR_IF;
 		par->p_state2 = PAR_IF_LBRACKET;
 		return PARONGO;
-#if !TODO_BREAK_WITH_ARGUMENT
-	case T_BREAK:
-		DP("break statement");
-
-		int label = break_label(&parse[0], &loop_at[0], loops-1);
-		add_code(OP_BREAK_LOOP, code);
-		add_code(label, code);
-		return PARDONE;
-#endif
 	case T_EOL:
 	case T_COMMENT:
 		return PARDONE;
@@ -830,19 +817,6 @@ static void nest_restore_if_needed(int *nest_p, int maxnests)
 
 
 }
-
-#if !TODO_BREAK_WITH_ARGUMENT
-static int break_label(struct parse *par, int *loop_at, int loop_p)
-{
-	int label;
-	int loopat = loop_at[loop_p];
-
-	label = par[loopat].p_label.l_end;
-	DP("label = parse[loop_at[loop_p=%d]=%d].p_label.l_end = %d",
-	   loop_p,loop_at[loop_p],label);
-	return label;
-}
-#endif
 
 #if DEBUG_PAR
 static void dump_context(const char *s, struct token *tok)

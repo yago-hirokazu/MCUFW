@@ -192,13 +192,11 @@ int exe_run_codes(struct code *code, struct exe *exe)
 
 		DP("Command: %s", proc->p_cmd->name);
 
-#if TODO_BREAK_WITH_ARGUMENT
 		if (0 == strcmp(proc->p_argv[0], "break") && ret >= 0 &&
 		    ret < code->c_ltab.l_num)
 			pc = code->c_ltab.l_addr[ret];
 		else
-#endif
-		pc += 1;
+			pc += 1;
 		reset_commands(exe);
 		break;
 	case OP_CMD_EXE_THEN_STACK:
@@ -253,16 +251,6 @@ int exe_run_codes(struct code *code, struct exe *exe)
 		label_p = code->c_code[pc+1];
 		pc = code->c_ltab.l_addr[label_p];
 		break;
-#if !TODO_BREAK_WITH_ARGUMENT
-	case OP_BREAK_LOOP:
-		DP("OP_BREAK_LOOP");
-		DP("jump from pc=%d to pc=%d",
-		   pc, code->c_ltab.l_addr[label_p]);
-
-		label_p = code->c_code[pc+1];
-		pc = code->c_ltab.l_addr[label_p];
-		break;
-#endif
 	case OP_PUSH_SYMBOL:
 		sid = code->c_code[pc+1];
 		exe->e_stack[sp] = sid;
