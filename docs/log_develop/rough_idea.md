@@ -1,4 +1,4 @@
-# ログ
+# rough idea
 
 ## 2024-04-21
 
@@ -12,9 +12,9 @@ __weak void usec(DELAY_UWORD us)
 
 dlyinitとusecの実装  
 ```
-MCUFW\lib\stm32\delay_adapt.c
-MCUFW\lib\windows
-MCUFW\lib\cygwin
+MCUFW\src\core\lib\dev\stm32\delay_adapt.c
+MCUFW\src\core\lib\dev\windows
+MCUFW\src\core\lib\dev\cygwin
 ```
 
 cygwinのシリアル端末設定はどこにある？HDD？gridなんかで検索すれば見つかるかも。  
@@ -51,8 +51,4 @@ Windowsの場合は？
 Cygwinの場合は？  
 
 
-### ucmd.hの場所
-
-Cmd/に移動？TBD。Adaptationが必要な要素
-
-
+[EOF]

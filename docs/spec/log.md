@@ -8,10 +8,11 @@ log_debug、audit log、STM32移植、既存チェックの一括置換は今後
 ## ディレクトリ構造
 
 ```text
+src/core/shell/assert/
+    custom_assert.h      warm assert
 src/core/shell/log/
     include/
         log_error.h      公開APIとログ構造体
-        custom_assert.h  warm assert
         code_file.h      ファイル番号一覧
         code_error.h     エラーコード一覧
         log_adapt.h      時刻・排他の移植API
