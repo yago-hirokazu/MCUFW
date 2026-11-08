@@ -1,6 +1,6 @@
 
 # CFLAGS
-CFLAGS=-I./include -I./dev/windows -I../../lib -I./stub -I../log/include
+CFLAGS=-I./include -I./dev/windows -I../../lib -I./stub -I../log/include -I../assert
 
 .PHONY: check-syntax
 check-syntax:

@@ -1,7 +1,7 @@
 CC = gcc
-CFLAGS = -std=c11 -Wall -Wextra -Werror -g -I../include -DNDEBUG
+CFLAGS = -std=c11 -Wall -Wextra -Werror -g -I../include -I../../assert -DNDEBUG
 TARGETS = test_error.exe test_windows.exe test_clock.exe
-HEADERS = $(wildcard ../include/*.h)
+HEADERS = $(wildcard ../include/*.h ../../assert/*.h)
 
 .PHONY: all test clean
 all: $(TARGETS)

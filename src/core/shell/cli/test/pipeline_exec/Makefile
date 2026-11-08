@@ -59,4 +59,4 @@ $(OUTDIR)/%.o: %.S
 clean:
 	rm -rf $(OUTDIR) $(TARGET)
 
-CFLAGS += -I../../../log/include
+CFLAGS += -I../../../log/include -I../../../assert

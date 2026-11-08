@@ -130,4 +130,4 @@ check-syntax:
 	$(CC) -o nul $(CPPFLAGS) -S $(CHK_SOURCES)
 
 
-CFLAGS += -I../../../log/include
+CFLAGS += -I../../../log/include -I../../../assert

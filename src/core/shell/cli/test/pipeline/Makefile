@@ -41,4 +41,4 @@ $(OUTDIR)/%.o: %.c
 clean:
 	rm -rf $(OUTDIR) $(TARGET)
 
-CFLAGS += -I../../../log/include
+CFLAGS += -I../../../log/include -I../../../assert
