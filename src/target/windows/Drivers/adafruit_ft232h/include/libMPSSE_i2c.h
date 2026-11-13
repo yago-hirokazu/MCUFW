@@ -4,7 +4,7 @@
  * \author FTDI
  * \date 20110505
  *
- * Copyright © 2011 Future Technology Devices International Limited
+ * Copyright Â© 2011 Future Technology Devices International Limited
  * Company Confidential
  *
  * Project: libMPSSE

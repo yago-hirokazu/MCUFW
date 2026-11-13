@@ -4,7 +4,7 @@
  * \author FTDI
  * \date 20110512
  *
- * Copyright © 2000-2014 Future Technology Devices International Limited
+ * Copyright Â© 2000-2014 Future Technology Devices International Limited
  *
  *
  * THIS SOFTWARE IS PROVIDED BY FUTURE TECHNOLOGY DEVICES INTERNATIONAL LIMITED ``AS IS'' AND ANY EXPRESS

@@ -1,4 +1,4 @@
-﻿
+
 /* tty_adapt.c */
 
 #include "machdep.h"
