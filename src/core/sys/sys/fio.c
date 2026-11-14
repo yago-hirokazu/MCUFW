@@ -1,4 +1,7 @@
-/* fio.c */
+/*
+ * sys2.c / fd_close() => getf() => proc.p_ofile[] => file[]
+ *   => invalid descriptor => proc.p_error
+ */
 
 #include <limits.h>
 #include <string.h>
@@ -15,14 +18,25 @@ void init_fsys(void)
 	memset(inode, 0, NINODE * sizeof(inode[0]));
 }
 
+/* Convert descriptor to file pointer and record lookup failure */
 struct file *getf(struct proc *proc, int fd)
 {
-	return proc->p_ofile[fd];
+	struct file *fp = NULL;
+
+	/* Check descriptor before indexing process file table */
+	if (fd < 0 || fd >= NOFILE)
+		goto bad;
+	fp = proc->p_ofile[fd];
+	if (fp != NULL)
+		return fp;
+bad:
+	proc->p_error = -SYS_EBADF;
+	return NULL;
 }
 
 int ufalloc(struct proc *proc)
 {
-	int fd;
+	int fd = 0;
 
 	for (fd = 0; fd < NOFILE; fd++) {
 		if (!proc->p_ofile[fd])
@@ -33,9 +47,9 @@ int ufalloc(struct proc *proc)
 
 struct file *falloc(struct proc *proc, int *fd)
 {
-	struct file *fp;
-	int new_fd;
-	int i;
+	struct file *fp = NULL;
+	int new_fd = 0;
+	int i = 0;
 
 	new_fd = ufalloc(proc);
 	if (new_fd < 0) {
@@ -58,8 +72,8 @@ struct file *falloc(struct proc *proc, int *fd)
 
 void closef(struct file *fp)
 {
-	struct inode *ip;
-	unsigned char flag;
+	struct inode *ip = NULL;
+	unsigned char flag = 0;
 
 	fp->f_count--;
 	if (fp->f_count)
@@ -77,7 +91,7 @@ void closef(struct file *fp)
 
 int fd_install(struct proc *proc, struct file *fp)
 {
-	int fd;
+	int fd = 0;
 
 	if (fp->f_count == UCHAR_MAX)
 		return -SYS_ENFILE;
@@ -102,7 +116,7 @@ int fd_install_at(struct proc *proc, int fd, struct file *fp)
 
 int fd_close(struct proc *proc, int fd)
 {
-	struct file *fp;
+	struct file *fp = NULL;
 
 	fp = getf(proc, fd);
 	if (!fp)
@@ -114,7 +128,7 @@ int fd_close(struct proc *proc, int fd)
 
 void close_all(struct proc *proc)
 {
-	int fd;
+	int fd = 0;
 
 	for (fd = 0; fd < NOFILE; fd++) {
 		if (proc->p_ofile[fd])
@@ -124,8 +138,8 @@ void close_all(struct proc *proc)
 
 size_t file_in_use(void)
 {
-	size_t count;
-	int i;
+	size_t count = 0;
+	int i = 0;
 
 	count = 0;
 	for (i = 0; i < NFILE; i++) {

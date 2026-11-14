@@ -36,6 +36,7 @@ struct proc {
 	struct proc *p_link;
 	void *p_ctx;
 	int p_ret;
+	int p_error;
 };
 
 /* Non-recursive sys lock protects pipes, cache, queues and wait lists */

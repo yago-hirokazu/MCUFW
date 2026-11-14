@@ -1,4 +1,6 @@
-/* test_file.c */
+/*
+ * test_getf() => getf() => descriptor lookup / process error state
+ */
 
 #include <limits.h>
 #include <stdio.h>
@@ -24,6 +26,7 @@ static int failures;
 
 static void init_test_proc(struct proc *proc);
 static void test_file_allocation(void);
+static void test_getf(void);
 static void test_descriptor_helpers(void);
 static void test_fd_exhaustion(void);
 static void test_file_exhaustion(void);
@@ -35,6 +38,7 @@ static void test_reuse_after_close_all(void);
 int main(void)
 {
 	test_file_allocation();
+	test_getf();
 	test_descriptor_helpers();
 	test_fd_exhaustion();
 	test_file_exhaustion();
@@ -77,6 +81,43 @@ static void test_file_allocation(void)
 	CHECK(file_in_use() == 1);
 	CHECK(fd_close(&proc, fd) == 0);
 	CHECK(fd_close(&proc, fd) == -SYS_EBADF);
+	CHECK(file_in_use() == 0);
+}
+
+/* Check descriptor bounds, empty slots and process error preservation */
+static void test_getf(void)
+{
+	struct proc proc = {0};
+	struct file *fp = NULL;
+	const int invalid[] = {INT_MIN, -1, NOFILE, INT_MAX};
+	size_t i = 0;
+	int fd = 0;
+
+	init_bufc();
+	init_fsys();
+	CHECK(getf(&proc, 0) == NULL);
+	CHECK(proc.p_error == -SYS_EBADF);
+	proc.p_error = 0;
+	CHECK(getf(&proc, NOFILE - 1) == NULL);
+	CHECK(proc.p_error == -SYS_EBADF);
+	for (i = 0; i < sizeof(invalid) / sizeof(invalid[0]); i++) {
+		proc.p_error = 0;
+		CHECK(getf(&proc, invalid[i]) == NULL);
+		CHECK(proc.p_error == -SYS_EBADF);
+	}
+
+	/* Valid nonzero descriptor must select requested slot */
+	fp = falloc(&proc, &fd);
+	CHECK(fp != NULL);
+	CHECK(fd_install_at(&proc, NOFILE - 1, fp) == NOFILE - 1);
+	CHECK(fd_close(&proc, fd) == 0);
+	proc.p_error = 0;
+	CHECK(getf(&proc, NOFILE - 1) == fp);
+	CHECK(proc.p_error == 0);
+	proc.p_error = -SYS_EBADF;
+	CHECK(getf(&proc, NOFILE - 1) == fp);
+	CHECK(proc.p_error == -SYS_EBADF);
+	CHECK(fd_close(&proc, NOFILE - 1) == 0);
 	CHECK(file_in_use() == 0);
 }
 

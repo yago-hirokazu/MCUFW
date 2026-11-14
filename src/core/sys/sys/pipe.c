@@ -20,24 +20,24 @@ static struct pipe_io_status pipe_write_once(struct file *fp,
 
 int pipe_for_proc(struct proc *proc, int fd[2])
 {
-	struct inode *ip;
-	struct file *rf;
-	struct file *wf;
-	int read_fd;
-	int write_fd;
-	int error;
+	struct inode *ip = NULL;
+	struct file *rf = NULL;
+	struct file *wf = NULL;
+	int read_fd = 0;
+	int write_fd = 0;
+	int res = 0;
 
 	ip = ialloc();
-	if (!ip)
+	if (ip == NULL)
 		return -SYS_ENFILE;
 	rf = falloc(proc, &read_fd);
-	if (!rf) {
-		error = read_fd;
+	if (rf == NULL) {
+		res = read_fd;
 		goto put_inode;
 	}
 	wf = falloc(proc, &write_fd);
-	if (!wf) {
-		error = write_fd;
+	if (wf == NULL) {
+		res = write_fd;
 		goto close_read;
 	}
 
@@ -56,7 +56,7 @@ close_read:
 	fd_close(proc, read_fd);
 put_inode:
 	iput(ip);
-	return error;
+	return res;
 }
 
 int sys_pipe(int fd[2])
