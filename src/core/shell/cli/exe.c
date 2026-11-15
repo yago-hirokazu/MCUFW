@@ -75,7 +75,7 @@ static int execute_commands(struct exe *exe)
 	sched_set_current_proc(&proc->p_exec);
 	result = proc->p_cmd->main(proc->p_argc, proc->p_argv);
 	sys_lock();
-	close_all(&proc->p_exec);
+	fdclean(&proc->p_exec);
 	sys_unlock();
 	sched_set_current_proc(previous);
 	return result;
@@ -485,7 +485,7 @@ static void proc_entry(void *arg)
 	proc->p_exec.p_ret = proc->p_cmd->main(proc->p_argc,
 						    proc->p_argv);
 	sys_lock();
-	close_all(&proc->p_exec);
+	fdclean(&proc->p_exec);
 	sys_unlock();
 }
 
@@ -495,7 +495,7 @@ static void close_proc_fds(struct exe_proc *proc, int count)
 
 	sys_lock();
 	for (i = 0; i < count; i++)
-		close_all(&proc[i].p_exec);
+		fdclean(&proc[i].p_exec);
 	sys_unlock();
 }
 
@@ -524,14 +524,14 @@ static int connect_proc(struct exe_proc *writer, struct exe_proc *reader)
 		goto out;
 	read_file = getf(&owner, fd[0]);
 	write_file = getf(&owner, fd[1]);
-	result = fd_install_at(&writer->p_exec, FD_STDOUT, write_file);
+	result = fdassign(&writer->p_exec, FD_STDOUT, write_file);
 	if (result < 0)
 		goto out;
-	result = fd_install_at(&reader->p_exec, FD_STDIN, read_file);
+	result = fdassign(&reader->p_exec, FD_STDIN, read_file);
 	if (result < 0)
-		fd_close(&writer->p_exec, FD_STDOUT);
+		fdfree(&writer->p_exec, FD_STDOUT);
 out:
-	close_all(&owner);
+	fdclean(&owner);
 	sys_unlock();
 	return result < 0 ? result : 0;
 }

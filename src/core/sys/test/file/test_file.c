@@ -79,8 +79,8 @@ static void test_file_allocation(void)
 	CHECK(fp->f_offset == 0);
 	CHECK(getf(&proc, fd) == fp);
 	CHECK(file_in_use() == 1);
-	CHECK(fd_close(&proc, fd) == 0);
-	CHECK(fd_close(&proc, fd) == -SYS_EBADF);
+	CHECK(fdfree(&proc, fd) == 0);
+	CHECK(fdfree(&proc, fd) == -SYS_EBADF);
 	CHECK(file_in_use() == 0);
 }
 
@@ -109,15 +109,15 @@ static void test_getf(void)
 	/* Valid nonzero descriptor must select requested slot */
 	fp = falloc(&proc, &fd);
 	CHECK(fp != NULL);
-	CHECK(fd_install_at(&proc, NOFILE - 1, fp) == NOFILE - 1);
-	CHECK(fd_close(&proc, fd) == 0);
+	CHECK(fdassign(&proc, NOFILE - 1, fp) == NOFILE - 1);
+	CHECK(fdfree(&proc, fd) == 0);
 	proc.p_error = 0;
 	CHECK(getf(&proc, NOFILE - 1) == fp);
 	CHECK(proc.p_error == 0);
 	proc.p_error = -SYS_EBADF;
 	CHECK(getf(&proc, NOFILE - 1) == fp);
 	CHECK(proc.p_error == -SYS_EBADF);
-	CHECK(fd_close(&proc, NOFILE - 1) == 0);
+	CHECK(fdfree(&proc, NOFILE - 1) == 0);
 	CHECK(file_in_use() == 0);
 }
 
@@ -133,23 +133,23 @@ static void test_descriptor_helpers(void)
 	init_test_proc(&proc);
 	fp = falloc(&proc, &fd);
 	CHECK(fp != NULL);
-	copy = fd_install(&proc, fp);
+	copy = fdalloc(&proc, fp);
 	CHECK(copy == 1);
 	CHECK(fp->f_count == 2);
-	CHECK(fd_install_at(&proc, 4, fp) == 4);
+	CHECK(fdassign(&proc, 4, fp) == 4);
 	CHECK(fp->f_count == 3);
-	CHECK(fd_install_at(&proc, 4, fp) == -SYS_EMFILE);
-	CHECK(fd_close(&proc, fd) == 0);
+	CHECK(fdassign(&proc, 4, fp) == -SYS_EMFILE);
+	CHECK(fdfree(&proc, fd) == 0);
 	CHECK(fp->f_count == 2);
-	CHECK(fd_close(&proc, copy) == 0);
+	CHECK(fdfree(&proc, copy) == 0);
 	CHECK(fp->f_count == 1);
-	CHECK(fd_close(&proc, 4) == 0);
+	CHECK(fdfree(&proc, 4) == 0);
 	CHECK(file_in_use() == 0);
 
 	fp = &file[0];
 	fp->f_count = UCHAR_MAX;
-	CHECK(fd_install(&proc, fp) == -SYS_ENFILE);
-	CHECK(fd_install_at(&proc, 3, fp) == -SYS_ENFILE);
+	CHECK(fdalloc(&proc, fp) == -SYS_ENFILE);
+	CHECK(fdassign(&proc, 3, fp) == -SYS_ENFILE);
 	memset(fp, 0, sizeof(*fp));
 }
 
@@ -174,7 +174,7 @@ static void test_fd_exhaustion(void)
 	CHECK(falloc(&proc, &fd) == NULL);
 	CHECK(fd == -SYS_EMFILE);
 	CHECK(file_in_use() == used);
-	close_all(&proc);
+	fdclean(&proc);
 }
 
 static void test_file_exhaustion(void)
@@ -195,7 +195,7 @@ static void test_file_exhaustion(void)
 	CHECK(fd == -SYS_ENFILE);
 	CHECK(waiter.p_ofile[0] == NULL);
 	CHECK(file_in_use() == NFILE);
-	close_all(&owner);
+	fdclean(&owner);
 	CHECK(file_in_use() == 0);
 }
 
@@ -221,12 +221,12 @@ static void test_inode_lifecycle(void)
 	CHECK(fp != NULL);
 	fp->f_inode = ip;
 	fp->f_flag = FREAD | FPIPE;
-	copy = fd_install(&proc, fp);
+	copy = fdalloc(&proc, fp);
 	CHECK(copy >= 0);
-	CHECK(fd_close(&proc, fd) == 0);
+	CHECK(fdfree(&proc, fd) == 0);
 	CHECK(ip->i_count == 1);
 	CHECK(bp->b_flags & B_BUSY);
-	CHECK(fd_close(&proc, copy) == 0);
+	CHECK(fdfree(&proc, copy) == 0);
 	CHECK(inode_in_use() == 0);
 	CHECK(!(bp->b_flags & B_BUSY));
 }
@@ -288,7 +288,7 @@ static void test_reuse_after_close_all(void)
 	CHECK(fp != NULL);
 	bp = ip->i_buf;
 	fp->f_inode = ip;
-	close_all(&proc);
+	fdclean(&proc);
 	CHECK(file_in_use() == 0);
 	CHECK(inode_in_use() == 0);
 	CHECK(falloc(&proc, &fd) == &file[0]);
@@ -296,6 +296,6 @@ static void test_reuse_after_close_all(void)
 	ip = ialloc();
 	CHECK(ip == &inode[0]);
 	CHECK(ip->i_buf == bp);
-	close_all(&proc);
+	fdclean(&proc);
 	iput(ip);
 }

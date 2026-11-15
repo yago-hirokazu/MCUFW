@@ -43,7 +43,7 @@ struct proc
 - `f_count`が0になると対応endpointを閉じる
 - read/write fileは同じinodeを参照し、`i_count`で生存endpointを数える
 - `i_count`が0になるとinodeとbufferをpoolへ戻す
-- process終了時は`close_all()`がfd番号順に全fdを閉じる
+- process終了時は`fdclean()`がfd番号順に全fdを閉じる
 - `pipe_for_proc()`失敗時は確保済みfile、fd、inodeを巻き戻す
 - endpoint closeはread/write channelを起こし、EOFまたはEPIPEを再判定させる
 
@@ -62,7 +62,7 @@ backend未設定での非blocking利用はサポートしない。空・満杯�
 内部で待機・再試行する。`sys_pipe()`やfdの接続・closeは実行準備前にも行える。
 
 sys層内部とesh executorは、明示的な`struct proc *`を受け取る
-`pipe_for_proc()`、`getf()`、`fd_install_at()`、`fd_close()`、`close_all()`も
+`pipe_for_proc()`、`getf()`、`fdassign()`、`fdfree()`、`fdclean()`も
 使用する。
 
 - 作成とcloseは成功時0、失敗時は負の`SYS_E*`を返す

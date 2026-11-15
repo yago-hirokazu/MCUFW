@@ -54,7 +54,7 @@ int sys_close(int fd)
 
 	proc = current_proc();
 	sys_lock();
-	result = fd_close(proc, fd);
+	result = fdfree(proc, fd);
 	sys_unlock();
 	return result;
 }

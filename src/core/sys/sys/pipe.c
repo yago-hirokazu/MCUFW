@@ -53,7 +53,7 @@ int pipe_for_proc(struct proc *proc, int fd[2])
 	return 0;
 
 close_read:
-	fd_close(proc, read_fd);
+	fdfree(proc, read_fd);
 put_inode:
 	iput(ip);
 	return res;

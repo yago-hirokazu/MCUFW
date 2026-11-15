@@ -1,5 +1,5 @@
 /*
- * sys2.c / fd_close() => getf() => proc.p_ofile[] => file[]
+ * sys2.c / fdfree() => getf() => proc.p_ofile[] => file[]
  *   => invalid descriptor => proc.p_error
  */
 
@@ -89,7 +89,7 @@ void closef(struct file *fp)
 		iput(ip);
 }
 
-int fd_install(struct proc *proc, struct file *fp)
+int fdalloc(struct proc *proc, struct file *fp)
 {
 	int fd = 0;
 
@@ -103,7 +103,7 @@ int fd_install(struct proc *proc, struct file *fp)
 	return fd;
 }
 
-int fd_install_at(struct proc *proc, int fd, struct file *fp)
+int fdassign(struct proc *proc, int fd, struct file *fp)
 {
 	if (proc->p_ofile[fd])
 		return -SYS_EMFILE;
@@ -114,7 +114,7 @@ int fd_install_at(struct proc *proc, int fd, struct file *fp)
 	return fd;
 }
 
-int fd_close(struct proc *proc, int fd)
+int fdfree(struct proc *proc, int fd)
 {
 	struct file *fp = NULL;
 
@@ -126,13 +126,13 @@ int fd_close(struct proc *proc, int fd)
 	return 0;
 }
 
-void close_all(struct proc *proc)
+void fdclean(struct proc *proc)
 {
 	int fd = 0;
 
 	for (fd = 0; fd < NOFILE; fd++) {
 		if (proc->p_ofile[fd])
-			fd_close(proc, fd);
+			fdfree(proc, fd);
 	}
 }
 

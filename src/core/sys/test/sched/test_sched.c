@@ -196,7 +196,7 @@ static int proc_close(int fd)
 
 	sys_lock();
 	proc = current_proc();
-	result = fd_close(proc, fd);
+	result = fdfree(proc, fd);
 	sys_unlock();
 	return result;
 }
@@ -204,7 +204,7 @@ static int proc_close(int fd)
 static void close_all_locked(struct proc *proc)
 {
 	sys_lock();
-	close_all(proc);
+	fdclean(proc);
 	sys_unlock();
 }
 
@@ -220,12 +220,12 @@ static int connect_pipe(struct proc *writer, struct proc *reader,
 	if (result < 0)
 		goto out;
 	read_file = getf(writer, fd[0]);
-	*read_fd = fd_install(reader, read_file);
+	*read_fd = fdalloc(reader, read_file);
 	if (*read_fd < 0) {
 		result = *read_fd;
 		goto out;
 	}
-	result = fd_close(writer, fd[0]);
+	result = fdfree(writer, fd[0]);
 	if (result < 0)
 		goto out;
 	*write_fd = fd[1];
@@ -745,7 +745,7 @@ static void drain_full_pipes(struct proc *owner, int pipes[NINODE][2])
 			    &offset, &marker, 1) == 1);
 		CHECK(marker == (unsigned char)(0x30 + i));
 	}
-	close_all(owner);
+	fdclean(owner);
 }
 
 static void test_ram_capacity(void)
@@ -810,7 +810,7 @@ static void test_ram_capacity(void)
 	for (i = 0; i < NBUF; i++)
 		brelse(held[i]);
 	CHECK(pipe_for_proc(&owner, fd) == 0);
-	close_all(&owner);
+	fdclean(&owner);
 	sys_unlock();
 	ram_test_end();
 }

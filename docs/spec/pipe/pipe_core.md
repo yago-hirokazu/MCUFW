@@ -44,7 +44,7 @@ init_fsys();
 ## 所有権
 
 `falloc()`は空きfdとfile entryを同時に確保し、fdが所有する1参照を設定する。
-`fd_install()`と`fd_install_at()`は既存file参照を1個追加する。`fd_close()`はfdを
+`fdalloc()`と`fdassign()`は既存file参照を1個追加する。`fdfree()`はfdを
 外して`closef()`へ1参照を渡す。
 
 file参照が0になると、pipe wait channelを起床してinode参照を解放する。channelは
@@ -56,7 +56,7 @@ readまたはwrite endpointが閉じた状態は`i_count < 2`で判定する。�
 `pipe_for_proc()`はinodeと対応buffer、read file、write fileの順に確保する。
 `ialloc()`は`getblk(PIPEDEV, inodeの添字)`で共通cacheからbufferを取得し、
 `iput()`まで保持する。途中で失敗した
-場合は確保済みfd/file/inodeを逆順に戻す。process終了時は`close_all()`が全fdを
+場合は確保済みfd/file/inodeを逆順に戻す。process終了時は`fdclean()`が全fdを
 閉じる。
 
 ## Pipe I/O

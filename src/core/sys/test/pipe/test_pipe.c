@@ -103,7 +103,7 @@ static int call_close(struct proc *proc, int fd)
 	int result;
 
 	sys_lock();
-	result = fd_close(proc, fd);
+	result = fdfree(proc, fd);
 	sys_unlock();
 	return result;
 }
@@ -111,7 +111,7 @@ static int call_close(struct proc *proc, int fd)
 static void call_close_all(struct proc *proc)
 {
 	sys_lock();
-	close_all(proc);
+	fdclean(proc);
 	sys_unlock();
 }
 

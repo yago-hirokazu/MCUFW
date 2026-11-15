@@ -90,7 +90,7 @@ static size_t buffer_in_use(void)
 static void close_all_locked(struct proc *proc)
 {
 	sys_lock();
-	close_all(proc);
+	fdclean(proc);
 	sys_unlock();
 }
 
@@ -106,12 +106,12 @@ static int connect_pipe(struct proc *writer, struct proc *reader,
 	if (result < 0)
 		goto out;
 	read_file = getf(writer, fd[0]);
-	*read_fd = fd_install(reader, read_file);
+	*read_fd = fdalloc(reader, read_file);
 	if (*read_fd < 0) {
 		result = *read_fd;
 		goto out;
 	}
-	result = fd_close(writer, fd[0]);
+	result = fdfree(writer, fd[0]);
 	if (result < 0)
 		goto out;
 	*write_fd = fd[1];
@@ -397,7 +397,7 @@ static void test_reader_close_wakeup(void)
 	CHECK(sched_resume(&procs[1]) == 0);
 	CHECK(procs[1].p_state == PROC_WAIT_READ);
 	sys_lock();
-	CHECK(fd_close(&procs[0], write_fd) == 0);
+	CHECK(fdfree(&procs[0], write_fd) == 0);
 	sys_unlock();
 	CHECK(run_scheduler(&procs[1], 1) == 0);
 	CHECK(reader.result == 0);
@@ -428,7 +428,7 @@ static void test_writer_close_wakeup(void)
 	CHECK(sched_resume(&procs[0]) == 0);
 	CHECK(procs[0].p_state == PROC_WAIT_WRITE);
 	sys_lock();
-	CHECK(fd_close(&procs[1], read_fd) == 0);
+	CHECK(fdfree(&procs[1], read_fd) == 0);
 	sys_unlock();
 	CHECK(run_scheduler(&procs[0], 1) == 0);
 	CHECK(writer.result == -SYS_EPIPE);

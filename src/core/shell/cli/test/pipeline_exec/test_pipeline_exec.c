@@ -586,7 +586,7 @@ static void test_pipe_exhaustion_cleanup(void)
 	CHECK(file_in_use() == (NINODE - 1) * 2);
 	sys_lock();
 	for (i = 0; i < NINODE - 1; i++)
-		close_all(&blockers[i]);
+		fdclean(&blockers[i]);
 	sys_unlock();
 	CHECK(pipe_in_use() == 0);
 	CHECK(file_in_use() == 0);

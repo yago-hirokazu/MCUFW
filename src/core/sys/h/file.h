@@ -43,10 +43,10 @@ int ufalloc(struct proc *proc);
 struct file *falloc(struct proc *proc, int *fd);
 /* closef consumes one file reference */
 void closef(struct file *fp);
-int fd_install(struct proc *proc, struct file *fp);
-int fd_install_at(struct proc *proc, int fd, struct file *fp);
-int fd_close(struct proc *proc, int fd);
-void close_all(struct proc *proc);
+int fdalloc(struct proc *proc, struct file *fp);
+int fdassign(struct proc *proc, int fd, struct file *fp);
+int fdfree(struct proc *proc, int fd);
+void fdclean(struct proc *proc);
 size_t file_in_use(void);
 
 #ifdef __cplusplus
