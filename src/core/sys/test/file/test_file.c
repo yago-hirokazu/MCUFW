@@ -1,4 +1,9 @@
 /*
+ * File tests => falloc() / fdfree() / fdclean() => ialloc() / iput()
+ *   => device and block ownership across cache reuse
+ */
+
+/*
  * test_getf() => getf() => descriptor lookup / process error state
  */
 
@@ -199,14 +204,15 @@ static void test_file_exhaustion(void)
 	CHECK(file_in_use() == 0);
 }
 
+/* Inode references retain block identity without occupying cache buffer */
 static void test_inode_lifecycle(void)
 {
-	struct proc proc;
-	struct inode *ip;
-	struct file *fp;
-	struct buf *bp;
-	int fd;
-	int copy;
+	struct proc proc = {0};
+	struct inode *ip = NULL;
+	struct file *fp = NULL;
+	struct buf *bp = NULL;
+	int fd = 0;
+	int copy = 0;
 
 	init_bufc();
 	init_fsys();
@@ -214,9 +220,12 @@ static void test_inode_lifecycle(void)
 	ip = ialloc();
 	CHECK(ip == &inode[0]);
 	CHECK(ip->i_count == 1);
-	CHECK(ip->i_buf != NULL);
-	CHECK(ip->i_buf->b_flags & B_BUSY);
-	bp = ip->i_buf;
+	CHECK(ip->i_dev == PIPEDEV);
+	CHECK(ip->i_blkno == 0);
+	bp = bread(ip->i_dev, ip->i_blkno);
+	CHECK(bp != NULL && bp->b_error == 0);
+	brelse(bp);
+	CHECK((bp->b_flags & B_BUSY) == 0);
 	fp = falloc(&proc, &fd);
 	CHECK(fp != NULL);
 	fp->f_inode = ip;
@@ -225,10 +234,12 @@ static void test_inode_lifecycle(void)
 	CHECK(copy >= 0);
 	CHECK(fdfree(&proc, fd) == 0);
 	CHECK(ip->i_count == 1);
-	CHECK(bp->b_flags & B_BUSY);
+	CHECK((bp->b_flags & B_BUSY) == 0);
 	CHECK(fdfree(&proc, copy) == 0);
 	CHECK(inode_in_use() == 0);
-	CHECK(!(bp->b_flags & B_BUSY));
+	CHECK((bp->b_flags & B_BUSY) == 0);
+	CHECK(ip->i_dev == 0);
+	CHECK(ip->i_blkno == 0);
 }
 
 static void test_inode_exhaustion(void)
@@ -271,13 +282,17 @@ static void test_buffer_failure(void)
 	iput(&inode[0]);
 }
 
+/* Reused inode block starts empty even when previous data remains cached */
 static void test_reuse_after_close_all(void)
 {
-	struct proc proc;
-	struct inode *ip;
-	struct file *fp;
-	struct buf *bp;
-	int fd;
+	struct proc proc = {0};
+	struct inode *ip = NULL;
+	struct file *fp = NULL;
+	struct buf *bp = NULL;
+	unsigned int dev = 0;
+	unsigned long blkno = 0;
+	size_t i = 0;
+	int fd = 0;
 
 	init_bufc();
 	init_fsys();
@@ -286,7 +301,12 @@ static void test_reuse_after_close_all(void)
 	fp = falloc(&proc, &fd);
 	CHECK(ip != NULL);
 	CHECK(fp != NULL);
-	bp = ip->i_buf;
+	dev = ip->i_dev;
+	blkno = ip->i_blkno;
+	bp = bread(dev, blkno);
+	CHECK(bp != NULL && bp->b_error == 0);
+	memset(bp->b_addr, 0x5a, BSIZE);
+	bdwrite(bp);
 	fp->f_inode = ip;
 	fdclean(&proc);
 	CHECK(file_in_use() == 0);
@@ -295,7 +315,14 @@ static void test_reuse_after_close_all(void)
 	CHECK(fd == 0);
 	ip = ialloc();
 	CHECK(ip == &inode[0]);
-	CHECK(ip->i_buf == bp);
+	CHECK(ip->i_dev == dev);
+	CHECK(ip->i_blkno == blkno);
+	CHECK(ip->i_size == 0);
+	bp = bread(dev, blkno);
+	CHECK(bp != NULL && bp->b_error == 0);
+	for (i = 0; i < BSIZE; i++)
+		CHECK(bp->b_addr[i] == 0);
+	brelse(bp);
 	fdclean(&proc);
 	iput(ip);
 }

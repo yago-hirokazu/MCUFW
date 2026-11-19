@@ -1,3 +1,8 @@
+/*
+ * Block device tests => bdev_io_queue_enqueue() / bdev_io_queue_start()
+ *   => mock strategies and RAM disk queue ownership
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,6 +14,8 @@
 
 #define MOCK_RETRY_LIMIT	2U
 #define MOCK_ERROR	5
+
+#define CACHEDEV	0U
 
 #define CHECK(condition) \
 	do { \
@@ -129,8 +136,8 @@ static void setup(void)
 	memcpy(saved_devices, bdevsw, sizeof(saved_devices));
 	bdevsw[RAM_MAJOR].d_strategy = NULL;
 	bdevsw[RAM_MAJOR].d_queue = NULL;
-	bdevsw[major(PIPEDEV)].d_strategy = mock_strategy;
-	bdevsw[major(PIPEDEV)].d_queue = &mock_queue;
+	bdevsw[major(CACHEDEV)].d_strategy = mock_strategy;
+	bdevsw[major(CACHEDEV)].d_queue = &mock_queue;
 	init_bufc();
 	mock_started_count = 0;
 	mock_completed_count = 0;
@@ -180,7 +187,7 @@ static void test_one_request(void)
 	struct buf *bp;
 
 	setup();
-	bp = getblk(PIPEDEV, 1);
+	bp = getblk(CACHEDEV, 1);
 	CHECK(bp != NULL);
 	CHECK(!on_av_list(bp));
 	bp->b_flags |= B_WANTED;
@@ -207,7 +214,7 @@ static void test_multiple_requests(void)
 
 	setup();
 	for (i = 0; i < NBUF; i++) {
-		bp[i] = getblk(PIPEDEV, (unsigned long)(10 + i));
+		bp[i] = getblk(CACHEDEV, (unsigned long)(10 + i));
 		CHECK(bp[i] != NULL);
 		bdev_strategy(bp[i]);
 		CHECK(!on_av_list(bp[i]));
@@ -236,8 +243,8 @@ static void test_error_retry(void)
 	struct buf *next;
 
 	setup();
-	bp = getblk(PIPEDEV, 30);
-	next = getblk(PIPEDEV, 31);
+	bp = getblk(CACHEDEV, 30);
+	next = getblk(CACHEDEV, 31);
 	CHECK(bp != NULL);
 	CHECK(next != NULL);
 	bdev_strategy(bp);
@@ -271,7 +278,7 @@ static void test_async_completion(void)
 	struct buf *bp;
 
 	setup();
-	bp = getblk(PIPEDEV, 40);
+	bp = getblk(CACHEDEV, 40);
 	CHECK(bp != NULL);
 	bp->b_flags |= B_ASYNC;
 	bdev_strategy(bp);
@@ -330,7 +337,7 @@ static void test_strategy_rejection(void)
 	size_t i;
 
 	setup();
-	bp = getblk(PIPEDEV, 50);
+	bp = getblk(CACHEDEV, 50);
 	for (i = 0; i < sizeof(invalid) / sizeof(invalid[0]); i++) {
 		bp->b_dev = invalid[i];
 		check_rejection(bp, -SYS_ENODEV);
@@ -343,7 +350,7 @@ static void test_strategy_rejection(void)
 	check_rejection(bp, -SYS_ENODEV);
 	bdevsw[1].d_tab = head;
 	bdevsw[1].d_strategy = NULL;
-	bp->b_dev = PIPEDEV;
+	bp->b_dev = CACHEDEV;
 	bdev_strategy(bp);
 	check_rejection(bp, -SYS_EAGAIN);
 	CHECK(mock_interrupt(0) == BDEV_IO_QUEUE_DONE);
@@ -361,7 +368,7 @@ static void test_other_queue(void)
 	setup();
 	bdev_io_queue_init(&other);
 	bdevsw[1].d_queue = &other;
-	bp = getblk(PIPEDEV, 60);
+	bp = getblk(CACHEDEV, 60);
 	active = getblk(makedev(1, 0), 61);
 	CHECK(bdev_io_queue_enqueue(&other, active) == 0);
 	CHECK(bdev_io_queue_start(&other) == active);
@@ -393,7 +400,7 @@ static void test_invalid_queue(void)
 	}
 	bdev_io_queue_init(&other);
 	bdevsw[1].d_queue = &other;
-	bp = getblk(PIPEDEV, 70);
+	bp = getblk(CACHEDEV, 70);
 	other.dq_head = nodes;
 	other.dq_tail = &nodes[NBUF];
 	check_rejection(bp, -SYS_EINVAL);
@@ -431,7 +438,7 @@ static void test_driver_result(void)
 	struct buf *bp;
 
 	setup();
-	bp = getblk(PIPEDEV, 80);
+	bp = getblk(CACHEDEV, 80);
 	bdevsw[0].d_strategy = reject_strategy;
 	bdev_strategy(bp);
 	CHECK(bp->b_flags & B_DONE);

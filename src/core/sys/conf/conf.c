@@ -1,4 +1,7 @@
-/* conf.c */
+/*
+ * conf.c => shared file, inode and buffer tables
+ * bdevsw[RAM_MAJOR] => ramstrategy() => RAM disk units
+ */
 
 #include <stddef.h>
 
@@ -9,16 +12,24 @@
 #include "param.h"
 #include "ramdisk.h"
 
+#if (PIPEDEV >> 8) != RAM_MAJOR || (PIPEDEV & 0xffU) >= RAM_NDEV
+#error "PIPEDEV must select available RAM disk"
+#endif
+
+#if NINODE > RAM_NBLK
+#error "RAM disk must provide one block per pipe inode"
+#endif
+
 struct buf buf[NBUF];
 struct file file[NFILE];
 struct inode inode[NINODE];
 struct buf bfreelist;
 
-static struct buf pipe_tab;
+static struct buf cache_tab;
 static struct buf ram_tab;
 
 struct bdevsw bdevsw[] = {
-	{ NULL, &pipe_tab, NULL, 0 },
+	{ NULL, &cache_tab, NULL, 0 },
 	{ ramstrategy, &ram_tab, &ramqueue, BDEV_SYNC }
 };
 

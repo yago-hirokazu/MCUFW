@@ -1,4 +1,7 @@
-/* test_table.c */
+/*
+ * Table tests => conf.c file / inode / buffer arrays
+ *   => structure layout and initial state
+ */
 
 #include <stdio.h>
 #include <string.h>
@@ -50,8 +53,8 @@ static int file_is_unused(const struct file *fp)
 
 static int inode_is_unused(const struct inode *ip)
 {
-	return ip->i_flag == 0 && ip->i_count == 0 && ip->i_buf == NULL &&
-	       ip->i_size == 0;
+	return ip->i_flag == 0 && ip->i_count == 0 && ip->i_dev == 0 &&
+	       ip->i_blkno == 0 && ip->i_size == 0;
 }
 
 static void reset_tables(void)

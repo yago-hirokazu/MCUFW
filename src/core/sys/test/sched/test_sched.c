@@ -1,4 +1,7 @@
-/* test_sched.c */
+/*
+ * Scheduler tests => sched_*() / pipe I/O / buffer cache
+ *   => coroutine or native threads under shared sys lock
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -762,7 +765,8 @@ static void test_ram_capacity(void)
 	init_proc(&owner);
 	sys_lock();
 	make_full_pipes(&owner, pipes);
-	extra = NBUF - NINODE;
+	/* Pipe buffers remain reclaimable between I/O calls */
+	extra = NBUF;
 	for (i = 0; i < extra; i++) {
 		held[i] = bread(makedev(RAM_MAJOR, 0), (unsigned long)i);
 		CHECK(held[i] != NULL && held[i]->b_error == 0);
@@ -782,7 +786,9 @@ static void test_ram_capacity(void)
 		bdwrite(held[i]);
 	if (extra) {
 		for (i = 0; i < extra * 2 + 1; i++) {
-			bp = bread(makedev(RAM_MAJOR, 1), (unsigned long)i);
+			/* Keep churn outside pipe-reserved RAM blocks */
+			bp = bread(makedev(RAM_MAJOR, 1),
+				   (unsigned long)(NINODE + i));
 			CHECK(bp != NULL && bp->b_error == 0);
 			bp->b_addr[0] = (unsigned char)i;
 			bdwrite(bp);

@@ -1,4 +1,7 @@
-/* test_ramdisk.c */
+/*
+ * RAM disk tests => ramstrategy() => request queue / RAM blocks
+ *   => iodone() => bio.c buffer state
+ */
 
 #include <limits.h>
 #include <stdio.h>
@@ -256,7 +259,7 @@ static void test_rejection(void)
 	init_ramdisk();
 	init_bufc();
 	bp = request(0, 0, 1);
-	bp->b_dev = PIPEDEV;
+	bp->b_dev = makedev(0, 0);
 	ramstrategy(bp);
 	CHECK((bp->b_flags & (B_DONE | B_ERROR)) == (B_DONE | B_ERROR));
 	CHECK(bp->b_error == SYS_ENODEV);

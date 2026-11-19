@@ -12,13 +12,12 @@ extern "C" {
 #define ILOCK	0x01U
 #define IWANT	0x10U
 
-struct buf;
-
-/* Inode owns pipe buffer while reference count is nonzero */
+/* Inode owns RAM disk block while reference count is nonzero */
 struct inode {
 	unsigned char i_flag;
 	unsigned char i_count;		/* File or construction references */
-	struct buf *i_buf;
+	unsigned int i_dev;
+	unsigned long i_blkno;
 	size_t i_size;
 };
 

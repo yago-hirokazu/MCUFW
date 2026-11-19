@@ -1,15 +1,17 @@
 # sys pipe API・データモデル
 
-更新日: 2026-11-08
+更新日: 2026-11-19
 
 ## 対象範囲
 
 本書は`src/core/sys`のanonymous pipe APIと、eshからの利用方法を示す。
-通常ファイル、path探索、物理storage、リダイレクト、background job、signalは
+通常ファイル、path探索、永続storage、リダイレクト、background job、signalは
 含めない。
 
 UNIX V7の`file`、pipe inode、processごとのfd tableという関係を保つ。pipe
-dataは共通buffer cacheの1 blockに保持し、pipeの転送では物理deviceへ送らない。
+dataはRAM diskの1 blockに対応させ、共通buffer cacheを通して読み書きする。
+cache hitではdevice strategyを呼ばず、cache missやdirty bufferの書き戻しでは
+RAM diskのdevice strategyを利用する。
 
 ## 資源上限
 
@@ -23,9 +25,16 @@ dataは共通buffer cacheの1 blockに保持し、pipeの転送では物理devic
 | pipe data | 256 byte/pipe | `PIPSIZ` = `BSIZE` |
 
 4段pipelineに必要なpipeは最大3本である。全tableとpoolは固定長配列とし、
-portable sys層では動的memory確保を使用しない。`NBUF < NINODE`はcompile
-errorにする。pipeは共通buffer cacheを使うため、空きinodeがあっても
-対応bufferを確保できなければ作成に失敗する。
+portable sys層では動的memory確保を使用しない。`NBUF`は`NINODE`より小さくてもよい。
+pipeは共通buffer cacheを使うため、空きinodeがあっても初期化用bufferを確保できなければ
+作成は`-SYS_ENFILE`で失敗する。bufferは初期化後にcacheへ返し、pipeの生存中も
+占有し続けない。
+
+`PIPEDEV`は`0x0101U`で、RAM diskのmajor 1、unit 1を使う。inode tableの添字を
+block番号とし、先頭`NINODE` block（現在0から2）をpipe用に予約する。これらの
+blockは他用途のblock I/Oには使用しない。RAM diskを初期化した後に`init_bufc()`と
+`init_fsys()`を呼ぶ。再初期化はfile、inode、bufferの所有者や実行中processが
+ない状態で行う。
 
 ## 所有権
 
@@ -34,7 +43,9 @@ struct proc
   -> p_ofile[NOFILE]
        -> struct file
             -> struct inode
-                 -> struct buf
+                 -> device/block identity
+                      -> shared struct buf cache
+                           -> RAM disk block
                  -> lock/read/write wait channel
 ```
 
@@ -42,7 +53,10 @@ struct proc
 - file entryは`FREAD|FPIPE`または`FWRITE|FPIPE`のendpointを表す
 - `f_count`が0になると対応endpointを閉じる
 - read/write fileは同じinodeを参照し、`i_count`で生存endpointを数える
-- `i_count`が0になるとinodeとbufferをpoolへ戻す
+- inodeはdevice番号とblock番号を保持し、bufferへのpointerは保持しない
+- bufferは各操作中だけ占有し、転送後に共通cacheへ返す
+- `i_count`が0になるとinodeをpoolへ戻す
+- close後もdirty cacheは残り得る。次のinode割当てで同じblockを初期化する
 - process終了時は`fdclean()`がfd番号順に全fdを閉じる
 - `pipe_for_proc()`失敗時は確保済みfile、fd、inodeを巻き戻す
 - endpoint closeはread/write channelを起こし、EOFまたはEPIPEを再判定させる
@@ -73,6 +87,11 @@ sys層内部とesh executorは、明示的な`struct proc *`を受け取る
 - writeは空きへ書ける分を転送し、残量があれば待機して要求全体を完了する
 - 最終writer close後は残存dataを読み切ってからEOFを返す
 - reader不在時のwriteは`-SYS_EPIPE`を返し、signalは発生させない
+
+I/O用bufferの取得に失敗した場合は`-SYS_EAGAIN`、device I/Oの失敗時は
+`b_error`に対応する負のerrorを返す。個々の`readi()`または`writei()`が転送前に
+失敗した場合、その回のoffsetとsizeは進めない。複数回に分かれたwrite要求では、
+それ以前の回に転送したdataは残る。
 
 内部pipe処理は`PIPE_IO_*`で進行、read待ち、write待ち、EOF、broken pipe、
 errorを区別する。`sys_read()`と`sys_write()`が待機と再試行を隠す。
@@ -117,9 +136,10 @@ pipeline全体の終了statusは最後のcommandのstatusとする。途中comma
 ## V7との差分
 
 - trapとglobal user area `u`を使わず、current processまたは明示引数を使う
-- disk block、device strategy、MMU user copyを使わない
+- disk inode、directory、filesystemのblock割当て、MMU user copyを使わない
 - inodeはdirectoryやmodeを持たず、pipeに必要なstateだけを持つ
-- buffer cache entryはmemory-onlyで、pipe当たり1 blockに固定する
+- pipe当たりRAM diskの1 blockを固定し、buffer cacheを通して読み書きする
+- dirty bufferをcacheから追い出す場合はRAM diskへ書き戻し、必要時に読み戻す
 - V7 signal相当の`SIGPIPE`を送らず、`-SYS_EPIPE`だけを返す
 - coroutine/thread backendを選択でき、両者で同じpipe結果を返す
 - dynamic allocationを使わず、上限をcompile時定数で固定する

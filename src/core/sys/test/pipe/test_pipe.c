@@ -1,16 +1,24 @@
 /*
+ * Pipe tests => sys_pipe() / readp() / writep() => readi() / writei()
+ *   => bio.c buffer cache => ramstrategy() after eviction
+ */
+
+/*
  * Pipe unit tests => scheduler stub => peer-data and lock-release hooks
  * Prepared context integration => shell/cli/test/pipe and sys/test/sched
+ * Cache-backed transfers => bio.c => RAM disk on dirty buffer eviction
  */
 
 #include <stdio.h>
 #include <string.h>
 
 #include "buf.h"
+#include "conf.h"
 #include "file.h"
 #include "inode.h"
 #include "param.h"
 #include "pipe.h"
+#include "ramdisk.h"
 #include "sched.h"
 #include "sched_stub.h"
 #include "sys_error.h"
@@ -29,6 +37,10 @@ static struct file *hook_file;
 static struct inode *hook_inode;
 static ptrdiff_t hook_result;
 static unsigned char hook_data[PIPSIZ];
+static struct bdevsw saved_ram;
+static int io_reads;
+static int io_writes;
+static int io_fail;
 
 static void init_test_proc(struct proc *proc);
 static ptrdiff_t call_read(struct proc *proc, int fd, void *buf,
@@ -40,6 +52,10 @@ static void call_close_all(struct proc *proc);
 static void supply_read_hook(char *chan, enum wait_reason reason);
 static void drain_write_hook(char *chan, enum wait_reason reason);
 static void unlock_hook(char *chan, enum wait_reason reason);
+static void init_pipe_io_test(struct proc *proc);
+static void finish_pipe_io_test(struct proc *proc);
+static void pipe_io_strategy(struct buf *bp);
+static void evict_pipe_cache(void);
 static void test_zero_length(void);
 static void test_create_and_data_path(void);
 static void test_full_and_offset_reset(void);
@@ -48,6 +64,8 @@ static void test_wait_rechecks(void);
 static void test_pipe_lock(void);
 static void test_rdwri_bounds(void);
 static void test_resource_rollback(void);
+static void test_cache_backing(void);
+static void test_cache_io_failures(void);
 
 int main(void)
 {
@@ -59,6 +77,8 @@ int main(void)
 	test_pipe_lock();
 	test_rdwri_bounds();
 	test_resource_rollback();
+	test_cache_backing();
+	test_cache_io_failures();
 	if (failures) {
 		printf("%d tests failed\n", failures);
 		return 1;
@@ -139,6 +159,59 @@ static void unlock_hook(char *chan, enum wait_reason reason)
 	CHECK(chan == (char *)hook_inode);
 	CHECK(reason == WAIT_LOCK);
 	prele(hook_inode);
+}
+
+/* Count backing I/O while retaining actual RAM disk transfers */
+static void init_pipe_io_test(struct proc *proc)
+{
+	init_ramdisk();
+	init_bufc();
+	init_fsys();
+	init_test_proc(proc);
+	sched_stub_reset(proc);
+	saved_ram = bdevsw[RAM_MAJOR];
+	bdevsw[RAM_MAJOR].d_strategy = pipe_io_strategy;
+	io_reads = 0;
+	io_writes = 0;
+	io_fail = 0;
+}
+
+/* Flush remaining dirty blocks before restoring driver */
+static void finish_pipe_io_test(struct proc *proc)
+{
+	call_close_all(proc);
+	bflush(PIPEDEV);
+	bdevsw[RAM_MAJOR] = saved_ram;
+}
+
+/* Inject read failures without changing backing data */
+static void pipe_io_strategy(struct buf *bp)
+{
+	if ((bp->b_flags & B_READ) != 0)
+		io_reads++;
+	else
+		io_writes++;
+	if (io_fail != 0) {
+		bp->b_flags |= B_ERROR;
+		bp->b_error = SYS_EIO;
+		bp->b_resid = bp->b_bcount;
+		iodone(bp);
+		return;
+	}
+	ramstrategy(bp);
+}
+
+/* Reassign every available buffer, writing dirty victims first */
+static void evict_pipe_cache(void)
+{
+	struct buf *bp = NULL;
+	int i = 0;
+
+	for (i = 0; i < NBUF; i++) {
+		bp = geteblk();
+		CHECK(bp != NULL);
+		brelse(bp);
+	}
 }
 
 static void test_zero_length(void)
@@ -368,6 +441,109 @@ static void test_rdwri_bounds(void)
 	CHECK(readi(NULL, NULL, NULL, 0) == 0);
 	CHECK(writei(NULL, NULL, NULL, 0) == 0);
 	iput(ip);
+}
+
+/* Preserve unread tail across dirty eviction and partial append */
+static void test_cache_backing(void)
+{
+	struct proc proc = {0};
+	struct inode *ip = NULL;
+	struct file *rf = NULL;
+	struct buf *bp = NULL;
+	unsigned int dev = 0;
+	unsigned long blkno = 0;
+	char data[16] = {0};
+	int fd[2] = {0};
+
+	init_pipe_io_test(&proc);
+	CHECK(sys_pipe(fd) == 0);
+	rf = getf(&proc, fd[0]);
+	ip = rf->f_inode;
+	dev = ip->i_dev;
+	blkno = ip->i_blkno;
+	CHECK(dev == PIPEDEV);
+	CHECK(call_write(&proc, fd[1], "abcdef", 6) == 6);
+	CHECK(call_read(&proc, fd[0], data, 2) == 2);
+	CHECK(memcmp(data, "ab", 2) == 0);
+	CHECK(io_reads == 0);
+	CHECK(io_writes == 0);
+	bp = getblk(dev, blkno);
+	CHECK(bp != NULL);
+	CHECK((bp->b_flags & (B_DONE | B_DELWRI)) ==
+	      (B_DONE | B_DELWRI));
+	brelse(bp);
+
+	evict_pipe_cache();
+	CHECK(incore(dev, blkno) == 0);
+	CHECK(io_writes == 1);
+	CHECK(call_write(&proc, fd[1], "ghij", 4) == 4);
+	CHECK(io_reads == 1);
+	CHECK(rf->f_offset == 2);
+	CHECK(ip->i_size == 10);
+	evict_pipe_cache();
+	CHECK(incore(dev, blkno) == 0);
+	CHECK(io_writes == 2);
+	CHECK(call_read(&proc, fd[0], data, sizeof(data)) == 8);
+	CHECK(memcmp(data, "cdefghij", 8) == 0);
+	CHECK(io_reads == 2);
+	CHECK(rf->f_offset == 0);
+	CHECK(ip->i_size == 0);
+
+	/* Reusing inode block must expose only newly written data */
+	call_close_all(&proc);
+	CHECK(sys_pipe(fd) == 0);
+	ip = getf(&proc, fd[0])->f_inode;
+	CHECK(ip->i_dev == dev);
+	CHECK(ip->i_blkno == blkno);
+	CHECK(call_write(&proc, fd[1], "Z", 1) == 1);
+	evict_pipe_cache();
+	CHECK(call_close(&proc, fd[1]) == 0);
+	CHECK(call_read(&proc, fd[0], data, sizeof(data)) == 1);
+	CHECK(data[0] == 'Z');
+	CHECK(call_read(&proc, fd[0], data, sizeof(data)) == 0);
+	finish_pipe_io_test(&proc);
+}
+
+/* Resource and read errors leave pending pipe data and offsets intact */
+static void test_cache_io_failures(void)
+{
+	struct proc proc = {0};
+	struct inode *ip = NULL;
+	struct file *rf = NULL;
+	struct buf *held[NBUF] = {0};
+	char data = 0;
+	int fd[2] = {0};
+	int i = 0;
+
+	init_pipe_io_test(&proc);
+	CHECK(sys_pipe(fd) == 0);
+	rf = getf(&proc, fd[0]);
+	ip = rf->f_inode;
+	CHECK(call_write(&proc, fd[1], "a", 1) == 1);
+	evict_pipe_cache();
+	for (i = 0; i < NBUF; i++) {
+		held[i] = geteblk();
+		CHECK(held[i] != NULL);
+	}
+	CHECK(call_read(&proc, fd[0], &data, 1) == -SYS_EAGAIN);
+	CHECK(call_write(&proc, fd[1], "b", 1) == -SYS_EAGAIN);
+	CHECK(rf->f_offset == 0);
+	CHECK(ip->i_size == 1);
+	for (i = 0; i < NBUF; i++)
+		brelse(held[i]);
+
+	io_fail = 1;
+	CHECK(call_read(&proc, fd[0], &data, 1) == -SYS_EIO);
+	CHECK(call_write(&proc, fd[1], "b", 1) == -SYS_EIO);
+	CHECK(rf->f_offset == 0);
+	CHECK(ip->i_size == 1);
+	io_fail = 0;
+	CHECK(call_read(&proc, fd[0], &data, 1) == 1);
+	CHECK(data == 'a');
+	CHECK(call_write(&proc, fd[1], "b", 1) == 1);
+	CHECK(call_read(&proc, fd[0], &data, 1) == 1);
+	CHECK(data == 'b');
+	finish_pipe_io_test(&proc);
 }
 
 static void test_resource_rollback(void)

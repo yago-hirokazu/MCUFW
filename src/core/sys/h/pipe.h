@@ -14,10 +14,6 @@ extern "C" {
 
 #define PIPSIZ	BSIZE
 
-#if NBUF < NINODE
-#error "NBUF must be at least NINODE"
-#endif
-
 enum pipe_io_result {
 	PIPE_IO_PROGRESS,
 	PIPE_IO_WAIT_READ,

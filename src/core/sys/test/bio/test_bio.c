@@ -1,4 +1,7 @@
-/* test_bio.c */
+/*
+ * Cache tests => getblk() / bread() / bdwrite() / bflush()
+ *   => device strategies => iodone() => reusable buffers
+ */
 
 #include <limits.h>
 #include <stdio.h>
@@ -8,6 +11,8 @@
 #include "conf.h"
 #include "ramdisk.h"
 #include "sys_error.h"
+
+#define CACHEDEV	0U
 
 #define CHECK(condition) \
 	do { \
@@ -177,12 +182,13 @@ static void test_binit(void)
 	CHECK(nblkdev == 2);
 	CHECK(bdevsw[1].d_tab != bdevsw[0].d_tab);
 	CHECK(bdevsw[RAM_MAJOR].d_strategy == ramstrategy);
+	CHECK(bdevsw[major(PIPEDEV)].d_strategy == ramstrategy);
 	CHECK(bdevsw[RAM_MAJOR].d_queue == &ramqueue);
 	CHECK(ramqueue.dq_head == NULL);
 	CHECK(ramqueue.dq_tail == NULL);
 	CHECK(ramqueue.dq_active == NULL);
-	CHECK(bdevsw[major(PIPEDEV)].d_strategy == NULL);
-	CHECK(bdevsw[major(PIPEDEV)].d_queue == NULL);
+	CHECK(bdevsw[major(CACHEDEV)].d_strategy == NULL);
+	CHECK(bdevsw[major(CACHEDEV)].d_queue == NULL);
 	for (i = 0; i < NBUF; i++) {
 		CHECK(buf[i].b_addr == buffers[i]);
 		CHECK(buf[i].b_dev == NODEV);
@@ -198,17 +204,17 @@ static void test_cache_hit(void)
 	struct buf *hit;
 
 	init_bufc();
-	bp = getblk(PIPEDEV, 7);
+	bp = getblk(CACHEDEV, 7);
 	CHECK(bp != NULL);
 	CHECK(bp->b_flags & B_BUSY);
 	CHECK(!on_av_list(bp));
-	CHECK(incore(PIPEDEV, 7));
-	CHECK(getblk(PIPEDEV, 7) == NULL);
+	CHECK(incore(CACHEDEV, 7));
+	CHECK(getblk(CACHEDEV, 7) == NULL);
 	bp->b_addr[0] = 0x5a;
 	brelse(bp);
 	CHECK(!(bp->b_flags & B_BUSY));
 	CHECK(on_av_list(bp));
-	hit = getblk(PIPEDEV, 7);
+	hit = getblk(CACHEDEV, 7);
 	CHECK(hit == bp);
 	CHECK(hit->b_addr[0] == 0x5a);
 	CHECK(!on_av_list(hit));
@@ -224,11 +230,11 @@ static void test_exhaustion(void)
 
 	init_bufc();
 	for (i = 0; i < NBUF; i++) {
-		held[i] = getblk(PIPEDEV, (unsigned long)i);
+		held[i] = getblk(CACHEDEV, (unsigned long)i);
 		CHECK(held[i] != NULL);
 	}
 	CHECK(count_av_list() == 0);
-	CHECK(getblk(PIPEDEV, NBUF) == NULL);
+	CHECK(getblk(CACHEDEV, NBUF) == NULL);
 	CHECK(geteblk() == NULL);
 	check_invariants();
 	for (i = 0; i < NBUF; i++)
@@ -244,11 +250,11 @@ static void test_lru(void)
 
 	init_bufc();
 	for (i = 0; i < NBUF; i++)
-		held[i] = getblk(PIPEDEV, (unsigned long)i);
+		held[i] = getblk(CACHEDEV, (unsigned long)i);
 	for (i = 0; i < NBUF; i++)
 		brelse(held[i]);
 	CHECK(bfreelist.av_forw == held[0]);
-	bp = getblk(PIPEDEV, NBUF + 10UL);
+	bp = getblk(CACHEDEV, NBUF + 10UL);
 	CHECK(bp == held[0]);
 	brelse(bp);
 	check_invariants();
@@ -262,15 +268,15 @@ static void test_age(void)
 
 	init_bufc();
 	for (i = 0; i < NBUF; i++)
-		held[i] = getblk(PIPEDEV, (unsigned long)i);
+		held[i] = getblk(CACHEDEV, (unsigned long)i);
 	for (i = 0; i < NBUF; i++)
 		brelse(held[i]);
-	bp = getblk(PIPEDEV, 0);
+	bp = getblk(CACHEDEV, 0);
 	CHECK(bp == held[0]);
 	bp->b_flags |= B_AGE;
 	brelse(bp);
 	CHECK(bfreelist.av_forw == held[0]);
-	bp = getblk(PIPEDEV, NBUF + 20UL);
+	bp = getblk(CACHEDEV, NBUF + 20UL);
 	CHECK(bp == held[0]);
 	brelse(bp);
 	check_invariants();
@@ -299,13 +305,13 @@ static void test_error_release(void)
 	struct buf *bp;
 
 	init_bufc();
-	bp = getblk(PIPEDEV, 91);
+	bp = getblk(CACHEDEV, 91);
 	CHECK(bp != NULL);
 	bp->b_flags |= B_ERROR;
 	brelse(bp);
 	CHECK(bp->b_dev == NODEV);
 	CHECK(bp->b_flags & B_ERROR);
-	CHECK(!incore(PIPEDEV, 91));
+	CHECK(!incore(CACHEDEV, 91));
 	check_invariants();
 }
 
@@ -602,7 +608,7 @@ static void test_delayed_write(void)
 	CHECK(io_writes == 2);
 	bflush(NODEV);
 	CHECK(io_writes == 2);
-	bflush(PIPEDEV);
+	bflush(CACHEDEV);
 	init_bufc();
 	bp = bread(dev, 0);
 	CHECK(bp != NULL && bp->b_error == 0 && bp->b_addr[0] == 0x71);
@@ -666,8 +672,8 @@ static void test_dirty_reuse(void)
 		CHECK(bp != NULL && bp->b_error == 0);
 		bdwrite(bp);
 	}
-	bp = getblk(PIPEDEV, 90);
-	CHECK(bp != NULL && bp->b_dev == PIPEDEV);
+	bp = getblk(CACHEDEV, 90);
+	CHECK(bp != NULL && bp->b_dev == CACHEDEV);
 	CHECK(io_writes == NBUF + 1);
 	bflush(NODEV);
 	CHECK(io_writes == NBUF * 2);

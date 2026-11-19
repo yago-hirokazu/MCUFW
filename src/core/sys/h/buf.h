@@ -14,7 +14,7 @@
 #endif
 
 #define NODEV	((unsigned int)-1)
-#define PIPEDEV	0U
+#define PIPEDEV	0x0101U	/* RAM disk major 1, unit 1 */
 
 #define B_WRITE	0x0000U
 #define B_READ		0x0001U
