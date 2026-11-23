@@ -35,7 +35,7 @@ int init_cortn(struct cortn *self, void *stack, size_t stack_size,
 	self->c_stack = bytes;
 	self->c_stack_size = stack_size;
 	self->c_state = CORTN_RUNNABLE;
-	self->c_reason = CORTN_YIELD_NONE;
+	self->c_cause = CORTN_YIELD_NONE;
 	cortn_context_setup(&self->c_context, cortn_stack_top(self), self);
 	return CORTN_SUCCESS;
 }
@@ -47,26 +47,26 @@ int cortn_resume(struct cortn *self)
 		return CORTN_ERR_STATE;
 	if (cortn_stack_check(self) != CORTN_SUCCESS) {
 		self->c_state = CORTN_ERROR;
-		self->c_reason = CORTN_YIELD_ERROR;
+		self->c_cause = CORTN_YIELD_ERROR;
 		return CORTN_ERR_STACK;
 	}
 
 	self->c_state = CORTN_RUNNING;
-	self->c_reason = CORTN_YIELD_NONE;
+	self->c_cause = CORTN_YIELD_NONE;
 	cortn_switch(&self->c_caller, &self->c_context);
 
 	if (cortn_stack_check(self) != CORTN_SUCCESS) {
 		self->c_state = CORTN_ERROR;
-		self->c_reason = CORTN_YIELD_ERROR;
+		self->c_cause = CORTN_YIELD_ERROR;
 		return CORTN_ERR_STACK;
 	}
 	return CORTN_SUCCESS;
 }
 
 /* Suspend running coroutine with requested wait or voluntary state */
-int cortn_yield(struct cortn *self, enum cortn_yield_reason reason)
+int cortn_yield(struct cortn *self, enum cortn_yield_cause cause)
 {
-	switch (reason) {
+	switch (cause) {
 	case CORTN_YIELD_VOLUNTARY:
 		self->c_state = CORTN_RUNNABLE;
 		break;
@@ -83,7 +83,7 @@ int cortn_yield(struct cortn *self, enum cortn_yield_reason reason)
 		break;
 	}
 
-	self->c_reason = reason;
+	self->c_cause = cause;
 	cortn_switch(&self->c_context, &self->c_caller);
 	return CORTN_SUCCESS;
 }
@@ -125,12 +125,12 @@ void cortn_boot_main(struct cortn *self)
 {
 	self->c_entry(self, self->c_arg);
 	self->c_state = CORTN_FINISHED;
-	self->c_reason = CORTN_YIELD_FINISHED;
+	self->c_cause = CORTN_YIELD_FINISHED;
 	cortn_switch(&self->c_context, &self->c_caller);
 
 	/* Finished coroutine must never resume */
 	self->c_state = CORTN_ERROR;
-	self->c_reason = CORTN_YIELD_ERROR;
+	self->c_cause = CORTN_YIELD_ERROR;
 	for (;;)
 		;
 }

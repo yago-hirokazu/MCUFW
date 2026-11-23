@@ -15,9 +15,9 @@ struct wake_record {
 
 static struct proc *stub_current;
 static void (*stub_sleep_hook)(char *chan,
-			       enum wait_reason reason);
+			       enum wait_cause cause);
 static struct wake_record wake_record[WAKE_RECORD_MAX];
-static enum wait_reason last_reason;
+static enum wait_cause last_cause;
 static int sleep_result;
 static int sleep_count;
 static int lock_count;
@@ -28,7 +28,7 @@ void sched_stub_reset(struct proc *proc)
 
 	stub_current = proc;
 	stub_sleep_hook = NULL;
-	last_reason = WAIT_READ;
+	last_cause = WAIT_READ;
 	sleep_result = 0;
 	sleep_count = 0;
 	lock_count = 0;
@@ -44,7 +44,7 @@ void sched_stub_set_sleep_result(int result)
 }
 
 void sched_stub_set_sleep_hook(void (*hook)(char *chan,
-					    enum wait_reason reason))
+					    enum wait_cause cause))
 {
 	stub_sleep_hook = hook;
 }
@@ -54,9 +54,9 @@ int sched_stub_sleep_count(void)
 	return sleep_count;
 }
 
-enum wait_reason sched_stub_last_reason(void)
+enum wait_cause sched_stub_last_cause(void)
 {
-	return last_reason;
+	return last_cause;
 }
 
 int sched_stub_wakeup_count(char *chan)
@@ -86,12 +86,12 @@ int sys_lock_held(void)
 	return lock_count != 0;
 }
 
-int sched_sleep(char *chan, enum wait_reason reason)
+int sched_sleep(char *chan, enum wait_cause cause)
 {
 	sleep_count++;
-	last_reason = reason;
+	last_cause = cause;
 	if (stub_sleep_hook)
-		stub_sleep_hook(chan, reason);
+		stub_sleep_hook(chan, cause);
 	return sleep_result;
 }
 

@@ -26,7 +26,7 @@ enum cortn_state {
 	CORTN_ERROR
 };
 
-enum cortn_yield_reason {
+enum cortn_yield_cause {
 	CORTN_YIELD_NONE,
 	CORTN_YIELD_VOLUNTARY,
 	CORTN_YIELD_WAIT_LOCK,
@@ -53,14 +53,14 @@ struct cortn {
 	unsigned char *c_stack;
 	size_t c_stack_size;
 	enum cortn_state c_state;
-	enum cortn_yield_reason c_reason;
+	enum cortn_yield_cause c_cause;
 };
 
 int init_cortn(struct cortn *self, void *stack, size_t stack_size,
 	       void (*entry)(struct cortn *self, void *arg), void *arg);
 int cortn_resume(struct cortn *self);
 /* Yield requires self running on caller thread */
-int cortn_yield(struct cortn *self, enum cortn_yield_reason reason);
+int cortn_yield(struct cortn *self, enum cortn_yield_cause cause);
 /* Wake requires coroutine waiting for lock, read or write */
 int cortn_wake(struct cortn *self);
 int cortn_stack_check(const struct cortn *self);

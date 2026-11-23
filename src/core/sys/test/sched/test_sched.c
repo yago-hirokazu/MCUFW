@@ -54,7 +54,7 @@ struct reader_arg {
 
 struct wait_arg {
 	char *chan;
-	enum wait_reason reason;
+	enum wait_cause cause;
 	int result;
 	int lock_held;
 };
@@ -300,7 +300,7 @@ static void wait_entry(void *arg)
 
 	wait = arg;
 	sys_lock();
-	wait->result = sched_sleep(wait->chan, wait->reason);
+	wait->result = sched_sleep(wait->chan, wait->cause);
 	wait->lock_held = sys_lock_held();
 	sys_unlock();
 }
@@ -407,7 +407,7 @@ static void test_multiple_waiters(void)
 	for (i = 0; i < 2; i++) {
 		init_proc(&procs[i]);
 		wait[i].chan = &chan;
-		wait[i].reason = WAIT_READ;
+		wait[i].cause = WAIT_READ;
 		wait[i].result = -1;
 		wait[i].lock_held = 0;
 		CHECK(sched_prepare(&procs[i], wait_entry, &wait[i]) == 0);
@@ -433,7 +433,7 @@ static void test_inode_channels(void)
 	struct inode node = { 0 };
 	struct wait_arg wait[3];
 	struct proc procs[3];
-	enum wait_reason reasons[3] = { WAIT_LOCK, WAIT_WRITE, WAIT_READ };
+	enum wait_cause causes[3] = { WAIT_LOCK, WAIT_WRITE, WAIT_READ };
 	enum proc_state states[3] = {
 		PROC_WAIT_LOCK, PROC_WAIT_WRITE, PROC_WAIT_READ
 	};
@@ -445,7 +445,7 @@ static void test_inode_channels(void)
 		for (i = 0; i < 3; i++) {
 			init_proc(&procs[i]);
 			wait[i].chan = (char *)&node + i;
-			wait[i].reason = reasons[i];
+			wait[i].cause = causes[i];
 			CHECK(sched_prepare(&procs[i], wait_entry,
 					    &wait[i]) == 0);
 			CHECK(sched_resume(&procs[i]) == 0);
@@ -482,7 +482,7 @@ static void test_hash_collision(void)
 	for (i = 0; i < 3; i++) {
 		init_proc(&procs[i]);
 		wait[i].chan = channels + (i == 1);
-		wait[i].reason = WAIT_READ;
+		wait[i].cause = WAIT_READ;
 		CHECK(sched_prepare(&procs[i], wait_entry, &wait[i]) == 0);
 		CHECK(sched_resume(&procs[i]) == 0);
 	}
@@ -518,7 +518,7 @@ static void test_release_collision(void)
 		for (i = 0; i < 3; i++) {
 			init_proc(&procs[i]);
 			wait[i].chan = channels + i;
-			wait[i].reason = WAIT_READ;
+			wait[i].cause = WAIT_READ;
 			CHECK(sched_prepare(&procs[i], wait_entry,
 					    &wait[i]) == 0);
 			CHECK(sched_resume(&procs[i]) == 0);
@@ -550,7 +550,7 @@ static void test_release_waiter(void)
 
 	init_proc(&proc);
 	wait.chan = &chan;
-	wait.reason = WAIT_WRITE;
+	wait.cause = WAIT_WRITE;
 	CHECK(sched_prepare(&proc, wait_entry, &wait) == 0);
 	CHECK(sched_resume(&proc) == 0);
 	CHECK(proc.p_state == PROC_WAIT_WRITE);
@@ -568,7 +568,7 @@ static void test_wake_then_release(void)
 
 	init_proc(&proc);
 	wait.chan = &chan;
-	wait.reason = WAIT_READ;
+	wait.cause = WAIT_READ;
 	CHECK(sched_prepare(&proc, wait_entry, &wait) == 0);
 	CHECK(sched_resume(&proc) == 0);
 	sys_lock();
@@ -589,7 +589,7 @@ static void test_yield_failure_cleanup(void)
 
 	init_proc(&proc);
 	wait.chan = &chan;
-	wait.reason = WAIT_READ;
+	wait.cause = WAIT_READ;
 	wait.result = 0;
 	wait.lock_held = 0;
 	CHECK(sched_prepare(&proc, wait_entry, &wait) == 0);

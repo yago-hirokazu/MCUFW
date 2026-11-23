@@ -132,8 +132,12 @@ struct sched_cortn_slot {
 	.set CC_XMM6, 80
 	.set CC_MXCSR, 240
 	.set CC_X87_CONTROL, 244
-
 ```
+
+16. [c] `reason` を `cause` に変更お願いします。/commit, /push
+
+17. [o] ファイル名、ソースコード中の名前 `esh`, `ESH`, `Esh` を `sh`, `SH`, `Sh` に変更お願いします。/commit, /push
+
 ## note
 
 ### タスク6〜7
@@ -167,5 +171,11 @@ struct sched_cortn_slot {
 - MSYS2 の MINGW64 環境で executor の run_test.sh、coroutine の -O0 / -O2、pipeline_exec の cortn / thread × -O0 / -O2 が全て成功した。
 - テスト後に各構成で make clean を実行し、生成した *.d、*.o、*.exe を削除した。
 - 変更ファイルは UTF-8（BOMなし）、CRLF を維持した。
+
+### タスク16
+
+- scheduler / coroutine と関連テスト・スタブの reason を cause に統一した。enum wait_cause、enum cortn_yield_cause、c_cause、yield_cause、sched_stub_last_cause() など、識別子に含まれる名前も変更した。
+- coroutine と pipe の -O0 / -O2、scheduler の cortn / thread × -O0 / -O2 × 通常 / 小容量の全構成が成功した。
+- テスト後に make clean を実行し、生成物を削除した。変更ファイルは UTF-8（BOMなし）、CRLF を維持した。
 
 EOF

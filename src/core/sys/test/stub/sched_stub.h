@@ -8,9 +8,9 @@
 void sched_stub_reset(struct proc *proc);
 void sched_stub_set_sleep_result(int result);
 void sched_stub_set_sleep_hook(void (*hook)(char *chan,
-					    enum wait_reason reason));
+					    enum wait_cause cause));
 int sched_stub_sleep_count(void);
-enum wait_reason sched_stub_last_reason(void);
+enum wait_cause sched_stub_last_cause(void);
 int sched_stub_wakeup_count(char *chan);
 
 #endif

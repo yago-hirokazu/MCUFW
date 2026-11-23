@@ -81,20 +81,20 @@ void sched_adapt_release(void *backend)
 }
 
 /* Yield running coroutine and restore sys lock on resume */
-int sched_adapt_yield(struct proc *proc, enum wait_reason reason)
+int sched_adapt_yield(struct proc *proc, enum wait_cause cause)
 {
 	struct cortn *cortn;
-	enum cortn_yield_reason yield_reason;
+	enum cortn_yield_cause yield_cause;
 
 	cortn = proc->p_ctx;
-	if (reason == WAIT_LOCK)
-		yield_reason = CORTN_YIELD_WAIT_LOCK;
-	else if (reason == WAIT_READ)
-		yield_reason = CORTN_YIELD_WAIT_READ;
+	if (cause == WAIT_LOCK)
+		yield_cause = CORTN_YIELD_WAIT_LOCK;
+	else if (cause == WAIT_READ)
+		yield_cause = CORTN_YIELD_WAIT_READ;
 	else
-		yield_reason = CORTN_YIELD_WAIT_WRITE;
+		yield_cause = CORTN_YIELD_WAIT_WRITE;
 	sys_unlock();
-	cortn_yield(cortn, yield_reason);
+	cortn_yield(cortn, yield_cause);
 	sys_lock();
 	return 0;
 }

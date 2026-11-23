@@ -27,7 +27,7 @@ struct round_data {
 };
 
 struct wait_data {
-	enum cortn_yield_reason reason;
+	enum cortn_yield_cause cause;
 	int resumed;
 };
 
@@ -100,7 +100,7 @@ static void wait_entry(struct cortn *self, void *arg)
 	struct wait_data *data;
 
 	data = arg;
-	CHECK(cortn_yield(self, data->reason) == CORTN_SUCCESS);
+	CHECK(cortn_yield(self, data->cause) == CORTN_SUCCESS);
 	data->resumed = 1;
 }
 
@@ -160,24 +160,24 @@ static void test_basic(void)
 	CHECK(cortn.c_state == CORTN_RUNNABLE);
 	CHECK(cortn_resume(&cortn) == CORTN_SUCCESS);
 	CHECK(cortn.c_state == CORTN_RUNNABLE);
-	CHECK(cortn.c_reason == CORTN_YIELD_VOLUNTARY);
+	CHECK(cortn.c_cause == CORTN_YIELD_VOLUNTARY);
 	CHECK(data.step == 1);
 	CHECK(cortn_resume(&cortn) == CORTN_SUCCESS);
 	CHECK(cortn.c_state == CORTN_FINISHED);
-	CHECK(cortn.c_reason == CORTN_YIELD_FINISHED);
+	CHECK(cortn.c_cause == CORTN_YIELD_FINISHED);
 	CHECK(data.step == 2);
 	CHECK(data.value == 42);
 	CHECK(cortn_stack_used(&cortn) > 0);
 	CHECK(cortn_resume(&cortn) == CORTN_ERR_STATE);
 }
 
-static void test_wait_reason(enum cortn_yield_reason reason,
+static void test_wait_cause(enum cortn_yield_cause cause,
 			     enum cortn_state state)
 {
 	struct cortn cortn;
 	struct wait_data data;
 
-	data.reason = reason;
+	data.cause = cause;
 	data.resumed = 0;
 	CHECK(init_cortn(&cortn, wait_stack, sizeof(wait_stack),
 			 wait_entry, &data) == CORTN_SUCCESS);
@@ -192,9 +192,9 @@ static void test_wait_reason(enum cortn_yield_reason reason,
 
 static void test_wait(void)
 {
-	test_wait_reason(CORTN_YIELD_WAIT_LOCK, CORTN_WAIT_LOCK);
-	test_wait_reason(CORTN_YIELD_WAIT_READ, CORTN_WAIT_READ);
-	test_wait_reason(CORTN_YIELD_WAIT_WRITE, CORTN_WAIT_WRITE);
+	test_wait_cause(CORTN_YIELD_WAIT_LOCK, CORTN_WAIT_LOCK);
+	test_wait_cause(CORTN_YIELD_WAIT_READ, CORTN_WAIT_READ);
+	test_wait_cause(CORTN_YIELD_WAIT_WRITE, CORTN_WAIT_WRITE);
 }
 
 static void test_round_robin(void)
@@ -253,7 +253,7 @@ static void test_stack_boundary_guard(void)
 	      CORTN_SUCCESS);
 	CHECK(cortn_resume(&cortn) == CORTN_ERR_STACK);
 	CHECK(cortn.c_state == CORTN_ERROR);
-	CHECK(cortn.c_reason == CORTN_YIELD_ERROR);
+	CHECK(cortn.c_cause == CORTN_YIELD_ERROR);
 }
 
 static void test_simd_and_fpu(void)

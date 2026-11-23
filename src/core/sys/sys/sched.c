@@ -53,7 +53,7 @@ int sys_lock_held(void)
 }
 
 /* Register wait event before yielding with sys lock held */
-int sched_sleep(char *chan, enum wait_reason reason)
+int sched_sleep(char *chan, enum wait_cause cause)
 {
 	struct proc *proc;
 	int result;
@@ -61,9 +61,9 @@ int sched_sleep(char *chan, enum wait_reason reason)
 
 	proc = current_proc();
 
-	if (reason == WAIT_LOCK)
+	if (cause == WAIT_LOCK)
 		proc->p_state = PROC_WAIT_LOCK;
-	else if (reason == WAIT_READ)
+	else if (cause == WAIT_READ)
 		proc->p_state = PROC_WAIT_READ;
 	else
 		proc->p_state = PROC_WAIT_WRITE;
@@ -79,10 +79,10 @@ int sched_sleep(char *chan, enum wait_reason reason)
 		test_fail_yield = 0;
 		result = -SYS_EINVAL;
 	} else {
-		result = sched_adapt_yield(proc, reason);
+		result = sched_adapt_yield(proc, cause);
 	}
 #else
-	result = sched_adapt_yield(proc, reason);
+	result = sched_adapt_yield(proc, cause);
 #endif
 	if (result != 0) {
 		remove_wait_proc(chan, proc);

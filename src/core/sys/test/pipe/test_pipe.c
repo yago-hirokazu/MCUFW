@@ -49,9 +49,9 @@ static ptrdiff_t call_write(struct proc *proc, int fd, const void *buf,
 			    size_t count);
 static int call_close(struct proc *proc, int fd);
 static void call_close_all(struct proc *proc);
-static void supply_read_hook(char *chan, enum wait_reason reason);
-static void drain_write_hook(char *chan, enum wait_reason reason);
-static void unlock_hook(char *chan, enum wait_reason reason);
+static void supply_read_hook(char *chan, enum wait_cause cause);
+static void drain_write_hook(char *chan, enum wait_cause cause);
+static void unlock_hook(char *chan, enum wait_cause cause);
 static void init_pipe_io_test(struct proc *proc);
 static void finish_pipe_io_test(struct proc *proc);
 static void pipe_io_strategy(struct buf *bp);
@@ -135,29 +135,29 @@ static void call_close_all(struct proc *proc)
 	sys_unlock();
 }
 
-static void supply_read_hook(char *chan, enum wait_reason reason)
+static void supply_read_hook(char *chan, enum wait_cause cause)
 {
 	static const char data = 'Q';
 	size_t offset;
 
 	CHECK(chan == (char *)hook_inode + 2);
-	CHECK(reason == WAIT_READ);
+	CHECK(cause == WAIT_READ);
 	offset = hook_inode->i_size;
 	hook_result = writei(hook_inode, &offset, &data, 1);
 }
 
 /* Drain unread data while writer sleeps */
-static void drain_write_hook(char *chan, enum wait_reason reason)
+static void drain_write_hook(char *chan, enum wait_cause cause)
 {
 	CHECK(chan == (char *)hook_inode + 1);
-	CHECK(reason == WAIT_WRITE);
+	CHECK(cause == WAIT_WRITE);
 	hook_result = readp(hook_file, hook_data, sizeof(hook_data));
 }
 
-static void unlock_hook(char *chan, enum wait_reason reason)
+static void unlock_hook(char *chan, enum wait_cause cause)
 {
 	CHECK(chan == (char *)hook_inode);
-	CHECK(reason == WAIT_LOCK);
+	CHECK(cause == WAIT_LOCK);
 	prele(hook_inode);
 }
 
@@ -375,7 +375,7 @@ static void test_wait_rechecks(void)
 	CHECK(byte == 'Q');
 	CHECK(hook_result == 1);
 	CHECK(sched_stub_sleep_count() == 1);
-	CHECK(sched_stub_last_reason() == WAIT_READ);
+	CHECK(sched_stub_last_cause() == WAIT_READ);
 
 	memset(data, 0x5a, sizeof(data));
 	hook_file = rf;
@@ -385,7 +385,7 @@ static void test_wait_rechecks(void)
 	CHECK(hook_result == PIPSIZ);
 	CHECK(memcmp(data, hook_data, PIPSIZ) == 0);
 	CHECK(sched_stub_sleep_count() == 2);
-	CHECK(sched_stub_last_reason() == WAIT_WRITE);
+	CHECK(sched_stub_last_cause() == WAIT_WRITE);
 	CHECK(call_read(&proc, fd[0], &byte, 1) == 1);
 	CHECK(byte == 0x5a);
 	call_close_all(&proc);
@@ -410,7 +410,7 @@ static void test_pipe_lock(void)
 	CHECK(plock(ip) == 0);
 	CHECK(ip->i_flag & ILOCK);
 	CHECK(!(ip->i_flag & IWANT));
-	CHECK(sched_stub_last_reason() == WAIT_LOCK);
+	CHECK(sched_stub_last_cause() == WAIT_LOCK);
 	prele(ip);
 	sys_unlock();
 	call_close_all(&proc);

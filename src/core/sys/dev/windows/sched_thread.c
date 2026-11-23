@@ -113,11 +113,11 @@ void sched_adapt_release(void *backend)
 	sys_unlock();
 }
 
-int sched_adapt_yield(struct proc *proc, enum wait_reason reason)
+int sched_adapt_yield(struct proc *proc, enum wait_cause cause)
 {
 	struct sched_thread_slot *slot = proc->p_ctx;
 
-	(void)reason;
+	(void)cause;
 	slot->ts_run = 0;
 	WakeAllConditionVariable(&slot->ts_report_cv);
 	/* Predicate survives wakeup preceding native wait */

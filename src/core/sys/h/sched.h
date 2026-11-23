@@ -20,7 +20,7 @@ enum proc_state {
 	PROC_ERROR
 };
 
-enum wait_reason {
+enum wait_cause {
 	WAIT_LOCK,
 	WAIT_READ,
 	WAIT_WRITE
@@ -49,7 +49,7 @@ int sys_lock_held(void);
 /* Sleep and wakeup require sys lock held */
 /* Sleep requires current process running after sched_prepare() */
 /* Current process must not already belong to wait list */
-int sched_sleep(char *chan, enum wait_reason reason);
+int sched_sleep(char *chan, enum wait_cause cause);
 /* Wakeup requires valid execution contexts for processes in wait list */
 void sched_wakeup(char *chan);
 struct proc *current_proc(void);
