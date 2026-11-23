@@ -114,7 +114,7 @@ INCLUDES += -I../../../../lib
 INCLUDES += -I../../../../sys/h
 INCLUDES += -I../../../../sys/dev/windows
 INCLUDES += -I../../dev/windows
-INCLUDES += -I../../../../../target/windows/Adapt
+INCLUDES += -I../../../../../dev/windows/Adapt
 
 CFLAGS += $(INCLUDES)
 CFLAGS += -DUSE_STACKMACH

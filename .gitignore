@@ -1,6 +1,6 @@
-/src/target/windows/TDM-GCC/tdm
-/src/target/windows/TDM-GCC/make-3.81-bin
-/src/target/windows/TDM-GCC/make-3.81-dep
+/src/dev/windows/TDM-GCC/tdm
+/src/dev/windows/TDM-GCC/make-3.81-bin
+/src/dev/windows/TDM-GCC/make-3.81-dep
 
 # ESH test build and result files
 /src/core/shell/cli/test/exe/_output/

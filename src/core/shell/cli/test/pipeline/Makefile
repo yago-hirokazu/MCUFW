@@ -6,7 +6,7 @@ CXX = g++
 CFLAGS = -mno-ms-bitfields -g
 CFLAGS += -Wall -Wextra
 CFLAGS += -I. -I../../include -I../../../../lib
-CFLAGS += -I../../dev/windows -I../../../../../target/windows/Adapt
+CFLAGS += -I../../dev/windows -I../../../../../dev/windows/Adapt
 CFLAGS += -DUSE_STACKMACH
 
 LDFLAGS = -lwinmm

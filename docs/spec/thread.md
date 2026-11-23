@@ -13,7 +13,7 @@ linkしない。
 buildはMSYS2 MINGW64 shell内で実行する。
 
 ```sh
-cd src/target/windows
+cd src/dev/windows
 make -B SCHED_BACKEND=thread main.exe
 ./main.exe
 make -B SCHED_BACKEND=cortn main.exe

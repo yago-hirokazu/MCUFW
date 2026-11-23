@@ -33,7 +33,7 @@ core/						移植可能なレイヤ
 	usr/					STM32機種非依存プログラム置き場
 	sys/					UNIX V6 から移植したランタイムサービス
 		cmd/				STM32用汎用UARTコマンド
-target/						ハードウェア依存レイヤ
+dev/						ハードウェア依存レイヤ
 	NUCLEO-U575ZI-Q/		NUCLEO-U575ZI-Q評価ボード
 	windows					Windows (mingw64)
 
@@ -75,9 +75,9 @@ target/						ハードウェア依存レイヤ
    - UNIX V6 のように trap 命令を利用したシステムコールは使わない。
 
 
-## target
+## dev
 
-`target` 開発の基本方針
+`dev` 開発の基本方針
 
 1. まず Windows で動くソフトウェアを開発する。
 
@@ -99,13 +99,13 @@ C:\Keil_v543a\ARM\ARMCLANG\bin
 
 ## ビルドとテスト
 
-### src/target/windows
+### src/dev/windows
 
 PowerShell から `C:\msys64\mingw64\bin\gcc.exe` を直接起動したことです。MSYS2 shell 外では必要なDLL探索順が崩れ、各 `cc1.exe` が `clock_gettime64` を解決できず、エラーが発生します。PowerShell から `C:\msys64\mingw64\bin\gcc.exe` 直接起動はしないで、MSYS2 shell 経由だけで実行します。
 
 1. mingw64 シェルで下記を実行
 
-- cd src/target/windows
+- cd src/dev/windows
 - make
 - ./main.exe
 
@@ -203,7 +203,7 @@ if (a != NULL)
 #### 対象ディレクトリ
 
 src/core/
-src/target/windows/
+src/dev/windows/
 
 #### 適用ルール
 
@@ -214,7 +214,7 @@ docs/coding_style_summary_linux_kernel.md
 
 #### 対象ディレクトリ
 
-src/target/NUCLEO-U575ZI-Q/
+src/dev/NUCLEO-U575ZI-Q/
 
 #### 適用ルール1
 
@@ -223,9 +223,9 @@ STM32CubeMX が生成した下記対象ディレクトリのプログラムコ�
 
 ##### 対象ディレクトリ
 
-src/target/NUCLEO-U575ZI-Q/Drivers
-src/target/NUCLEO-U575ZI-Q/Inc
-src/target/NUCLEO-U575ZI-Q/Src
+src/dev/NUCLEO-U575ZI-Q/Drivers
+src/dev/NUCLEO-U575ZI-Q/Inc
+src/dev/NUCLEO-U575ZI-Q/Src
 
 ##### 適用ルール2
 

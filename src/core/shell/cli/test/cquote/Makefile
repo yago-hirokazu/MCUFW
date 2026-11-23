@@ -65,7 +65,7 @@ INCLUDES := -I.
 INCLUDES += -I../../include
 INCLUDES += -I../../../../lib
 INCLUDES += -I../../dev/windows
-INCLUDES += -I../../../../../target/windows/Adapt
+INCLUDES += -I../../../../../dev/windows/Adapt
 
 CFLAGS += $(INCLUDES)
 
