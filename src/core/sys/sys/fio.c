@@ -103,9 +103,13 @@ int fdalloc(struct proc *proc, struct file *fp)
 	return fd;
 }
 
+/* Add file reference at specified empty descriptor */
 int fdassign(struct proc *proc, int fd, struct file *fp)
 {
-	if (proc->p_ofile[fd])
+	/* Reject invalid descriptor before indexing process file table */
+	if (fd < 0 || fd >= NOFILE)
+		return -SYS_EBADF;
+	if (proc->p_ofile[fd] != NULL)
 		return -SYS_EMFILE;
 	if (fp->f_count == UCHAR_MAX)
 		return -SYS_ENFILE;

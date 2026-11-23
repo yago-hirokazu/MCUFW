@@ -19,6 +19,7 @@ OBJS += $(OUTDIR)/pipe.o
 OBJS += $(OUTDIR)/rdwri.o
 OBJS += $(OUTDIR)/sched.o
 OBJS += $(OUTDIR)/sys2.o
+OBJS += $(OUTDIR)/sys3.o
 OBJS += $(OUTDIR)/bio.o
 OBJS += $(OUTDIR)/conf.o
 OBJS += $(OUTDIR)/ramdisk.o
@@ -65,6 +66,9 @@ $(OUTDIR)/sched.o: ../../../../sys/sys/sched.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OUTDIR)/sys2.o: ../../../../sys/sys/sys2.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OUTDIR)/sys3.o: ../../../../sys/sys/sys3.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OUTDIR)/bio.o: ../../../../sys/dev/bio.c

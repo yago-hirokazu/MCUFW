@@ -69,6 +69,8 @@ struct proc
 - `sys_read()`：fdから読み取る
 - `sys_write()`：fdへ書き込む
 - `sys_close()`：fdを閉じる
+- `sys_dup()`：現在のprocess内で最小の空きfdに複製する
+- `sys_dup2()`：現在のprocess内で指定したfdに複製する
 
 pipe I/Oは`sched_prepare()`に成功した実行コンテキストから呼び出す。
 schedulerがそのprocessをcurrent processとして実行していることを前提とし、
@@ -97,6 +99,24 @@ I/O用bufferの取得に失敗した場合は`-SYS_EAGAIN`、device I/Oの失敗
 errorを区別する。`sys_read()`と`sys_write()`が待機と再試行を隠す。
 内部の`readp(fp, buf, count)`、`writep(fp, buf, count)`、`plock(ip)`を直接呼ぶ
 場合も同じ実行コンテキストを必要とし、sys lockを保持して呼び出す。
+
+## fd複製
+
+`sys3.c`の`fddup(src, oldfd, dst)`と`fddup2(src, oldfd, dst, newfd)`は、
+複製元・複製先のprocessを明示する内部APIである。呼び出し側がsys lockを保持する。
+`sys_dup()`と`sys_dup2()`は現在のprocessを両方に渡し、sys lockを取得・解放する。
+複製は成功時に複製先fd、失敗時に負の`SYS_E*`を返す。両公開APIは入口で
+`p_error`を0にし、失敗時に負の戻り値を記録する。
+
+`fddup()`はV6の`dup`に沿って最小の空きfdを選ぶ。`fddup2()`はV7の`dup2`に
+沿って使用中の複製先を閉じて置き換える。同じprocessの同じ有効fdなら何も変更しない。
+別processの同じfd番号は異なるslotとして扱う。範囲・参照数上限の検査を置換前に
+行い、失敗時は既存fdと参照数を保持する。同じfileへの別名を置き換える場合は
+参照数が増えないため、参照数上限でも成功する。
+
+複製元fdは残り、複製先も同じfile、offset、access flagを共有する。新しいfileや
+inodeは確保せず、inodeの参照数も増やさない。最後のfd参照を閉じるまでendpointは
+存続する。`fdassign()`は空きfdへの登録用として残し、使用中のfdにはエラーを返す。
 
 ## Pipe data位置
 

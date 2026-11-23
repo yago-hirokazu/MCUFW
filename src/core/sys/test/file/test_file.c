@@ -5,6 +5,7 @@
 
 /*
  * test_getf() => getf() => descriptor lookup / process error state
+ * test_fdassign_bounds() => fdassign() => descriptor bounds / file references
  */
 
 #include <limits.h>
@@ -33,6 +34,7 @@ static void init_test_proc(struct proc *proc);
 static void test_file_allocation(void);
 static void test_getf(void);
 static void test_descriptor_helpers(void);
+static void test_fdassign_bounds(void);
 static void test_fd_exhaustion(void);
 static void test_file_exhaustion(void);
 static void test_inode_lifecycle(void);
@@ -40,17 +42,21 @@ static void test_inode_exhaustion(void);
 static void test_buffer_failure(void);
 static void test_reuse_after_close_all(void);
 
+int test_dup(void);
+
 int main(void)
 {
 	test_file_allocation();
 	test_getf();
 	test_descriptor_helpers();
+	test_fdassign_bounds();
 	test_fd_exhaustion();
 	test_file_exhaustion();
 	test_inode_lifecycle();
 	test_inode_exhaustion();
 	test_buffer_failure();
 	test_reuse_after_close_all();
+	failures += test_dup();
 	if (failures) {
 		printf("%d tests failed\n", failures);
 		return 1;
@@ -156,6 +162,39 @@ static void test_descriptor_helpers(void)
 	CHECK(fdalloc(&proc, fp) == -SYS_ENFILE);
 	CHECK(fdassign(&proc, 3, fp) == -SYS_ENFILE);
 	memset(fp, 0, sizeof(*fp));
+}
+
+/* Check invalid descriptors preserve table and valid boundaries accept refs */
+static void test_fdassign_bounds(void)
+{
+	struct proc proc = {0};
+	struct file *fp = NULL;
+	const int invalid[] = {INT_MIN, -1, NOFILE, INT_MAX};
+	size_t i = 0;
+	int fd = 0;
+	int slot = 0;
+
+	init_bufc();
+	init_fsys();
+	fp = falloc(&proc, &fd);
+	CHECK(fp != NULL);
+	for (i = 0; i < sizeof(invalid) / sizeof(invalid[0]); i++) {
+		CHECK(fdassign(&proc, invalid[i], fp) == -SYS_EBADF);
+		CHECK(fp->f_count == 1);
+		for (slot = 0; slot < NOFILE; slot++)
+			CHECK(proc.p_ofile[slot] == (slot == fd ? fp : NULL));
+	}
+
+	/* Keep file alive while releasing and reassigning lowest descriptor */
+	CHECK(fdassign(&proc, NOFILE - 1, fp) == NOFILE - 1);
+	CHECK(proc.p_ofile[NOFILE - 1] == fp);
+	CHECK(fp->f_count == 2);
+	CHECK(fdfree(&proc, fd) == 0);
+	CHECK(fdassign(&proc, 0, fp) == 0);
+	CHECK(proc.p_ofile[0] == fp);
+	CHECK(fp->f_count == 2);
+	fdclean(&proc);
+	CHECK(file_in_use() == 0);
 }
 
 static void test_fd_exhaustion(void)

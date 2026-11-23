@@ -23,6 +23,7 @@ CSOURCES += esh_adapt.c stdio_adapt.c tty_adapt.c
 CSOURCES += cmd_sample.c qbyte.c symchar.c
 CSOURCES += $(SCHED_CSOURCES)
 CSOURCES += alloc.c bio.c conf.c fio.c iget.c pipe.c rdwri.c sched.c sys2.c
+CSOURCES += sys3.c
 CSOURCES += bdev.c ramdisk.c
 ASOURCES = $(SCHED_ASOURCES)
 

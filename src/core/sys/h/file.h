@@ -35,6 +35,9 @@ int sys_pipe(int fd[2]);
 ptrdiff_t sys_read(int fd, void *buf, size_t count);
 ptrdiff_t sys_write(int fd, const void *buf, size_t count);
 int sys_close(int fd);
+/* Duplication clears current p_error, recording negative error on failure */
+int sys_dup(int oldfd);
+int sys_dup2(int oldfd, int newfd);
 
 void init_fsys(void);
 struct file *getf(struct proc *proc, int fd);
@@ -45,6 +48,9 @@ struct file *falloc(struct proc *proc, int *fd);
 void closef(struct file *fp);
 int fdalloc(struct proc *proc, struct file *fp);
 int fdassign(struct proc *proc, int fd, struct file *fp);
+/* Duplication requires sys lock held; source descriptor remains open */
+int fddup(struct proc *src, int oldfd, struct proc *dst);
+int fddup2(struct proc *src, int oldfd, struct proc *dst, int newfd);
 int fdfree(struct proc *proc, int fd);
 void fdclean(struct proc *proc);
 size_t file_in_use(void);

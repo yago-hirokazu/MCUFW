@@ -18,6 +18,7 @@ OBJS += $(addprefix $(OUTDIR)/,$(SCHED_ASOURCES:.S=.o))
 OBJS += $(OUTDIR)/pipe.o
 OBJS += $(OUTDIR)/rdwri.o
 OBJS += $(OUTDIR)/fio.o
+OBJS += $(OUTDIR)/sys3.o
 OBJS += $(OUTDIR)/alloc.o
 OBJS += $(OUTDIR)/iget.o
 OBJS += $(OUTDIR)/bio.o
@@ -63,6 +64,9 @@ $(OUTDIR)/rdwri.o: ../../sys/rdwri.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OUTDIR)/fio.o: ../../sys/fio.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OUTDIR)/sys3.o: ../../sys/sys3.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OUTDIR)/alloc.o: ../../sys/alloc.c

@@ -1,5 +1,6 @@
 /*
  * Prepared test entries => sys_read() / sys_write() => pipe sleep/wakeup
+ * sys_dup() / sys_dup2() => shared offset / last endpoint close
  * Controller => sched_resume() => verify wait state and transferred data
  */
 
@@ -52,6 +53,7 @@ static void write_entry(void *arg);
 static void read_entry(void *arg);
 static void offset_read_entry(void *arg);
 static void public_api_entry(void *arg);
+static void duplicate_api_entry(void *arg);
 static void test_v7_offset(void);
 static void peer_close_entry(void *arg);
 static void test_blocking_transfer(void);
@@ -61,6 +63,7 @@ static void test_writer_close_wakeup(void);
 int main(void)
 {
 	run_prepared(public_api_entry);
+	run_prepared(duplicate_api_entry);
 	test_v7_offset();
 	run_prepared(peer_close_entry);
 	test_blocking_transfer();
@@ -94,19 +97,18 @@ static void close_all_locked(struct proc *proc)
 	sys_unlock();
 }
 
+/* Copy read endpoint to reader before releasing writer reference */
 static int connect_pipe(struct proc *writer, struct proc *reader,
 			int *write_fd, int *read_fd)
 {
-	struct file *read_file;
-	int fd[2];
-	int result;
+	int fd[2] = {0};
+	int result = 0;
 
 	sys_lock();
 	result = pipe_for_proc(writer, fd);
 	if (result < 0)
 		goto out;
-	read_file = getf(writer, fd[0]);
-	*read_fd = fdalloc(reader, read_file);
+	*read_fd = fddup(writer, fd[0], reader);
 	if (*read_fd < 0) {
 		result = *read_fd;
 		goto out;
@@ -232,6 +234,55 @@ static void public_api_entry(void *arg)
 	CHECK(file_in_use() == 0);
 	CHECK(pipe_in_use() == 0);
 	CHECK(buffer_in_use() == 0);
+}
+
+/* Share pipe offset and preserve endpoint until last duplicate closes */
+static void duplicate_api_entry(void *arg)
+{
+	struct proc *proc = NULL;
+	char data[4] = {0};
+	int fd[2] = {0};
+	int copy[2] = {0};
+
+	(void)arg;
+	proc = current_proc();
+	CHECK(sys_pipe(fd) == 0);
+	copy[0] = sys_dup(fd[0]);
+	copy[1] = sys_dup2(fd[1], NOFILE - 1);
+	CHECK(copy[0] == 2 && copy[1] == NOFILE - 1);
+	CHECK(file_in_use() == 2 && pipe_in_use() == 1);
+	CHECK(proc->p_ofile[copy[0]] == proc->p_ofile[fd[0]]);
+	CHECK(proc->p_ofile[copy[1]] == proc->p_ofile[fd[1]]);
+	CHECK(sys_write(fd[1], "abc", 3) == 3);
+	CHECK(sys_read(fd[0], data, 1) == 1 && data[0] == 'a');
+	CHECK(sys_read(copy[0], data, 1) == 1 && data[0] == 'b');
+	CHECK(proc->p_ofile[fd[0]]->f_offset == 2);
+	CHECK(sys_close(fd[0]) == 0);
+	CHECK(sys_close(fd[1]) == 0);
+	CHECK(sys_write(copy[1], "d", 1) == 1);
+	CHECK(sys_close(copy[1]) == 0);
+	CHECK(sys_read(copy[0], data, sizeof(data)) == 2);
+	CHECK(memcmp(data, "cd", 2) == 0);
+	CHECK(sys_read(copy[0], data, 1) == 0);
+	CHECK(sys_close(copy[0]) == 0);
+
+	/* Closing original reader must not break surviving duplicate */
+	CHECK(sys_pipe(fd) == 0);
+	CHECK(sys_dup2(fd[0], NOFILE - 1) == NOFILE - 1);
+	CHECK(sys_close(fd[0]) == 0);
+	CHECK(sys_write(fd[1], "x", 1) == 1);
+	CHECK(sys_close(NOFILE - 1) == 0);
+	CHECK(sys_write(fd[1], "x", 1) == -SYS_EPIPE);
+	CHECK(sys_close(fd[1]) == 0);
+
+	/* Replacing last writer with read alias must expose EOF */
+	CHECK(sys_pipe(fd) == 0);
+	CHECK(sys_dup2(fd[0], fd[1]) == fd[1]);
+	CHECK(sys_read(fd[0], data, 1) == 0);
+	CHECK(sys_close(fd[0]) == 0);
+	CHECK(sys_read(fd[1], data, 1) == 0);
+	CHECK(sys_close(fd[1]) == 0);
+	CHECK(file_in_use() == 0 && pipe_in_use() == 0);
 }
 
 /* Pause after partial read so controller can inspect blocked writer */
@@ -375,13 +426,14 @@ static void test_blocking_transfer(void)
 	CHECK(pipe_in_use() == 0);
 }
 
+/* Wake blocked reader only after final writer duplicate closes */
 static void test_reader_close_wakeup(void)
 {
-	struct read_arg reader;
-	struct proc procs[2];
-	unsigned char byte;
-	int write_fd;
-	int read_fd;
+	struct read_arg reader = {0};
+	struct proc procs[2] = {0};
+	unsigned char byte = 0;
+	int write_fd = 0;
+	int read_fd = 0;
 
 	init_bufc();
 	init_fsys();
@@ -397,7 +449,11 @@ static void test_reader_close_wakeup(void)
 	CHECK(sched_resume(&procs[1]) == 0);
 	CHECK(procs[1].p_state == PROC_WAIT_READ);
 	sys_lock();
+	CHECK(fddup2(&procs[0], write_fd, &procs[0], NOFILE - 1) ==
+	      NOFILE - 1);
 	CHECK(fdfree(&procs[0], write_fd) == 0);
+	CHECK(procs[1].p_state == PROC_WAIT_READ);
+	CHECK(fdfree(&procs[0], NOFILE - 1) == 0);
 	sys_unlock();
 	CHECK(run_scheduler(&procs[1], 1) == 0);
 	CHECK(reader.result == 0);
@@ -406,13 +462,14 @@ static void test_reader_close_wakeup(void)
 	CHECK(pipe_in_use() == 0);
 }
 
+/* Wake blocked writer only after final reader duplicate closes */
 static void test_writer_close_wakeup(void)
 {
-	struct write_arg writer;
-	struct proc procs[2];
-	unsigned char data[PIPSIZ + 1];
-	int write_fd;
-	int read_fd;
+	struct write_arg writer = {0};
+	struct proc procs[2] = {0};
+	unsigned char data[PIPSIZ + 1] = {0};
+	int write_fd = 0;
+	int read_fd = 0;
 
 	memset(data, 0x3c, sizeof(data));
 	init_bufc();
@@ -428,7 +485,11 @@ static void test_writer_close_wakeup(void)
 	CHECK(sched_resume(&procs[0]) == 0);
 	CHECK(procs[0].p_state == PROC_WAIT_WRITE);
 	sys_lock();
+	CHECK(fddup2(&procs[1], read_fd, &procs[1], NOFILE - 1) ==
+	      NOFILE - 1);
 	CHECK(fdfree(&procs[1], read_fd) == 0);
+	CHECK(procs[0].p_state == PROC_WAIT_WRITE);
+	CHECK(fdfree(&procs[1], NOFILE - 1) == 0);
 	sys_unlock();
 	CHECK(run_scheduler(&procs[0], 1) == 0);
 	CHECK(writer.result == -SYS_EPIPE);

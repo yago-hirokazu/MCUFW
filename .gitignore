@@ -12,3 +12,9 @@
 /src/core/shell/cli/test/par/*.dll
 /src/core/shell/cli/test/par/result_test*_sh.txt
 /.agents
+
+# Generated source index and Windows runtime copies
+/src/cscope.files
+/src/cscope.out
+/src/dev/windows/libMPSSE.dll
+/src/dev/windows/libMPSSE_i2c.dll

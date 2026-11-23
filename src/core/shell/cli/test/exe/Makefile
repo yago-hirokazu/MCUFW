@@ -74,6 +74,7 @@ CSOURCES += pipe.c
 CSOURCES += rdwri.c
 CSOURCES += sched.c
 CSOURCES += sys2.c
+CSOURCES += sys3.c
 
 ## ../../dev/windows/
 CSOURCES += $(SCHED_CSOURCES)

@@ -211,19 +211,18 @@ static void close_all_locked(struct proc *proc)
 	sys_unlock();
 }
 
+/* Copy read endpoint to reader before releasing writer reference */
 static int connect_pipe(struct proc *writer, struct proc *reader,
 			int *write_fd, int *read_fd)
 {
-	struct file *read_file;
-	int fd[2];
-	int result;
+	int fd[2] = {0};
+	int result = 0;
 
 	sys_lock();
 	result = pipe_for_proc(writer, fd);
 	if (result < 0)
 		goto out;
-	read_file = getf(writer, fd[0]);
-	*read_fd = fdalloc(reader, read_file);
+	*read_fd = fddup(writer, fd[0], reader);
 	if (*read_fd < 0) {
 		result = *read_fd;
 		goto out;

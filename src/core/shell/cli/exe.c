@@ -57,43 +57,6 @@ static int connect_proc(struct exe_proc *writer, struct exe_proc *reader);
 static int execute_commands(struct exe *exe);
 static void reset_commands(struct exe *exe);
 
-static int execute_commands(struct exe *exe)
-{
-	struct exe_proc *proc;
-	struct proc *previous;
-	int result;
-
-	if (assert_warm_execute_commands(exe) != 0)
-		return -SYS_EINVAL;
-	if (exe->e_procs > 1)
-		return exe_run_pipeline(exe->e_proc, exe->e_procs);
-	proc = &exe->e_proc[0];
-	init_proc(&proc->p_exec);
-	previous = current_proc();
-	sched_set_current_proc(&proc->p_exec);
-	result = proc->p_cmd->main(proc->p_argc, proc->p_argv);
-	sys_lock();
-	fdclean(&proc->p_exec);
-	sys_unlock();
-	sched_set_current_proc(previous);
-	return result;
-}
-
-static void reset_commands(struct exe *exe)
-{
-	int i;
-
-	for (i = 0; i < exe->e_procs; i++) {
-		exe->e_proc[i].p_cmd = NULL;
-		exe->e_proc[i].p_argc = 0;
-		memset(exe->e_proc[i].p_argv, 0,
-		       sizeof(exe->e_proc[i].p_argv));
-		memset(exe->e_proc[i].p_args, 0,
-		       sizeof(exe->e_proc[i].p_args));
-	}
-	exe->e_procs = 0;
-}
-
 int exe_run_codes(struct code *code, struct exe *exe)
 {
 	int c=0, cid=0, sid=0, vid=0, ret=0, label_p=0;
@@ -492,31 +455,67 @@ static void cleanup_pipeline(struct exe_proc *proc, int pipe_count,
 		sched_release(&proc[i].p_exec);
 }
 
+/* Connect pipe endpoints to command descriptors under sys lock */
 static int connect_proc(struct exe_proc *writer, struct exe_proc *reader)
 {
-	struct proc owner;
-	struct file *read_file;
-	struct file *write_file;
-	int fd[2];
-	int result;
+	struct proc owner = {0};
+	int fd[2] = {0};
+	int result = 0;
 
 	init_proc(&owner);
 	sys_lock();
 	result = pipe_for_proc(&owner, fd);
 	if (result < 0)
 		goto out;
-	read_file = getf(&owner, fd[0]);
-	write_file = getf(&owner, fd[1]);
-	result = fdassign(&writer->p_exec, FD_STDOUT, write_file);
+	/* Transfer references before releasing temporary owner */
+	result = fddup2(&owner, fd[1], &writer->p_exec, FD_STDOUT);
 	if (result < 0)
 		goto out;
-	result = fdassign(&reader->p_exec, FD_STDIN, read_file);
+	result = fddup2(&owner, fd[0], &reader->p_exec, FD_STDIN);
 	if (result < 0)
 		fdfree(&writer->p_exec, FD_STDOUT);
 out:
 	fdclean(&owner);
 	sys_unlock();
 	return result < 0 ? result : 0;
+}
+
+
+static int execute_commands(struct exe *exe)
+{
+	struct exe_proc *proc;
+	struct proc *previous;
+	int result;
+
+	if (assert_warm_execute_commands(exe) != 0)
+		return -SYS_EINVAL;
+	if (exe->e_procs > 1)
+		return exe_run_pipeline(exe->e_proc, exe->e_procs);
+	proc = &exe->e_proc[0];
+	init_proc(&proc->p_exec);
+	previous = current_proc();
+	sched_set_current_proc(&proc->p_exec);
+	result = proc->p_cmd->main(proc->p_argc, proc->p_argv);
+	sys_lock();
+	fdclean(&proc->p_exec);
+	sys_unlock();
+	sched_set_current_proc(previous);
+	return result;
+}
+
+static void reset_commands(struct exe *exe)
+{
+	int i;
+
+	for (i = 0; i < exe->e_procs; i++) {
+		exe->e_proc[i].p_cmd = NULL;
+		exe->e_proc[i].p_argc = 0;
+		memset(exe->e_proc[i].p_argv, 0,
+		       sizeof(exe->e_proc[i].p_argv));
+		memset(exe->e_proc[i].p_args, 0,
+		       sizeof(exe->e_proc[i].p_args));
+	}
+	exe->e_procs = 0;
 }
 
 

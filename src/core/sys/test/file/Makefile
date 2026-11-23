@@ -9,6 +9,8 @@ CFLAGS += -I../../h
 CFLAGS += -I../stub
 
 OBJS = $(OUTDIR)/test_file.o
+OBJS += $(OUTDIR)/test_dup.o
+OBJS += $(OUTDIR)/sys3.o
 OBJS += $(OUTDIR)/fio.o
 OBJS += $(OUTDIR)/alloc.o
 OBJS += $(OUTDIR)/iget.o
@@ -29,6 +31,12 @@ $(OUTDIR):
 	mkdir -p $(OUTDIR)
 
 $(OUTDIR)/test_file.o: test_file.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OUTDIR)/test_dup.o: test_dup.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OUTDIR)/sys3.o: ../../sys/sys3.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OUTDIR)/fio.o: ../../sys/fio.c

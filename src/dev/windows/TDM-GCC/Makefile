@@ -60,6 +60,7 @@ CSOURCES += tty.c
 ## ../../../core/sys
 CSOURCES += $(SCHED_CSOURCES)
 CSOURCES += alloc.c fio.c iget.c pipe.c rdwri.c sched.c sys2.c
+CSOURCES += sys3.c
 CSOURCES += bio.c
 CSOURCES += conf.c
 CSOURCES += bdev.c ramdisk.c
