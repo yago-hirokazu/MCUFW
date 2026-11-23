@@ -48,9 +48,9 @@ CSOURCES += qbyte.c
 CSOURCES += symchar.c
 
 ## ../../../core/shell/cli
-CSOURCES += break.c cat.c code.c esh_debug.c exe.c lex.c par.c script.c tok.c
+CSOURCES += break.c cat.c code.c sh_debug.c exe.c lex.c par.c script.c tok.c
 CSOURCES += echo.c
-CSOURCES += esh.c
+CSOURCES += sh.c
 CSOURCES += expr.c
 CSOURCES += help.c
 CSOURCES += run.c
@@ -66,7 +66,7 @@ CSOURCES += conf.c
 CSOURCES += bdev.c ramdisk.c
 
 ## ../../../core/shell/cli/dev/windows
-CSOURCES += esh_adapt.c
+CSOURCES += sh_adapt.c
 CSOURCES += stdio_adapt.c
 CSOURCES += tty_adapt.c
 
@@ -100,8 +100,8 @@ INCLUDES += -I../../../core/sys/h
 INCLUDES += -I../../../core/sys/dev/windows
 
 CFLAGS += $(INCLUDES)
-CFLAGS += -DESH_STDIO_PIPE
-CFLAGS += -DUSE_STACKMACH -DESH_SCRIPT
+CFLAGS += -DSH_STDIO_PIPE
+CFLAGS += -DUSE_STACKMACH -DSH_SCRIPT
 CFLAGS += $(SCHED_CPPFLAGS)
 # CFLAGS += -DADAFRUIT
 

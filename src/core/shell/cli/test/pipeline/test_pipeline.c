@@ -4,7 +4,7 @@
 #include "tty_config.h"
 
 #include "code.h"
-#include "esh.h"
+#include "sh.h"
 #include "lex.h"
 #include "machdep.h"
 #include "par.h"

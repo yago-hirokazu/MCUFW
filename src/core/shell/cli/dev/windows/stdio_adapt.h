@@ -25,7 +25,7 @@ extern int win_scanf(const char *fmt, ...);
 #define putchar win_putchar
 #define printf  win_printf
 #define scanf   win_scanf
-#ifdef ESH_STDIO_PIPE
+#ifdef SH_STDIO_PIPE
 #undef fprintf
 #define fprintf win_fprintf
 #endif

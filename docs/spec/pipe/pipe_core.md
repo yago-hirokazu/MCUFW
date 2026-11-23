@@ -5,7 +5,7 @@
 ## 役割
 
 `src/core/sys`はanonymous pipeに必要なfile、inode、buffer cache、read/write、
-schedulerをeshから独立して提供する。pipe APIの範囲はanonymous pipeであり、
+schedulerをshから独立して提供する。pipe APIの範囲はanonymous pipeであり、
 通常ファイル、path探索、signalは扱わない。
 
 UNIX V7の次の関係を最小構成で維持する。
@@ -47,7 +47,7 @@ init_fsys();
 
 共有資源の初期化は、所有中のfile、inode、bufferや実行中processがない状態で
 行う。各processのfd tableと実行状態は`init_proc()`で初期化する。Windowsの
-`eshinit()`は先に`init_ramdisk()`を呼び、共有資源の初期化後に`init_tty()`を呼ぶ。
+`shinit()`は先に`init_ramdisk()`を呼び、共有資源の初期化後に`init_tty()`を呼ぶ。
 
 ## 所有権
 

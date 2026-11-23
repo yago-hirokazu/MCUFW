@@ -1,8 +1,8 @@
 
 /* help.c */
 
-#include "esh.h"
-#include "esh_adapt.h"
+#include "sh.h"
+#include "sh_adapt.h"
 
 #if USE_STACKMACH
 char * const usage_builtins[] = {

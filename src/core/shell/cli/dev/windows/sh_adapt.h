@@ -1,8 +1,8 @@
 
-/* esh_adapt.h */
+/* sh_adapt.h */
 
-#ifndef __ESH_ADAPT_H__
-#define __ESH_ADAPT_H__
+#ifndef __SH_ADAPT_H__
+#define __SH_ADAPT_H__
 
 #ifdef __cplusplus
 extern "C" {

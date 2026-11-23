@@ -1,4 +1,4 @@
-name: ESH tests
+name: SH tests
 
 on:
   push:

@@ -3,8 +3,8 @@
 /**************************************************************************
  * PROJECT-SPECIFIC INCLUDE FILES
  **************************************************************************/
-#include "esh.h"
-#include "esh_errno.h"
+#include "sh.h"
+#include "sh_errno.h"
 #include "exe.h"
 #include "lex.h"
 #include "par.h"
@@ -27,7 +27,7 @@ static void script_reset_preserving_variables(void);
 /**************************************************************************
  * FUNCTION DEFINITIONS
  **************************************************************************/
-void esh_script_init(void)
+void sh_script_init(void)
 {
 	init_code(&script_code);
 	memset(&script_exe, 0, sizeof(script_exe));
@@ -35,7 +35,7 @@ void esh_script_init(void)
 	init_lex();
 }
 
-int esh_script_line(char *line)
+int sh_script_line(char *line)
 {
 	struct tty_arg args;
 	struct token token;
@@ -69,7 +69,7 @@ int esh_script_line(char *line)
 	result = script_exe.e_status;
 	goto out;
 error:
-	result = -ESH_EINVAL;
+	result = -SH_EINVAL;
 out:
 	script_reset_preserving_variables();
 	return result;
@@ -80,6 +80,6 @@ static void script_reset_preserving_variables(void)
 	struct variable_table variables;
 
 	variables = script_code.c_vtab;
-	esh_script_init();
+	sh_script_init();
 	script_code.c_vtab = variables;
 }

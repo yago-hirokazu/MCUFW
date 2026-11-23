@@ -8,8 +8,8 @@
 #include <string.h>
 
 #include "buf.h"
-#include "esh.h"
-#include "esh_errno.h"
+#include "sh.h"
+#include "sh_errno.h"
 #include "exe.h"
 #include "file.h"
 #include "lex.h"
@@ -129,7 +129,7 @@ static void test_startup_ram(void)
 	unsigned long block;
 	size_t i;
 
-	eshinit();
+	shinit();
 	sys_lock();
 
 	for (unit = 0; unit < RAM_NDEV; unit++) {
@@ -152,7 +152,7 @@ static void test_startup_ram(void)
 	}
 	sys_unlock();
 	/* Cold start resets storage and invalidates old cached contents */
-	eshinit();
+	shinit();
 	sys_lock();
 
 	for (unit = 0; unit < RAM_NDEV; unit++) {
@@ -178,7 +178,7 @@ static int producer_main(int argc, char **argv)
 	count = sys_write(FD_STDOUT, source, source_count);
 	if (count < 0)
 		return (int)count;
-	return count == (ptrdiff_t)source_count ? 11 : -ESH_EINVAL;
+	return count == (ptrdiff_t)source_count ? 11 : -SH_EINVAL;
 }
 
 static int filter_main(int argc, char **argv)
@@ -198,7 +198,7 @@ static int filter_main(int argc, char **argv)
 			buffer[i] = (unsigned char)toupper(buffer[i]);
 		written = sys_write(FD_STDOUT, buffer, (size_t)count);
 		if (written != count)
-			return written < 0 ? (int)written : -ESH_EINVAL;
+			return written < 0 ? (int)written : -SH_EINVAL;
 	}
 	return count < 0 ? (int)count : 22;
 }
@@ -227,7 +227,7 @@ static int early_filter_main(int argc, char **argv)
 	(void)argc;
 	(void)argv;
 	if (sys_read(FD_STDIN, &byte, 1) != 1)
-		return -ESH_EINVAL;
+		return -SH_EINVAL;
 	return 23;
 }
 
@@ -240,7 +240,7 @@ static int error_main(int argc, char **argv)
 {
 	(void)argc;
 	(void)argv;
-	return -ESH_EINVAL;
+	return -SH_EINVAL;
 }
 
 static struct applet error_applet = {"error", error_main};
@@ -368,8 +368,8 @@ static void test_invalid_count(void)
 {
 	struct exe_proc proc[PROCS];
 
-	CHECK(exe_run_pipeline(proc, 1) == -ESH_EINVAL);
-	CHECK(exe_run_pipeline(proc, PROCS + 1) == -ESH_EINVAL);
+	CHECK(exe_run_pipeline(proc, 1) == -SH_EINVAL);
+	CHECK(exe_run_pipeline(proc, PROCS + 1) == -SH_EINVAL);
 }
 
 static void test_transfer_matrix(void)
@@ -407,7 +407,7 @@ static void test_transfer_matrix(void)
 	source_count = sizeof(source);
 	init_command(&proc[0], &producer);
 	init_command(&proc[1], &error_applet);
-	CHECK(exe_run_pipeline(proc, 2) == -ESH_EINVAL);
+	CHECK(exe_run_pipeline(proc, 2) == -SH_EINVAL);
 	CHECK(proc[0].p_exec.p_ret == -SYS_EPIPE);
 	init_command(&proc[0], &producer);
 	init_command(&proc[1], &error_applet);
@@ -452,12 +452,12 @@ static int script_line(const char *text)
 	CHECK(strlen(text) < sizeof(line));
 	memset(line, 0, sizeof(line));
 	strcpy(line, text);
-	return esh_script_line(line);
+	return sh_script_line(line);
 }
 
 static void test_console_script(void)
 {
-	esh_script_init();
+	sh_script_init();
 	CHECK(script_line("echo hello|cat|cat|cat \n") == 0);
 	CHECK(script_line("k = 1 \n") == 0);
 	/* Incomplete block retains parser state and returns one */
@@ -472,7 +472,7 @@ static void test_console_script(void)
 	CHECK(script_line("echo \" value $k \"|cat \n") == 1);
 	CHECK(script_line("fi \n") == 0);
 	/* Error reset preserves variable table */
-	CHECK(script_line("echo | \n") == -ESH_EINVAL);
+	CHECK(script_line("echo | \n") == -SH_EINVAL);
 	CHECK(script_line("test $k -eq 3 \n") == 0);
 	/* Break execution uses loop metadata before script reset */
 	CHECK(script_line("while [ 1 -eq 1 ] \n") == 1);
@@ -552,15 +552,15 @@ static void test_parser_bounds(void)
 	memset(long_symbol, 'x', sizeof(long_symbol));
 	long_symbol[SYMCHARS] = 0;
 	CHECK(lex_analyze_token(long_symbol, &token) == LEXERROR);
-	esh_script_init();
+	sh_script_init();
 	for (i = 0; i < MAXNESTS - 1; i++) {
 		CHECK(script_line("while [ 1 -eq 1 ] \n") == 1);
 		CHECK(script_line("do \n") == 1);
 	}
 	CHECK(script_line("while [ 1 -eq 1 ] \n") == 1);
-	CHECK(script_line("do \n") == -ESH_EINVAL);
+	CHECK(script_line("do \n") == -SH_EINVAL);
 	CHECK(script_line("echo recovered|cat \n") == 0);
-	esh_script_init();
+	sh_script_init();
 }
 
 static void test_pipe_exhaustion_cleanup(void)

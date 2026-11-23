@@ -1,8 +1,8 @@
 
-/* esh_debug.c */
+/* sh_debug.c */
 
 #include "machdep.h"
-#include "esh_debug.h"
+#include "sh_debug.h"
 
 char * const token_type_str[] = {
 	"T_UNDEF",

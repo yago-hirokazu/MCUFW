@@ -4,8 +4,8 @@
 #include "custom_assert.h"
 #include "code_file.h"
 #include "machdep.h"
-#include "esh.h"
-#include "esh_debug.h"
+#include "sh.h"
+#include "sh_debug.h"
 #include "lex.h"
 #include "tok.h"
 

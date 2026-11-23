@@ -43,7 +43,7 @@ The status of a completed pipeline is the final command's return value.
 
 ## Windows standard I/O
 
-With `ESH_STDIO_PIPE`, the Windows stdio adapter routes mapped input and
+With `SH_STDIO_PIPE`, the Windows stdio adapter routes mapped input and
 output through the current process's fd 0 and fd 1. A stage without the
 corresponding descriptor uses host I/O. Stderr remains on the host, and
 `scanf()` returns EOF for pipe input. See [Windows stdio](../stdio.md).

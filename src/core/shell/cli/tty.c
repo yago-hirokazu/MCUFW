@@ -18,13 +18,13 @@
  **************************************************************************/
 #include "custom_assert.h"
 #include "code_file.h"
-#include "esh.h"
+#include "sh.h"
 #include "keymap.h"
 #include "prompt.h"
 #include "qbyte.h"
 #include "tty.h"
 #include "tty_adapt.h"
-#ifdef ESH_SCRIPT
+#ifdef SH_SCRIPT
 #include "script.h"
 #endif
 
@@ -134,17 +134,17 @@ extern void echo_left(void);
 void init_tty(void)
 {
 	qbinit(&line, (uint8_t *)&linebuf[0], TTY_NBUF);
-#ifdef ESH_SCRIPT
-	esh_script_init();
+#ifdef SH_SCRIPT
+	sh_script_init();
 #endif
 }
 
 void ttytask(int c)
 {
-#ifdef ESH_SCRIPT
+#ifdef SH_SCRIPT
 	char input[TTY_NBUF];
 #endif
-#ifndef ESH_SCRIPT
+#ifndef SH_SCRIPT
 	struct tty_arg *arg_p = &arg;
 	char found_applet;
 #endif
@@ -152,10 +152,10 @@ void ttytask(int c)
 	if (!(DELIM_LF & scan(c, &line)))
 		return;
 
-#ifdef ESH_SCRIPT
+#ifdef SH_SCRIPT
 	memcpy(input, linebuf, sizeof(input));
 	puth(&line, &history);
-	if (esh_script_line(input) < 0)
+	if (sh_script_line(input) < 0)
 		fprintf(stderr, "script rejected\n");
 #else
 	arg_p = make_argvect(linebuf, arg_p);

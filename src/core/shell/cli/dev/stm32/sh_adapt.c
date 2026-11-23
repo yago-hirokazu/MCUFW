@@ -1,13 +1,13 @@
 
-/* esh_adapt.c */
+/* sh_adapt.c */
 
-#include "esh.h"
-#include "esh_adapt.h"
+#include "sh.h"
+#include "sh_adapt.h"
 #include "stdio_uart.h"
 #include "tty_adapt.h"
 
 
-void eshinit(void)
+void shinit(void)
 {
 	init_tty();
 	stdio_uart_open();

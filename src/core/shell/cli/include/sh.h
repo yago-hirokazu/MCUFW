@@ -13,9 +13,9 @@ extern "C" {
 #include <string.h>
 
 #include "machdep.h"
-#include "esh_debug.h"
-#include "esh_anote.h"
-#include "esh_adapt.h"
+#include "sh_debug.h"
+#include "sh_anote.h"
+#include "sh_adapt.h"
 #include "stdio_adapt.h"
 
 
@@ -33,8 +33,8 @@ extern int run_applet(int argc, char **argv);
 extern void run_tasks(void);
 extern void init_tty(void);
 extern void ttytask(int c);
-extern void eshinit(void);
-extern void esh(void);
+extern void shinit(void);
+extern void sh(void);
 
 extern int return_from_applet;
 

@@ -52,7 +52,7 @@ CSOURCES := test_exe.c
 CSOURCES += break.c
 CSOURCES += code.c
 CSOURCES += echo.c
-CSOURCES += esh_debug.c
+CSOURCES += sh_debug.c
 CSOURCES += exe.c
 CSOURCES += expr.c
 CSOURCES += help.c
@@ -119,7 +119,7 @@ INCLUDES += -I../../../../../dev/windows/Adapt
 
 CFLAGS += $(INCLUDES)
 CFLAGS += -DUSE_STACKMACH
-CFLAGS += -DESH_STDIO_PIPE
+CFLAGS += -DSH_STDIO_PIPE
 CFLAGS += $(SCHED_CPPFLAGS)
 
 # CXXFLAGS

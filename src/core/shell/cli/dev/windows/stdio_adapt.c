@@ -2,9 +2,9 @@
 
 #include "machdep.h"
 #include <stdarg.h>
-#include "esh_debug.h"
+#include "sh_debug.h"
 
-#ifdef ESH_STDIO_PIPE
+#ifdef SH_STDIO_PIPE
 #include "file.h"
 #include "sched.h"
 
@@ -26,7 +26,7 @@ int win_getchar(void)
 {
 	int ch;
 
-#ifdef ESH_STDIO_PIPE
+#ifdef SH_STDIO_PIPE
 	unsigned char byte;
 
 	if (win_pipe_fd(0)) {
@@ -44,7 +44,7 @@ int win_getchar(void)
 
 int win_putchar(int c)
 {
-#ifdef ESH_STDIO_PIPE
+#ifdef SH_STDIO_PIPE
 	unsigned char byte = (unsigned char)c;
 
 	if (win_pipe_fd(1))
@@ -55,7 +55,7 @@ int win_putchar(int c)
 
 static int win_vfprintf(FILE *stream, const char *fmt, va_list args)
 {
-#ifdef ESH_STDIO_PIPE
+#ifdef SH_STDIO_PIPE
 	va_list copy;
 	char *buffer;
 	int length;

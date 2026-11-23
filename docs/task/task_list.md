@@ -136,7 +136,7 @@ struct sched_cortn_slot {
 
 16. [c] `reason` を `cause` に変更お願いします。/commit, /push
 
-17. [o] ファイル名、ソースコード中の名前 `esh`, `ESH`, `Esh` を `sh`, `SH`, `Sh` に変更お願いします。/commit, /push
+17. [c] ファイル名、ソースコード中の名前 `esh`, `ESH`, `Esh` を `sh`, `SH`, `Sh` に変更お願いします。/commit, /push
 
 ## note
 
@@ -177,5 +177,13 @@ struct sched_cortn_slot {
 - scheduler / coroutine と関連テスト・スタブの reason を cause に統一した。enum wait_cause、enum cortn_yield_cause、c_cause、yield_cause、sched_stub_last_cause() など、識別子に含まれる名前も変更した。
 - coroutine と pipe の -O0 / -O2、scheduler の cortn / thread × -O0 / -O2 × 通常 / 小容量の全構成が成功した。
 - テスト後に make clean を実行し、生成物を削除した。変更ファイルは UTF-8（BOMなし）、CRLF を維持した。
+
+### タスク17
+
+- シェル本体、移植層、テストのファイル名とソース中の esh / ESH / Esh を sh / SH / Sh に変更した。include、関数名、マクロ、Makefile、CI workflow、現行仕様書の参照も更新した。
+- parser の run_test1.sh / run_test2.sh、executor、cquote、pipeline のテストが成功した。pipeline_exec は cortn / thread × -O0 / -O2 の全構成が成功した。
+- Windows 本体をビルドし、sam1、sam2 1 10 100、sam3 -a -b string の正常動作を確認した。
+- テスト・ビルド後に make clean を実行した。変更ファイルは UTF-8（BOMなし）、CRLF を維持した。
+- src/dev/NUCLEO-U575ZI-Q の独立リポジトリ、外部ライブラリ、過去の作業記録は変更対象外とした。fresh などの一般語は変更していない。
 
 EOF

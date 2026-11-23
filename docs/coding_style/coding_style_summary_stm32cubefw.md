@@ -96,7 +96,7 @@ static int32_t shell_start(ShellContext_TypeDef *context)
 ### 4. 名前の付け方
 
 - 外部公開する関数は `MODULE_ActionObject` 形式とし、モジュールを示す大文字の接頭辞を
-  付ける。例：`ESH_Init()`、`ESH_Execute()`。
+  付ける。例：`SH_Init()`、`SH_Execute()`。
 - 内部関数は `static` とし、公開関数と混同しない一貫した名前を付ける。
 - 型名は UpperCamelCase を基本とし、末尾に `_TypeDef` を付ける。
 - マクロ、列挙子、定数は大文字のスネークケースとし、モジュール接頭辞を付ける。
@@ -127,18 +127,18 @@ static int32_t shell_start(ShellContext_TypeDef *context)
 ```c
 typedef enum
 {
-  ESH_STATE_RESET = 0U,
-  ESH_STATE_READY,
-  ESH_STATE_BUSY,
-  ESH_STATE_ERROR
-} ESH_StateTypeDef;
+  SH_STATE_RESET = 0U,
+  SH_STATE_READY,
+  SH_STATE_BUSY,
+  SH_STATE_ERROR
+} SH_StateTypeDef;
 
 typedef struct
 {
-  ESH_StateTypeDef state;
+  SH_StateTypeDef state;
   uint32_t error_code;
   void *user_context;
-} ESH_HandleTypeDef;
+} SH_HandleTypeDef;
 ```
 
 ### 6. 関数
@@ -218,10 +218,10 @@ HAL では、後始末が不要な異常をその場で返す形式も使われ�
 /**
   * @brief  Start command execution.
   * @param  context Command shell context.
-  * @retval ESH_OK Execution was started.
-  * @retval ESH_ERROR_INVALID_PARAM context was NULL.
+  * @retval SH_OK Execution was started.
+  * @retval SH_ERROR_INVALID_PARAM context was NULL.
   */
-int32_t ESH_Start(ESH_HandleTypeDef *context);
+int32_t SH_Start(SH_HandleTypeDef *context);
 
 /*
  * Clear the pending flag before enabling the interrupt to prevent a stale
@@ -247,20 +247,20 @@ int32_t ESH_Start(ESH_HandleTypeDef *context);
   順にグループ化する。各グループ内の順序を一定にする。
 
 ```c
-#ifndef ESH_PORT_H
-#define ESH_PORT_H
+#ifndef SH_PORT_H
+#define SH_PORT_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define ESH_ARRAY_SIZE(array)  (sizeof(array) / sizeof((array)[0]))
+#define SH_ARRAY_SIZE(array)  (sizeof(array) / sizeof((array)[0]))
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* ESH_PORT_H */
+#endif /* SH_PORT_H */
 ```
 
 ### 10. データ構造
@@ -297,16 +297,16 @@ extern "C" {
 - `void` は、失敗しない処理、失敗を通知できないコールバック、または既定シグネチャに限る。
 
 ```c
-int32_t ESH_GetState(const ESH_HandleTypeDef *handle,
-                     ESH_StateTypeDef *state)
+int32_t SH_GetState(const SH_HandleTypeDef *handle,
+                     SH_StateTypeDef *state)
 {
   if ((handle == NULL) || (state == NULL))
   {
-    return ESH_ERROR_INVALID_PARAM;
+    return SH_ERROR_INVALID_PARAM;
   }
 
   *state = handle->state;
-  return ESH_OK;
+  return SH_OK;
 }
 ```
 

@@ -10,8 +10,8 @@ extern "C" {
 
 
 #include "code.h"
-#include "esh.h"
-#include "esh_adapt.h"
+#include "sh.h"
+#include "sh_adapt.h"
 #include "param.h"
 #include "sched.h"
 #include "tty.h"

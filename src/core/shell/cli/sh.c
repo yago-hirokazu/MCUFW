@@ -1,9 +1,9 @@
 
-/* esh.c */
+/* sh.c */
 
-#include "esh.h"
+#include "sh.h"
 
-void esh(void)
+void sh(void)
 {
 	int c = getchar();
 	if (c != EOF)

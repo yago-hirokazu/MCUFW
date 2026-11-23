@@ -10,7 +10,7 @@ extern "C" {
 
 
 #include "machdep.h"
-#include "esh_adapt.h"
+#include "sh_adapt.h"
 
 enum	token_type {
 	T_UNDEF=0,

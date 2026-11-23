@@ -6,14 +6,14 @@ extern "C" {
 #endif /* __cplusplus */
 
 
-#include "esh_adapt.h"
+#include "sh_adapt.h"
 
 #undef BLTN
 
 #if defined(PROTOTYPES)
 
 extern const char C_HELP;
-#ifdef ESH_SCRIPT
+#ifdef SH_SCRIPT
 extern int cat(int argc, char **argv);
 #endif
 #if USE_STACKMACH
@@ -53,7 +53,7 @@ const struct applet builtins[] = {
 #if USE_STACKMACH
 	{"break", break_command},
 #endif // #if USE_STACKMACH
-#ifdef ESH_SCRIPT
+#ifdef SH_SCRIPT
 	{"cat", cat},
 #endif
 	{NULL, NULL}

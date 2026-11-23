@@ -5,8 +5,8 @@
 #include "machdep.h"
 #include "tty_config.h"
 #include "code.h"
-#include "esh.h"
-#include "esh_debug.h"
+#include "sh.h"
+#include "sh_debug.h"
 #include "lex.h"
 #include "par.h"
 #include "qbyte.h"
@@ -175,7 +175,7 @@ parse:
 		ret = par_make_code(&token[k], &code);
 		if (ret == PARINVLD) {
 			EP("Invalid grammer");
-			EP("Debug par.c with setting DEBUG_PAR=1 of include/esh_debug.h");
+			EP("Debug par.c with setting DEBUG_PAR=1 of include/sh_debug.h");
 			exit(EXIT_FAILURE);
 		}
 		k++;

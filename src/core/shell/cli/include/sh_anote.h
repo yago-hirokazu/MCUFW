@@ -1,8 +1,8 @@
 
-/* esh_anote.h */
+/* sh_anote.h */
 
-#ifndef __ESH_ANOTE_H__
-#define __ESH_ANOTE_H__
+#ifndef __SH_ANOTE_H__
+#define __SH_ANOTE_H__
 
 #ifdef __cplusplus
 extern "C" {

@@ -2,7 +2,7 @@
 
 更新日: 2026-10-13
 
-Windows buildは`ESH_STDIO_PIPE`でprocess stdio routingを有効にする。parser-only、
+Windows buildは`SH_STDIO_PIPE`でprocess stdio routingを有効にする。parser-only、
 quote-only buildはconsole-only adapterを使用する。
 
 - `printf`、`putchar`、`fprintf(stdout, ...)`はcurrent processのfd 1が

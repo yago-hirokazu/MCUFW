@@ -1,8 +1,8 @@
 
-/* esh_debug.h */
+/* sh_debug.h */
 
-#ifndef __ESH_DEBUG_H__
-#define __ESH_DEBUG_H__
+#ifndef __SH_DEBUG_H__
+#define __SH_DEBUG_H__
 
 #ifdef __cplusplus
 extern "C" {
@@ -28,9 +28,9 @@ extern "C" {
 
 #if ENABLE_ASSERT
 #include <assert.h>
-#define	ESHASSERT(_a_)	assert(_a_)
+#define	SHASSERT(_a_)	assert(_a_)
 #else
-#define ESHASSERT(_a_)
+#define SHASSERT(_a_)
 #endif
 
 

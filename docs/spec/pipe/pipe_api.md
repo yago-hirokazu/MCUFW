@@ -4,7 +4,7 @@
 
 ## 対象範囲
 
-本書は`src/core/sys`のanonymous pipe APIと、eshからの利用方法を示す。
+本書は`src/core/sys`のanonymous pipe APIと、shからの利用方法を示す。
 通常ファイル、path探索、永続storage、リダイレクト、background job、signalは
 含めない。
 
@@ -77,7 +77,7 @@ schedulerがそのprocessをcurrent processとして実行していることを�
 backend未設定での非blocking利用はサポートしない。空・満杯・inode lock競合時は
 内部で待機・再試行する。`sys_pipe()`やfdの接続・closeは実行準備前にも行える。
 
-sys層内部とesh executorは、明示的な`struct proc *`を受け取る
+sys層内部とsh executorは、明示的な`struct proc *`を受け取る
 `pipe_for_proc()`、`getf()`、`fdassign()`、`fdfree()`、`fdclean()`も
 使用する。
 
@@ -125,12 +125,12 @@ write位置は現在の`i_size`である。未読dataをring末尾から先頭�
 
 readerが`i_size`まで読み切った時点でread offsetと`i_size`を0へ戻し、1 block
 全体を再利用する。このため、未読dataが残る間は先頭側に空きがあっても再利用
-しない。これは旧esh ring bufferから意図的に変更したV7型の意味である。
+しない。これは旧sh ring bufferから意図的に変更したV7型の意味である。
 
 ## Processとwait channel
 
 `struct proc`はfd table、実行状態、待機先、backend、終了statusを所有する。
-esh executor用processはこれを`p_exec`として埋め込み、command引数等のshell
+sh executor用processはこれを`p_exec`として埋め込み、command引数等のshell
 固有情報とportable scheduler状態を分離する。
 
 wait listはportable schedulerが管理し、backendはcontext切替とsys lockを
@@ -147,7 +147,7 @@ pipeline全体の終了statusは最後のcommandのstatusとする。途中comma
 - fd 0、1、2をstdin、stdout、stderrとする
 - pipelineはstdoutと次段stdinだけを接続する
 - stderrとdebug logはconsoleへ出し、pipe dataへ混入させない
-- Windowsの`ESH_STDIO_PIPE`付きbuildでは、current processにfd 0があれば
+- Windowsの`SH_STDIO_PIPE`付きbuildでは、current processにfd 0があれば
   `getchar()`を`sys_read()`へ、fd 1があれば`putchar()`、`printf()`、
   `fprintf(stdout, ...)`を`sys_write()`へ接続する
 - 対象fdがなければhost I/Oへ渡す。pipe stdinでの`scanf()`は入力を消費せず

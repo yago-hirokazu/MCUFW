@@ -151,7 +151,7 @@ void log_adapt_unlock(enum log_lock_id id);
 - ハードウェア周回割り込みを再現せず、取得値から周回数を求める。
 - frequency APIの範囲に合わせ、周波数が0以下またはUINT32_MAX超なら
   初期化失敗とする。
-- Windows本体はmain()のeshinit()より前にinit_error()を呼ぶ。
+- Windows本体はmain()のshinit()より前にinit_error()を呼ぶ。
 
 ### Cortex-M（今後実装）
 

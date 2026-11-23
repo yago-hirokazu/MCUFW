@@ -2,7 +2,7 @@
 /src/dev/windows/TDM-GCC/make-3.81-bin
 /src/dev/windows/TDM-GCC/make-3.81-dep
 
-# ESH test build and result files
+# SH test build and result files
 /src/core/shell/cli/test/exe/_output/
 /src/core/shell/cli/test/exe/*.exe
 /src/core/shell/cli/test/exe/*.dll

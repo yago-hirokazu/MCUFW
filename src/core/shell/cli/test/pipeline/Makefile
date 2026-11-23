@@ -12,7 +12,7 @@ CFLAGS += -DUSE_STACKMACH
 LDFLAGS = -lwinmm
 
 CSOURCES = test_pipeline.c
-CSOURCES += break.c code.c echo.c esh_debug.c expr.c help.c
+CSOURCES += break.c code.c echo.c sh_debug.c expr.c help.c
 CSOURCES += par.c run.c lex.c test.c tok.c tty.c
 CSOURCES += stdio_adapt.c tty_adapt.c cmd_sample.c qbyte.c symchar.c
 

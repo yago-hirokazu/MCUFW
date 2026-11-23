@@ -10,7 +10,7 @@ extern "C" {
 
 
 #include "machdep.h"
-#include "esh_adapt.h"
+#include "sh_adapt.h"
 
 int is_quotestart(char *str, char quote);
 int is_quoteend(char *str, char quote, int *ctrace);
