@@ -9,12 +9,12 @@
 #include "sched_adapt.h"
 
 struct sched_cortn_slot {
-	struct cortn cs_cortn;
-	void (*cs_entry)(void *arg);
-	void *cs_arg;
-	unsigned char cs_stack[CORTN_WINDOWS_STACK_SIZE]
+	struct cortn c_cortn;
+	void (*c_entry)(void *arg);
+	void *c_arg;
+	unsigned char c_stack[CORTN_WINDOWS_STACK_SIZE]
 		__attribute__((aligned(16)));
-	unsigned char cs_used;
+	unsigned char c_used;
 };
 
 static unsigned char sys_lock_owned;
@@ -57,15 +57,15 @@ void *sched_adapt_prepare(void (*entry)(void *arg), void *arg)
 
 	for (i = 0; i < PIPELINE_MAX; i++) {
 		slot = &cortn_slots[i];
-		if (slot->cs_used != 0)
+		if (slot->c_used != 0)
 			continue;
 		memset(slot, 0, sizeof(*slot));
-		slot->cs_used = 1;
-		slot->cs_entry = entry;
-		slot->cs_arg = arg;
-		init_cortn(&slot->cs_cortn, slot->cs_stack,
-			   sizeof(slot->cs_stack), sched_cortn_entry, slot);
-		return &slot->cs_cortn;
+		slot->c_used = 1;
+		slot->c_entry = entry;
+		slot->c_arg = arg;
+		init_cortn(&slot->c_cortn, slot->c_stack,
+			   sizeof(slot->c_stack), sched_cortn_entry, slot);
+		return &slot->c_cortn;
 	}
 	return NULL;
 }
@@ -138,5 +138,5 @@ static void sched_cortn_entry(struct cortn *cortn, void *arg)
 
 	(void)cortn;
 	slot = arg;
-	slot->cs_entry(slot->cs_arg);
+	slot->c_entry(slot->c_arg);
 }

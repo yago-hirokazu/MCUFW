@@ -68,7 +68,72 @@ ESH_STDIO_PIPE は、Windows 版の標準入出力を MCUFW 内部のパイプ�
 
 12. [c] `C:\usr\src\MCUFW\src\target` を `C:\usr\src\MCUFW\src\dev` に変更
 
+13. [c] `/c/usr/src/MCUFW/src/core/shell/cli/exe.c` の各関数に引数チェックのために複数の assert_warm() がある場合は、それらをひとつの関数にまとめてください。assert_warm() をまとめる関数は assert_warm_関数名() とします。
+例：
+```c
+static char *get_symbol_from_variable(char var_p, struct code *code)
+{
+	struct variable_table *v;
 
+	assert_warm(code != NULL, FILE_CLI_EXE, NULL);
+	assert_warm(var_p >= 0, FILE_CLI_EXE, NULL);
+	assert_warm(var_p < SYMBOLS, FILE_CLI_EXE, NULL);
+	v = &code->c_vtab;
+	return (char *)&v->v_val[var_p * SYMCHARS];
+}
+```
+↓
+```c
+static char *get_symbol_from_variable(char var_p, struct code *code)
+{
+	assert_warm_get_symbol_from_variable(var_p, code);
+
+	struct variable_table *v;
+	v = &code->c_vtab;
+	return (char *)&v->v_val[var_p * SYMCHARS];
+}
+```
+
+14. [c] `/c/usr/src/MCUFW/src/core/sys/dev/windows/sched_cortn.c` の下記の構造体メンバ変数の名前を変更お願いします。
+```c
+struct sched_cortn_slot {
+	struct cortn cs_cortn;
+	void (*cs_entry)(void *arg);
+	void *cs_arg;
+	unsigned char cs_stack[CORTN_WINDOWS_STACK_SIZE]
+		__attribute__((aligned(16)));
+	unsigned char cs_used;
+};
+```
+↓
+```c
+struct sched_cortn_slot {
+	struct cortn c_cortn;
+	void (*c_entry)(void *arg);
+	void *c_arg;
+	unsigned char c_stack[CORTN_WINDOWS_STACK_SIZE]
+		__attribute__((aligned(16)));
+	unsigned char c_used;
+};
+```
+
+15. [c] `/c/usr/src/MCUFW/src/core/sys/dev/windows/cortn_switch.S` の下記の名前の prefix を `CC_` から `C_` に変更お願いします。
+
+```assembler
+	.set CC_RSP, 0
+	.set CC_RBX, 8
+	.set CC_RBP, 16
+	.set CC_RDI, 24
+	.set CC_RSI, 32
+	.set CC_R12, 40
+	.set CC_R13, 48
+	.set CC_R14, 56
+	.set CC_R15, 64
+	.set CC_XMM6, 80
+	.set CC_MXCSR, 240
+	.set CC_X87_CONTROL, 244
+
+```
 ## note
 
 ### タスク6〜7
@@ -93,5 +158,14 @@ ESH_STDIO_PIPE は、Windows 版の標準入出力を MCUFW 内部のパイプ�
 - cquote / pipeline は -O0 / -O2、pipeline_exec は cortn / thread × -O0 / -O2 の全構成で成功した。
 - 全ビルド・テスト後に make clean を実行し、今回生成した *.d、*.o、*.exe を削除した。
 
+
+### タスク13〜15
+
+- タスク13: exe.c の exe_run_pipeline()、get_symbol_from_variable()、get_string()、execute_commands() の複数の assert_warm() を、それぞれ assert_warm_関数名() に集約した。検査失敗時は呼び出し元も従来のエラー値または NULL を返し、処理を終了する。
+- タスク14: sched_cortn_slot の5メンバと全参照の接頭辞を cs_ から c_ に変更した。
+- タスク15: cortn_switch.S の定数定義と全参照の接頭辞を CC_ から C_ に変更した。
+- MSYS2 の MINGW64 環境で executor の run_test.sh、coroutine の -O0 / -O2、pipeline_exec の cortn / thread × -O0 / -O2 が全て成功した。
+- テスト後に各構成で make clean を実行し、生成した *.d、*.o、*.exe を削除した。
+- 変更ファイルは UTF-8（BOMなし）、CRLF を維持した。
 
 EOF

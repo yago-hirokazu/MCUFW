@@ -39,6 +39,11 @@ do {\
 
 extern int exe_run_pipeline(struct exe_proc *proc, int count);
 
+static int assert_warm_exe_run_pipeline(struct exe_proc *proc, int count);
+static int assert_warm_get_symbol_from_variable(char var_p, struct code *code);
+static int assert_warm_get_string(char id, struct code *code);
+static int assert_warm_execute_commands(struct exe *exe);
+
 static void set_symbol_to_variable(char var_p, char *val, struct code *code);
 static char *get_symbol_from_variable(char var_p, struct code *code);
 static char *get_string(char id, struct code *code);
@@ -57,16 +62,9 @@ static int execute_commands(struct exe *exe)
 	struct exe_proc *proc;
 	struct proc *previous;
 	int result;
-	int i;
 
-	assert_warm(exe->e_procs > 0, FILE_CLI_EXE, -SYS_EINVAL);
-	assert_warm(exe->e_procs <= PROCS, FILE_CLI_EXE, -SYS_EINVAL);
-	for (i = 0; i < exe->e_procs; i++) {
-		assert_warm(exe->e_proc[i].p_cmd != NULL,
-			    FILE_CLI_EXE, -SYS_EINVAL);
-		assert_warm(exe->e_proc[i].p_cmd->main != NULL,
-			    FILE_CLI_EXE, -SYS_EINVAL);
-	}
+	if (assert_warm_execute_commands(exe) != 0)
+		return -SYS_EINVAL;
 	if (exe->e_procs > 1)
 		return exe_run_pipeline(exe->e_proc, exe->e_procs);
 	proc = &exe->e_proc[0];
@@ -301,21 +299,8 @@ int exe_run_pipeline(struct exe_proc *proc, int count)
 	int result;
 	int i;
 
-	assert_warm(proc != NULL, FILE_CLI_EXE, -SYS_EINVAL);
-	assert_warm(count >= 2, FILE_CLI_EXE, -SYS_EINVAL);
-	assert_warm(count <= PROCS, FILE_CLI_EXE, -SYS_EINVAL);
-	for (i = 0; i < count; i++) {
-		assert_warm(proc[i].p_cmd != NULL, FILE_CLI_EXE, -SYS_EINVAL);
-		assert_warm(proc[i].p_cmd->main != NULL, FILE_CLI_EXE,
-			    -SYS_EINVAL);
-		assert_warm(proc[i].p_cmd->name != NULL, FILE_CLI_EXE,
-			    -SYS_EINVAL);
-		assert_warm(proc[i].p_argc >= 1, FILE_CLI_EXE, -SYS_EINVAL);
-		assert_warm(proc[i].p_argc <= TTY_NARG, FILE_CLI_EXE,
-			    -SYS_EINVAL);
-		assert_warm(proc[i].p_argv[0] != NULL, FILE_CLI_EXE,
-			    -SYS_EINVAL);
-	}
+	if (assert_warm_exe_run_pipeline(proc, count) != 0)
+		return -SYS_EINVAL;
 	for (i = 0; i < count; i++) {
 		init_proc(&proc[i].p_exec);
 	}
@@ -397,9 +382,8 @@ static char *get_symbol_from_variable(char var_p, struct code *code)
 {
 	struct variable_table *v;
 
-	assert_warm(code != NULL, FILE_CLI_EXE, NULL);
-	assert_warm(var_p >= 0, FILE_CLI_EXE, NULL);
-	assert_warm(var_p < SYMBOLS, FILE_CLI_EXE, NULL);
+	if (assert_warm_get_symbol_from_variable(var_p, code) != 0)
+		return NULL;
 	v = &code->c_vtab;
 	return (char *)&v->v_val[var_p * SYMCHARS];
 }
@@ -410,9 +394,8 @@ static char *get_symbol_from_variable(char var_p, struct code *code)
  */
 static char *get_string(char id, struct code *code)
 {
-	assert_warm(code != NULL, FILE_CLI_EXE, NULL);
-	assert_warm(id >= 0, FILE_CLI_EXE, NULL);
-	assert_warm(id < SYMBOLS, FILE_CLI_EXE, NULL);
+	if (assert_warm_get_string(id, code) != 0)
+		return NULL;
 	return (char *)&code->c_stab.s_str[id * SYMCHARS];
 }
 
@@ -536,6 +519,71 @@ out:
 	return result < 0 ? result : 0;
 }
 
+
+/*
+ * Check exe_run_pipeline arguments before execution
+ */
+static int assert_warm_exe_run_pipeline(struct exe_proc *proc, int count)
+{
+	int i = 0;
+
+	assert_warm(proc != NULL, FILE_CLI_EXE, -SYS_EINVAL);
+	assert_warm(count >= 2, FILE_CLI_EXE, -SYS_EINVAL);
+	assert_warm(count <= PROCS, FILE_CLI_EXE, -SYS_EINVAL);
+	for (i = 0; i < count; i++) {
+		assert_warm(proc[i].p_cmd != NULL, FILE_CLI_EXE, -SYS_EINVAL);
+		assert_warm(proc[i].p_cmd->main != NULL, FILE_CLI_EXE,
+			    -SYS_EINVAL);
+		assert_warm(proc[i].p_cmd->name != NULL, FILE_CLI_EXE,
+			    -SYS_EINVAL);
+		assert_warm(proc[i].p_argc >= 1, FILE_CLI_EXE, -SYS_EINVAL);
+		assert_warm(proc[i].p_argc <= TTY_NARG, FILE_CLI_EXE,
+			    -SYS_EINVAL);
+		assert_warm(proc[i].p_argv[0] != NULL, FILE_CLI_EXE,
+			    -SYS_EINVAL);
+	}
+	return 0;
+}
+
+/*
+ * Check get_symbol_from_variable arguments before execution
+ */
+static int assert_warm_get_symbol_from_variable(char var_p, struct code *code)
+{
+	assert_warm(code != NULL, FILE_CLI_EXE, -SYS_EINVAL);
+	assert_warm(var_p >= 0, FILE_CLI_EXE, -SYS_EINVAL);
+	assert_warm(var_p < SYMBOLS, FILE_CLI_EXE, -SYS_EINVAL);
+	return 0;
+}
+
+/*
+ * Check get_string arguments before execution
+ */
+static int assert_warm_get_string(char id, struct code *code)
+{
+	assert_warm(code != NULL, FILE_CLI_EXE, -SYS_EINVAL);
+	assert_warm(id >= 0, FILE_CLI_EXE, -SYS_EINVAL);
+	assert_warm(id < SYMBOLS, FILE_CLI_EXE, -SYS_EINVAL);
+	return 0;
+}
+
+/*
+ * Check execute_commands arguments before execution
+ */
+static int assert_warm_execute_commands(struct exe *exe)
+{
+	int i = 0;
+
+	assert_warm(exe->e_procs > 0, FILE_CLI_EXE, -SYS_EINVAL);
+	assert_warm(exe->e_procs <= PROCS, FILE_CLI_EXE, -SYS_EINVAL);
+	for (i = 0; i < exe->e_procs; i++) {
+		assert_warm(exe->e_proc[i].p_cmd != NULL,
+			    FILE_CLI_EXE, -SYS_EINVAL);
+		assert_warm(exe->e_proc[i].p_cmd->main != NULL,
+			    FILE_CLI_EXE, -SYS_EINVAL);
+	}
+	return 0;
+}
 
 /* EOF */
 
